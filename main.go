@@ -20,5 +20,5 @@ func main() {
 			panic(err)
 		}
 	}()
-	log.Info("the application configuration is initialized")
+	log.With(logger.Any("config", cfg)).Info("the application configuration is initialized")
 }
