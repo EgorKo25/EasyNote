@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/creasty/defaults"
 	"github.com/go-playground/validator/v10"
@@ -50,6 +51,13 @@ type Config struct {
 	AppConfig      `yaml:"app" validate:"required"`
 	LoggerConfig   `yaml:"logger" validate:"required"`
 	DatabaseConfig `yaml:"database" validate:"required"`
+}
+
+type SchedulerConfig struct {
+	CacheWindow     time.Duration `yaml:"cache_window" default:"24h" validate:"required,gt=0"`
+	RefreshInterval time.Duration `yaml:"refresh_interval" default:"5m" validate:"required,gt=0"`
+	LockTimeout     time.Duration `yaml:"lock_timeout" default:"1m" validate:"required,gt=0"`
+	MaxAttempts     int           `yaml:"max_attempts" default:"5" validate:"required,min=1"`
 }
 
 type AppConfig struct {
