@@ -40,7 +40,7 @@ func validate(cfg Config) error {
 	v := validator.New(validator.WithRequiredStructEnabled())
 
 	if err := v.Struct(cfg); err != nil {
-		return fmt.Errorf("валидация конфигурации: %w", err)
+		return fmt.Errorf("configuration validation: %w", err)
 	}
 
 	return nil
