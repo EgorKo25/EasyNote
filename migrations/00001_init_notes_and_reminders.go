@@ -3,6 +3,7 @@ package migrations
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/pressly/goose/v3"
 )
@@ -45,7 +46,12 @@ func upInitNotesAndReminders(ctx context.Context, tx *sql.Tx) error {
 		created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 );
 `)
-	return err
+
+	if err != nil {
+		return fmt.Errorf("apply init notes and reminders migration: %w", err)
+	}
+
+	return nil
 }
 
 func downInitNotesAndReminders(ctx context.Context, tx *sql.Tx) error {
@@ -53,5 +59,10 @@ func downInitNotesAndReminders(ctx context.Context, tx *sql.Tx) error {
 		DROP TABLE IF EXISTS reminders;
 		DROP TABLE IF EXISTS notes;
 `)
-	return err
+
+	if err != nil {
+		return fmt.Errorf("rollback init notes and reminders migration: %w", err)
+	}
+
+	return nil
 }

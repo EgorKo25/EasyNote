@@ -1,8 +1,9 @@
 package logger
 
 import (
-	"easynote/src/config"
+	"errors"
 	"fmt"
+	"github.com/EgorKo25/EasyNote/src/config"
 	"os"
 	"path/filepath"
 	"time"
@@ -10,6 +11,8 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
+
+var errUnsupportedLoggerOutput = errors.New("unsupported logger output")
 
 func New(app config.AppConfig, cfg config.LoggerConfig) (Logger, error) {
 	cores := make([]zapcore.Core, 0, len(cfg.Cores))
@@ -45,7 +48,7 @@ type zapLogger struct {
 func newCore(cfg config.LoggerCoreConfig) (zapcore.Core, error) {
 	level := zapcore.InfoLevel
 	if err := level.Set(cfg.Level); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("set logger level %q: %w", cfg.Level, err)
 	}
 
 	encoderCfg := zap.NewProductionEncoderConfig()
@@ -85,7 +88,7 @@ func newOutput(cfg config.LoggerCoreConfig) (zapcore.WriteSyncer, error) {
 		return newFileWriteSyncer(cfg.Path)
 
 	default:
-		return nil, fmt.Errorf("unsupported logger output: %s", cfg.Output)
+		return nil, fmt.Errorf("%w: %s", errUnsupportedLoggerOutput, cfg.Output)
 	}
 }
 
@@ -144,7 +147,7 @@ func (l *zapLogger) Named(name string) Logger {
 }
 
 func (l *zapLogger) Sync() error {
-	return l.log.Sync()
+	return fmt.Errorf("sync logger: %w", l.log.Sync())
 }
 
 func attrsToZapFields(attrs []Attr) []zap.Field {
@@ -167,7 +170,9 @@ func attrToZapField(attr Attr) zap.Field {
 		return zap.Int64(attr.key, attr.value.(int64))
 	case kindBool:
 		return zap.Bool(attr.key, attr.value.(bool))
-	default:
+	case kindAny:
 		return zap.Any(attr.key, attr.value)
 	}
+
+	return zap.Any(attr.key, attr.value)
 }
