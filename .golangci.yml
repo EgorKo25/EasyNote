@@ -1,0 +1,125 @@
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+  allow-parallel-runners: true
+  modules-download-mode: readonly
+  go: "1.25"
+
+output:
+  sort-results: true
+  sort-order:
+    - linter
+    - severity
+    - file
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  uniq-by-line: false
+
+linters:
+  default: all
+  disable:
+    - wsl
+    - ginkgolinter
+    - gomodguard
+    - promlinter
+    - zerologlint
+    - depguard
+
+  exclusions:
+    rules:
+      - path: '.*_test\.go'
+        linters:
+          - cyclop
+          - dupl
+  settings:
+    cyclop:
+      max-complexity: 8
+
+    dupl:
+      threshold: 100
+
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+
+    exhaustive:
+      default-signifies-exhaustive: false
+
+    funlen:
+      lines: 80
+      statements: 50
+
+    gocognit:
+      min-complexity: 10
+
+    gocritic:
+      enable-all: true
+
+    gocyclo:
+      min-complexity: 10
+
+    govet:
+      enable-all: true
+
+    lll:
+      line-length: 120
+      tab-width: 1
+
+    mnd:
+      ignored-functions:
+        - '^time\.Date$'
+        - '^time\.Parse$'
+        - '^make$'
+
+    nakedret:
+      max-func-lines: 0
+
+    nestif:
+      min-complexity: 3
+
+    nlreturn:
+      block-size: 2
+
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+      allow-unused: false
+
+    paralleltest:
+      ignore-missing: false
+
+    tagliatelle:
+      case:
+        rules:
+          json: snake
+          yaml: snake
+          mapstructure: snake
+
+    testifylint:
+      enable-all: true
+
+    varnamelen:
+      min-name-length: 2
+      ignore-decls:
+        - i int
+        - j int
+        - k int
+        - t *testing.T
+        - id int64
+        - tx *sql.Tx
+        - db *sql.DB
+        - wg sync.WaitGroup
+
+    wrapcheck:
+      ignore-sigs:
+        - errors.New(
+        - errors.Unwrap(
+        - errors.Join(
+        - fmt.Errorf(
+
+severity:
+  default: error

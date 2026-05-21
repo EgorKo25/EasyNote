@@ -1,8 +1,8 @@
 package main
 
 import (
-	"easynote/src/config"
-	"easynote/src/logger"
+	"github.com/EgorKo25/EasyNote/src/config"
+	"github.com/EgorKo25/EasyNote/src/logger"
 )
 
 func main() {
