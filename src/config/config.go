@@ -17,16 +17,16 @@ func New() (*Config, error) {
 	var cfg Config
 
 	if err := defaults.Set(&cfg); err != nil {
-		return nil, fmt.Errorf("установка значений конфигурации по умолчанию: %w", err)
+		return nil, fmt.Errorf("setting Default Configuration Values: %w", err)
 	}
 
 	data, err := os.ReadFile(localConfigPath)
 	if err != nil {
-		return nil, fmt.Errorf("чтение файла конфигурации %q: %w", localConfigPath, err)
+		return nil, fmt.Errorf("read configuration file %q: %w", localConfigPath, err)
 	}
 
 	if err = yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("разбор файла конфигурации %q: %w", localConfigPath, err)
+		return nil, fmt.Errorf("parsing the configuration file %q: %w", localConfigPath, err)
 	}
 
 	if err = validate(cfg); err != nil {
