@@ -1,3 +1,5 @@
+// Package config is a configurator for  all app's services and modules
+//
 //nolint:lll,tagalign // The linter was disabled because it had a conflict with the tagalign linter. Tagalign linter is more important in this file.
 package config
 
