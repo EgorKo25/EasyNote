@@ -1,8 +1,10 @@
+//nolint:lll,tagalign // The linter was disabled because it had a conflict with the tagalign linter. Tagalign linter is more important in this file.
 package config
 
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/creasty/defaults"
 	"github.com/go-playground/validator/v10"
@@ -47,33 +49,40 @@ func validate(cfg Config) error {
 }
 
 type Config struct {
-	AppConfig      `yaml:"app" validate:"required"`
-	LoggerConfig   `yaml:"logger" validate:"required"`
-	DatabaseConfig `yaml:"database" validate:"required"`
+	AppConfig      `validate:"required" yaml:"app"`
+	LoggerConfig   `validate:"required" yaml:"logger"`
+	DatabaseConfig `validate:"required" yaml:"database"`
+}
+
+type SchedulerConfig struct {
+	CacheWindow     time.Duration `default:"24h" validate:"required,gt=0"  yaml:"cache_window"`
+	RefreshInterval time.Duration `default:"5m"  validate:"required,gt=0"  yaml:"refresh_interval"`
+	LockTimeout     time.Duration `default:"1m"  validate:"required,gt=0"  yaml:"lock_timeout"`
+	MaxAttempts     int           `default:"5"   validate:"required,min=1" yaml:"max_attempts"`
 }
 
 type AppConfig struct {
-	Name        string `yaml:"name" default:"easy-note" validate:"required"`
-	Environment string `yaml:"environment" default:"local" validate:"required,oneof=local dev test stage production"`
+	Name        string `default:"easy-note" validate:"required"                                       yaml:"name"`
+	Environment string `default:"local"     validate:"required,oneof=local dev test stage production" yaml:"environment"`
 }
 
 type LoggerConfig struct {
-	Cores []LoggerCoreConfig `yaml:"cores" validate:"required,min=1,dive"`
+	Cores []LoggerCoreConfig `validate:"required,min=1,dive" yaml:"cores"`
 }
 
 type LoggerCoreConfig struct {
-	Name       string `yaml:"name" validate:"required"`
-	Level      string `yaml:"level" default:"info" validate:"required,oneof=debug info warn error dpanic panic fatal"`
-	Encoding   string `yaml:"encoding" default:"json" validate:"required,oneof=json console"`
-	Output     string `yaml:"output" default:"stdout" validate:"required,oneof=stdout stderr file"`
-	Path       string `yaml:"path" validate:"required_if=Output file"`
-	TimeFormat string `yaml:"time_format" default:"utc" validate:"required,oneof=utc local"`
+	Name       string `validate:"required"                                                yaml:"name"`
+	Level      string `validate:"required,oneof=debug info warn error dpanic panic fatal" yaml:"level"       default:"info"`
+	Encoding   string `validate:"required,oneof=json console"                             yaml:"encoding"    default:"json"`
+	Output     string `validate:"required,oneof=stdout stderr file"                       yaml:"output"      default:"stdout"`
+	Path       string `validate:"required_if=Output file"                                 yaml:"path"`
+	TimeFormat string `validate:"required,oneof=utc local"                                yaml:"time_format" default:"utc"`
 }
 type DatabaseConfig struct {
-	Host     string `yaml:"host" default:"localhost" validate:"required"`
-	Port     int    `yaml:"port" default:"5432" validate:"required,min=1,max=65535"`
-	User     string `yaml:"user" default:"enote" validate:"required"`
-	Password string `yaml:"password" default:"enotePassword" validate:"required"`
-	Name     string `yaml:"name" default:"easy_note" validate:"required"`
-	SSLMode  string `yaml:"ssl_mode" default:"disable" validate:"required,oneof=disable require verify-ca verify-full"`
+	Host     string `default:"localhost"     validate:"required"                                             yaml:"host"`
+	Port     int    `default:"5432"          validate:"required,min=1,max=65535"                             yaml:"port"`
+	User     string `default:"enote"         validate:"required"                                             yaml:"user"`
+	Password string `default:"enotePassword" validate:"required"                                             yaml:"password"`
+	Name     string `default:"easy_note"     validate:"required"                                             yaml:"name"`
+	SSLMode  string `default:"disable"       validate:"required,oneof=disable require verify-ca verify-full" yaml:"ssl_mode"`
 }

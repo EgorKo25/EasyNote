@@ -1,15 +1,19 @@
 package logger
 
 import (
-	"easynote/src/config"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 
+	"github.com/EgorKo25/EasyNote/src/config"
+
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
+
+var errUnsupportedLoggerOutput = errors.New("unsupported logger output")
 
 func New(app config.AppConfig, cfg config.LoggerConfig) (Logger, error) {
 	cores := make([]zapcore.Core, 0, len(cfg.Cores))
@@ -45,7 +49,7 @@ type zapLogger struct {
 func newCore(cfg config.LoggerCoreConfig) (zapcore.Core, error) {
 	level := zapcore.InfoLevel
 	if err := level.Set(cfg.Level); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("set logger level %q: %w", cfg.Level, err)
 	}
 
 	encoderCfg := zap.NewProductionEncoderConfig()
@@ -85,16 +89,16 @@ func newOutput(cfg config.LoggerCoreConfig) (zapcore.WriteSyncer, error) {
 		return newFileWriteSyncer(cfg.Path)
 
 	default:
-		return nil, fmt.Errorf("unsupported logger output: %s", cfg.Output)
+		return nil, fmt.Errorf("%w: %s", errUnsupportedLoggerOutput, cfg.Output)
 	}
 }
 
 func newFileWriteSyncer(path string) (zapcore.WriteSyncer, error) {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return nil, fmt.Errorf("creating a directory for the log file %q: %w", path, err)
 	}
 
-	file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	file, err := os.OpenFile(filepath.Clean(path), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
 	if err != nil {
 		return nil, fmt.Errorf("open log file %q: %w", path, err)
 	}
@@ -144,7 +148,11 @@ func (l *zapLogger) Named(name string) Logger {
 }
 
 func (l *zapLogger) Sync() error {
-	return l.log.Sync()
+	if err := l.log.Sync(); err != nil {
+		return fmt.Errorf("sync logger: %w", err)
+	}
+
+	return nil
 }
 
 func attrsToZapFields(attrs []Attr) []zap.Field {
@@ -157,6 +165,7 @@ func attrsToZapFields(attrs []Attr) []zap.Field {
 	return fields
 }
 
+//nolint:forcetypeassert // an error when casting a type is not important and is unlikely, so the linter is disabled
 func attrToZapField(attr Attr) zap.Field {
 	switch attr.kind {
 	case kindString:
@@ -167,7 +176,9 @@ func attrToZapField(attr Attr) zap.Field {
 		return zap.Int64(attr.key, attr.value.(int64))
 	case kindBool:
 		return zap.Bool(attr.key, attr.value.(bool))
-	default:
+	case kindAny:
 		return zap.Any(attr.key, attr.value)
 	}
+
+	return zap.Any(attr.key, attr.value)
 }
