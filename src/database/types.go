@@ -38,3 +38,16 @@ type Reminder struct {
 
 	CreatedAt time.Time
 }
+
+type ScheduledReminder struct {
+	ID int64
+
+	NoteID int64
+
+	TelegramChatID int64
+	Text           string
+
+	RemindAt time.Time
+
+	Index int
+}

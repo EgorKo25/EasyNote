@@ -51,9 +51,10 @@ func validate(cfg Config) error {
 }
 
 type Config struct {
-	AppConfig      `validate:"required" yaml:"app"`
-	LoggerConfig   `validate:"required" yaml:"logger"`
-	DatabaseConfig `validate:"required" yaml:"database"`
+	AppConfig       `validate:"required" yaml:"app"`
+	LoggerConfig    `validate:"required" yaml:"logger"`
+	SchedulerConfig `validate:"required" yaml:"scheduler"`
+	DatabaseConfig  `validate:"required" yaml:"database"`
 }
 
 type SchedulerConfig struct {
