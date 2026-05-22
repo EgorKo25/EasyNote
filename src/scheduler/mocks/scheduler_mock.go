@@ -127,6 +127,18 @@ func (mr *MockCacheMockRecorder) Remove(reminderID any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Remove", reflect.TypeOf((*MockCache)(nil).Remove), reminderID)
 }
 
+// Replace mocks base method.
+func (m *MockCache) Replace(reminders []database.ScheduledReminder) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "Replace", reminders)
+}
+
+// Replace indicates an expected call of Replace.
+func (mr *MockCacheMockRecorder) Replace(reminders any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Replace", reflect.TypeOf((*MockCache)(nil).Replace), reminders)
+}
+
 // Upsert mocks base method.
 func (m *MockCache) Upsert(reminder database.ScheduledReminder) {
 	m.ctrl.T.Helper()
@@ -177,17 +189,31 @@ func (m *MockDatabase) EXPECT() *MockDatabaseMockRecorder {
 	return m.recorder
 }
 
-// ScheduledReminders mocks base method.
-func (m *MockDatabase) ScheduledReminders(ctx context.Context, now time.Time, window time.Duration) ([]database.ScheduledReminder, error) {
+// SaveScheduledReminder mocks base method.
+func (m *MockDatabase) SaveScheduledReminder(ctx context.Context, reminder database.ScheduledReminder) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ScheduledReminders", ctx, now, window)
+	ret := m.ctrl.Call(m, "SaveScheduledReminder", ctx, reminder)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SaveScheduledReminder indicates an expected call of SaveScheduledReminder.
+func (mr *MockDatabaseMockRecorder) SaveScheduledReminder(ctx, reminder any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveScheduledReminder", reflect.TypeOf((*MockDatabase)(nil).SaveScheduledReminder), ctx, reminder)
+}
+
+// ScheduledReminders mocks base method.
+func (m *MockDatabase) ScheduledReminders(ctx context.Context, from, to time.Time) ([]database.ScheduledReminder, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ScheduledReminders", ctx, from, to)
 	ret0, _ := ret[0].([]database.ScheduledReminder)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ScheduledReminders indicates an expected call of ScheduledReminders.
-func (mr *MockDatabaseMockRecorder) ScheduledReminders(ctx, now, window any) *gomock.Call {
+func (mr *MockDatabaseMockRecorder) ScheduledReminders(ctx, from, to any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ScheduledReminders", reflect.TypeOf((*MockDatabase)(nil).ScheduledReminders), ctx, now, window)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ScheduledReminders", reflect.TypeOf((*MockDatabase)(nil).ScheduledReminders), ctx, from, to)
 }

@@ -71,6 +71,16 @@ func (c *ReminderCache) Upsert(reminder ScheduledReminder) {
 	c.byID[item.ID] = item
 }
 
+func (c *ReminderCache) Replace(reminders []ScheduledReminder) {
+	c.heap = make(reminderHeap, 0, len(reminders))
+	c.byID = make(map[int64]*ScheduledReminder, len(reminders))
+	heap.Init(&c.heap)
+
+	for _, reminder := range reminders {
+		c.Upsert(reminder)
+	}
+}
+
 func (c *ReminderCache) Next() (ScheduledReminder, bool) {
 	if c.heap.Len() == 0 {
 		return ScheduledReminder{}, false
