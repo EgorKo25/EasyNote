@@ -1,8 +1,8 @@
 package main
 
 import (
-	"easynote/src/config"
-	"easynote/src/logger"
+	"github.com/EgorKo25/EasyNote/src/config"
+	"github.com/EgorKo25/EasyNote/src/logger"
 )
 
 func main() {
@@ -10,15 +10,18 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
 	log, err := logger.New(cfg.AppConfig, cfg.LoggerConfig)
 	if err != nil {
 		panic(err)
 	}
+
 	defer func() {
 		err = log.Sync()
 		if err != nil {
 			panic(err)
 		}
 	}()
-	log.Info("the application configuration is initialized")
+
+	log.With(logger.Any("config", cfg)).Info("the application configuration is initialized")
 }

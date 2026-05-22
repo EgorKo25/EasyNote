@@ -1,0 +1,112 @@
+version: "2"
+
+linters:
+  enable:
+    - asciicheck
+    - asasalint
+    - bidichk
+    - bodyclose
+    - canonicalheader
+    - containedctx
+    - contextcheck
+    - copyloopvar
+    - durationcheck
+    - embeddedstructfieldcheck
+    - err113
+    - errcheck
+    - errchkjson
+    - errname
+    - errorlint
+    - exptostd
+    - fatcontext
+    - forcetypeassert
+    - gocheckcompilerdirectives
+    - gosec
+    - govet
+    - ineffassign
+    - nilerr
+    - nilnesserr
+    - nilnil
+    - noctx
+    - nosprintfhostport
+    - rowserrcheck
+    - sqlclosecheck
+    - staticcheck
+    - unused
+    - wastedassign
+    - wrapcheck
+    - cyclop
+    - dupl
+    - dupword
+    - goconst
+    - gocritic
+    - godoclint
+    - grouper
+    - lll
+    - nlreturn
+    - revive
+    - sloglint
+    - tagalign
+    - unconvert
+    - usestdlibvars
+    - varnamelen
+    - whitespace
+    - wsl_v5
+    - gomoddirectives
+    - iface
+    - importas
+    - musttag
+    - paralleltest
+    - testableexamples
+    - testifylint
+    - testpackage
+    - thelper
+    - tparallel
+    - usetesting
+    - dupword
+    - godoclint
+    - misspell
+    - exptostd
+    - intrange
+    - iotamixing
+    - makezero
+    - mirror
+    - modernize
+    - perfsprint
+    - goprintffuncname
+    - loggercheck
+    - promlinter
+    - nolintlint
+
+  settings:
+    cyclop:
+      max-complexity: 10
+      package-average: 0.0
+    revive:
+      severity: error
+      rules:
+        - name: package-comments
+          disabled: true
+
+formatters:
+  settings:
+    golines:
+      max-len: 120
+      reformat-tags: true
+  enable:
+    - gofmt
+    - goimports
+    - golines
+
+run:
+  timeout: 3m
+  tests: true
+  relative-path-mode: gomod
+  issues-exit-code: 1
+  allow-parallel-runners: true
+  enable-build-vcs: true
+  modules-download-mode: readonly
+  go: '1.25.2'
+  concurrency: 0
+severity:
+  default: error

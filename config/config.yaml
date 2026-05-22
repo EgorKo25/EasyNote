@@ -17,6 +17,12 @@ logger:
       path: ./logs/easy.log
       time_format: utc
 
+scheduler:
+  cache_window: 24h
+  refresh_interval: 5m
+  lock_timeout: 1m
+  max_attempts: 5
+
 database:
   host: localhost
   port: 5432
