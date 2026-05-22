@@ -7,6 +7,8 @@ import (
 	"github.com/EgorKo25/EasyNote/src/database"
 )
 
+type ScheduledReminder = database.ScheduledReminder
+
 func NewScheduledReminder(note database.Note, reminder database.Reminder) ScheduledReminder {
 	return ScheduledReminder{
 		ID:             reminder.ID,
@@ -15,19 +17,6 @@ func NewScheduledReminder(note database.Note, reminder database.Reminder) Schedu
 		Text:           note.Text,
 		RemindAt:       reminder.RemindAt,
 	}
-}
-
-type ScheduledReminder struct {
-	ID int64
-
-	NoteID int64
-
-	TelegramChatID int64
-	Text           string
-
-	RemindAt time.Time
-
-	index int
 }
 
 func NewReminderCache(cacheWindow time.Duration) *ReminderCache {
@@ -65,7 +54,7 @@ func (c *ReminderCache) Upsert(reminder ScheduledReminder) {
 		item.Text = reminder.Text
 		item.RemindAt = reminder.RemindAt
 
-		heap.Fix(&c.heap, item.index)
+		heap.Fix(&c.heap, item.Index)
 
 		return
 	}
@@ -118,7 +107,7 @@ func (c *ReminderCache) Remove(elementID int64) bool {
 		return false
 	}
 
-	heap.Remove(&c.heap, item.index)
+	heap.Remove(&c.heap, item.Index)
 	delete(c.byID, elementID)
 
 	return true

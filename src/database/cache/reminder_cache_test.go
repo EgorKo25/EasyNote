@@ -295,7 +295,7 @@ func TestReminderHeapOperations(t *testing.T) {
 				require.True(t, ok)
 
 				poppedIDs = append(poppedIDs, item.ID)
-				require.Equal(t, -1, item.index)
+				require.Equal(t, -1, item.Index)
 			}
 
 			require.Equal(t, testCase.expected.poppedIDs, poppedIDs)
@@ -304,7 +304,7 @@ func TestReminderHeapOperations(t *testing.T) {
 			actualIndexes := make(map[int64]int, len(insertedByID))
 			for id := range testCase.expected.indexes {
 				require.Contains(t, insertedByID, id)
-				actualIndexes[id] = insertedByID[id].index
+				actualIndexes[id] = insertedByID[id].Index
 			}
 
 			require.Equal(t, testCase.expected.indexes, actualIndexes)
