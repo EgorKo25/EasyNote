@@ -18,7 +18,7 @@ func (h reminderHeap) Swap(i, j int) {
 }
 
 func (h *reminderHeap) Push(value any) {
-	item := value.(*ScheduledReminder)
+	item, _ := value.(*ScheduledReminder)
 	item.index = len(*h)
 
 	*h = append(*h, item)
@@ -26,13 +26,13 @@ func (h *reminderHeap) Push(value any) {
 
 func (h *reminderHeap) Pop() any {
 	old := *h
-	n := len(old)
+	lengthOldHeap := len(old)
 
-	item := old[n-1]
+	item := old[lengthOldHeap-1]
 	item.index = -1
 
-	old[n-1] = nil
-	*h = old[:n-1]
+	old[lengthOldHeap-1] = nil
+	*h = old[:lengthOldHeap-1]
 
 	return item
 }

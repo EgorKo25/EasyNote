@@ -46,7 +46,6 @@ func upInitNotesAndReminders(ctx context.Context, tx *sql.Tx) error {
 		created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 );
 `)
-
 	if err != nil {
 		return fmt.Errorf("apply init notes and reminders migration: %w", err)
 	}
@@ -59,7 +58,6 @@ func downInitNotesAndReminders(ctx context.Context, tx *sql.Tx) error {
 		DROP TABLE IF EXISTS reminders;
 		DROP TABLE IF EXISTS notes;
 `)
-
 	if err != nil {
 		return fmt.Errorf("rollback init notes and reminders migration: %w", err)
 	}
