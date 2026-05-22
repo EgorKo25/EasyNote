@@ -3,6 +3,8 @@ package scheduler_test
 import (
 	"context"
 	"errors"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -18,22 +20,54 @@ import (
 
 var errStorageUnavailable = errors.New("storage unavailable")
 
+type scheduleExpectation struct {
+	added        bool
+	errText      string
+	next         database.ScheduledReminder
+	hasNext      bool
+	len          int
+	nextDelay    time.Duration
+	hasNextDelay bool
+}
+
+type dueExpectation struct {
+	due     []database.ScheduledReminder
+	next    database.ScheduledReminder
+	hasNext bool
+	len     int
+}
+
+type refreshExpectation struct {
+	errText string
+	loaded  int
+	next    database.ScheduledReminder
+	hasNext bool
+	len     int
+	exists  bool
+}
+
+type loadExpectation struct {
+	due  int
+	rest int
+}
+
+type concurrentExpectation struct {
+	len   int
+	added int64
+}
+
 func TestSchedulerScheduleWithRealCache(t *testing.T) {
 	t.Parallel()
 
 	baseTime := time.Date(2026, time.May, 22, 12, 0, 0, 0, time.UTC)
 
 	testCases := []struct {
-		name         string
-		window       time.Duration
-		note         database.Note
-		reminder     database.Reminder
-		added        bool
-		next         database.ScheduledReminder
-		hasNext      bool
-		len          int
-		nextDelay    time.Duration
-		hasNextDelay bool
+		name     string
+		window   time.Duration
+		note     database.Note
+		reminder database.Reminder
+		err      error
+		expected scheduleExpectation
 	}{
 		{
 			name:   "adds reminder inside cache window",
@@ -44,18 +78,20 @@ func TestSchedulerScheduleWithRealCache(t *testing.T) {
 				NoteID:   10,
 				RemindAt: baseTime.Add(5 * time.Minute),
 			},
-			added: true,
-			next: database.ScheduledReminder{
-				ID:             20,
-				NoteID:         10,
-				TelegramChatID: 1001,
-				Text:           "send report",
-				RemindAt:       baseTime.Add(5 * time.Minute),
+			expected: scheduleExpectation{
+				added: true,
+				next: database.ScheduledReminder{
+					ID:             20,
+					NoteID:         10,
+					TelegramChatID: 1001,
+					Text:           "send report",
+					RemindAt:       baseTime.Add(5 * time.Minute),
+				},
+				hasNext:      true,
+				len:          1,
+				nextDelay:    5 * time.Minute,
+				hasNextDelay: true,
 			},
-			hasNext:      true,
-			len:          1,
-			nextDelay:    5 * time.Minute,
-			hasNextDelay: true,
 		},
 		{
 			name:   "adds reminder with unicode text",
@@ -66,18 +102,20 @@ func TestSchedulerScheduleWithRealCache(t *testing.T) {
 				NoteID:   11,
 				RemindAt: baseTime.Add(15 * time.Minute),
 			},
-			added: true,
-			next: database.ScheduledReminder{
-				ID:             21,
-				NoteID:         11,
-				TelegramChatID: 1002,
-				Text:           "Купить молоко",
-				RemindAt:       baseTime.Add(15 * time.Minute),
+			expected: scheduleExpectation{
+				added: true,
+				next: database.ScheduledReminder{
+					ID:             21,
+					NoteID:         11,
+					TelegramChatID: 1002,
+					Text:           "Купить молоко",
+					RemindAt:       baseTime.Add(15 * time.Minute),
+				},
+				hasNext:      true,
+				len:          1,
+				nextDelay:    15 * time.Minute,
+				hasNextDelay: true,
 			},
-			hasNext:      true,
-			len:          1,
-			nextDelay:    15 * time.Minute,
-			hasNextDelay: true,
 		},
 		{
 			name:   "adds past reminder as due item",
@@ -88,17 +126,19 @@ func TestSchedulerScheduleWithRealCache(t *testing.T) {
 				NoteID:   12,
 				RemindAt: baseTime.Add(-time.Minute),
 			},
-			added: true,
-			next: database.ScheduledReminder{
-				ID:             22,
-				NoteID:         12,
-				TelegramChatID: 1003,
-				Text:           "past due",
-				RemindAt:       baseTime.Add(-time.Minute),
+			expected: scheduleExpectation{
+				added: true,
+				next: database.ScheduledReminder{
+					ID:             22,
+					NoteID:         12,
+					TelegramChatID: 1003,
+					Text:           "past due",
+					RemindAt:       baseTime.Add(-time.Minute),
+				},
+				hasNext:      true,
+				len:          1,
+				hasNextDelay: true,
 			},
-			hasNext:      true,
-			len:          1,
-			hasNextDelay: true,
 		},
 		{
 			name:   "adds reminder with detached note id",
@@ -109,18 +149,20 @@ func TestSchedulerScheduleWithRealCache(t *testing.T) {
 				NoteID:   130,
 				RemindAt: baseTime.Add(30 * time.Minute),
 			},
-			added: true,
-			next: database.ScheduledReminder{
-				ID:             23,
-				NoteID:         130,
-				TelegramChatID: 1004,
-				Text:           "detached",
-				RemindAt:       baseTime.Add(30 * time.Minute),
+			expected: scheduleExpectation{
+				added: true,
+				next: database.ScheduledReminder{
+					ID:             23,
+					NoteID:         130,
+					TelegramChatID: 1004,
+					Text:           "detached",
+					RemindAt:       baseTime.Add(30 * time.Minute),
+				},
+				hasNext:      true,
+				len:          1,
+				nextDelay:    30 * time.Minute,
+				hasNextDelay: true,
 			},
-			hasNext:      true,
-			len:          1,
-			nextDelay:    30 * time.Minute,
-			hasNextDelay: true,
 		},
 		{
 			name:   "adds reminder exactly on cache window boundary",
@@ -131,18 +173,20 @@ func TestSchedulerScheduleWithRealCache(t *testing.T) {
 				NoteID:   14,
 				RemindAt: baseTime.Add(10 * time.Minute),
 			},
-			added: true,
-			next: database.ScheduledReminder{
-				ID:             24,
-				NoteID:         14,
-				TelegramChatID: 1005,
-				Text:           "boundary",
-				RemindAt:       baseTime.Add(10 * time.Minute),
+			expected: scheduleExpectation{
+				added: true,
+				next: database.ScheduledReminder{
+					ID:             24,
+					NoteID:         14,
+					TelegramChatID: 1005,
+					Text:           "boundary",
+					RemindAt:       baseTime.Add(10 * time.Minute),
+				},
+				hasNext:      true,
+				len:          1,
+				nextDelay:    10 * time.Minute,
+				hasNextDelay: true,
 			},
-			hasNext:      true,
-			len:          1,
-			nextDelay:    10 * time.Minute,
-			hasNextDelay: true,
 		},
 		{
 			name:   "adds reminder at current time boundary",
@@ -153,17 +197,19 @@ func TestSchedulerScheduleWithRealCache(t *testing.T) {
 				NoteID:   15,
 				RemindAt: baseTime,
 			},
-			added: true,
-			next: database.ScheduledReminder{
-				ID:             25,
-				NoteID:         15,
-				TelegramChatID: 1006,
-				Text:           "now",
-				RemindAt:       baseTime,
+			expected: scheduleExpectation{
+				added: true,
+				next: database.ScheduledReminder{
+					ID:             25,
+					NoteID:         15,
+					TelegramChatID: 1006,
+					Text:           "now",
+					RemindAt:       baseTime,
+				},
+				hasNext:      true,
+				len:          1,
+				hasNextDelay: true,
 			},
-			hasNext:      true,
-			len:          1,
-			hasNextDelay: true,
 		},
 		{
 			name:   "rejects reminder just outside cache window",
@@ -173,6 +219,9 @@ func TestSchedulerScheduleWithRealCache(t *testing.T) {
 				ID:       26,
 				NoteID:   16,
 				RemindAt: baseTime.Add(10*time.Minute + time.Nanosecond),
+			},
+			expected: scheduleExpectation{
+				added: false,
 			},
 		},
 		{
@@ -184,6 +233,9 @@ func TestSchedulerScheduleWithRealCache(t *testing.T) {
 				NoteID:   17,
 				RemindAt: baseTime.Add(24 * time.Hour),
 			},
+			expected: scheduleExpectation{
+				added: false,
+			},
 		},
 	}
 
@@ -193,22 +245,36 @@ func TestSchedulerScheduleWithRealCache(t *testing.T) {
 
 			testClock := clock.NewMock()
 			testClock.Set(baseTime)
+
+			ctrl := gomock.NewController(t)
+			reminderDatabase := mocks.NewMockDatabase(ctrl)
+			expectedSavedReminder := expectedScheduledReminder(testCase.note, testCase.reminder)
+			reminderDatabase.EXPECT().
+				SaveScheduledReminder(gomock.Any(), expectedSavedReminder).
+				Return(testCase.err)
+
 			reminderScheduler := scheduler.New(
 				cache.NewReminderCache(testCase.window),
-				nil,
+				reminderDatabase,
 				scheduler.WithClock(testClock),
 			)
 
-			added := reminderScheduler.Schedule(testCase.note, testCase.reminder)
+			added, err := reminderScheduler.Schedule(context.Background(), testCase.note, testCase.reminder)
 			next, hasNext := reminderScheduler.Next()
 			delay, hasDelay := reminderScheduler.NextDelay()
 
-			require.Equal(t, testCase.added, added)
-			require.Equal(t, testCase.hasNext, hasNext)
-			require.Equal(t, testCase.next, clearReminderIndex(next))
-			require.Equal(t, testCase.len, reminderScheduler.Len())
-			require.Equal(t, testCase.hasNextDelay, hasDelay)
-			require.Equal(t, testCase.nextDelay, delay)
+			if testCase.expected.errText != "" {
+				require.EqualErrorf(t, err, testCase.expected.errText, "unexpected schedule error")
+			} else {
+				require.NoError(t, err)
+			}
+
+			require.Equal(t, testCase.expected.added, added)
+			require.Equal(t, testCase.expected.hasNext, hasNext)
+			require.Equal(t, testCase.expected.next, clearReminderIndex(next))
+			require.Equal(t, testCase.expected.len, reminderScheduler.Len())
+			require.Equal(t, testCase.expected.hasNextDelay, hasDelay)
+			require.Equal(t, testCase.expected.nextDelay, delay)
 		})
 	}
 }
@@ -219,19 +285,18 @@ func TestSchedulerDueWithRealCache(t *testing.T) {
 	baseTime := time.Date(2026, time.May, 22, 12, 0, 0, 0, time.UTC)
 
 	testCases := []struct {
-		name    string
-		advance time.Duration
-		seed    []database.ScheduledReminder
-		due     []database.ScheduledReminder
-		next    database.ScheduledReminder
-		hasNext bool
-		len     int
+		name     string
+		advance  time.Duration
+		seed     []database.ScheduledReminder
+		expected dueExpectation
 	}{
 		{
 			name:    "returns reminder after clock reaches due time",
 			advance: 5 * time.Minute,
 			seed:    []database.ScheduledReminder{{ID: 1, NoteID: 10, RemindAt: baseTime.Add(5 * time.Minute)}},
-			due:     []database.ScheduledReminder{{ID: 1, NoteID: 10, RemindAt: baseTime.Add(5 * time.Minute)}},
+			expected: dueExpectation{
+				due: []database.ScheduledReminder{{ID: 1, NoteID: 10, RemindAt: baseTime.Add(5 * time.Minute)}},
+			},
 		},
 		{
 			name:    "returns multiple due reminders",
@@ -240,9 +305,11 @@ func TestSchedulerDueWithRealCache(t *testing.T) {
 				{ID: 2, NoteID: 20, RemindAt: baseTime.Add(2 * time.Minute)},
 				{ID: 3, NoteID: 30, RemindAt: baseTime.Add(5 * time.Minute)},
 			},
-			due: []database.ScheduledReminder{
-				{ID: 2, NoteID: 20, RemindAt: baseTime.Add(2 * time.Minute)},
-				{ID: 3, NoteID: 30, RemindAt: baseTime.Add(5 * time.Minute)},
+			expected: dueExpectation{
+				due: []database.ScheduledReminder{
+					{ID: 2, NoteID: 20, RemindAt: baseTime.Add(2 * time.Minute)},
+					{ID: 3, NoteID: 30, RemindAt: baseTime.Add(5 * time.Minute)},
+				},
 			},
 		},
 		{
@@ -250,20 +317,26 @@ func TestSchedulerDueWithRealCache(t *testing.T) {
 			seed: []database.ScheduledReminder{
 				{ID: 4, NoteID: 40, RemindAt: baseTime.Add(-time.Minute)},
 			},
-			due: []database.ScheduledReminder{{ID: 4, NoteID: 40, RemindAt: baseTime.Add(-time.Minute)}},
+			expected: dueExpectation{
+				due: []database.ScheduledReminder{{ID: 4, NoteID: 40, RemindAt: baseTime.Add(-time.Minute)}},
+			},
 		},
 		{
 			name: "returns reminder exactly at current time boundary",
 			seed: []database.ScheduledReminder{{ID: 5, NoteID: 50, RemindAt: baseTime}},
-			due:  []database.ScheduledReminder{{ID: 5, NoteID: 50, RemindAt: baseTime}},
+			expected: dueExpectation{
+				due: []database.ScheduledReminder{{ID: 5, NoteID: 50, RemindAt: baseTime}},
+			},
 		},
 		{
 			name:    "keeps reminder just before due boundary",
 			advance: 5*time.Minute - time.Nanosecond,
 			seed:    []database.ScheduledReminder{{ID: 6, NoteID: 60, RemindAt: baseTime.Add(5 * time.Minute)}},
-			next:    database.ScheduledReminder{ID: 6, NoteID: 60, RemindAt: baseTime.Add(5 * time.Minute)},
-			hasNext: true,
-			len:     1,
+			expected: dueExpectation{
+				next:    database.ScheduledReminder{ID: 6, NoteID: 60, RemindAt: baseTime.Add(5 * time.Minute)},
+				hasNext: true,
+				len:     1,
+			},
 		},
 		{
 			name:    "keeps later reminder after due prefix is removed",
@@ -272,20 +345,27 @@ func TestSchedulerDueWithRealCache(t *testing.T) {
 				{ID: 7, NoteID: 70, RemindAt: baseTime.Add(time.Minute)},
 				{ID: 8, NoteID: 80, RemindAt: baseTime.Add(2 * time.Minute)},
 			},
-			due:     []database.ScheduledReminder{{ID: 7, NoteID: 70, RemindAt: baseTime.Add(time.Minute)}},
-			next:    database.ScheduledReminder{ID: 8, NoteID: 80, RemindAt: baseTime.Add(2 * time.Minute)},
-			hasNext: true,
-			len:     1,
+			expected: dueExpectation{
+				due:     []database.ScheduledReminder{{ID: 7, NoteID: 70, RemindAt: baseTime.Add(time.Minute)}},
+				next:    database.ScheduledReminder{ID: 8, NoteID: 80, RemindAt: baseTime.Add(2 * time.Minute)},
+				hasNext: true,
+				len:     1,
+			},
 		},
 		{
 			name: "returns empty due list on empty scheduler",
+			expected: dueExpectation{
+				due: []database.ScheduledReminder{},
+			},
 		},
 		{
-			name:    "returns empty due list when all reminders are in future",
-			seed:    []database.ScheduledReminder{{ID: 10, NoteID: 100, RemindAt: baseTime.Add(time.Minute)}},
-			next:    database.ScheduledReminder{ID: 10, NoteID: 100, RemindAt: baseTime.Add(time.Minute)},
-			hasNext: true,
-			len:     1,
+			name: "returns empty due list when all reminders are in future",
+			seed: []database.ScheduledReminder{{ID: 10, NoteID: 100, RemindAt: baseTime.Add(time.Minute)}},
+			expected: dueExpectation{
+				next:    database.ScheduledReminder{ID: 10, NoteID: 100, RemindAt: baseTime.Add(time.Minute)},
+				hasNext: true,
+				len:     1,
+			},
 		},
 	}
 
@@ -310,10 +390,60 @@ func TestSchedulerDueWithRealCache(t *testing.T) {
 			due := reminderScheduler.Due()
 			next, hasNext := reminderScheduler.Next()
 
-			require.ElementsMatch(t, testCase.due, clearReminderIndexes(due))
-			require.Equal(t, testCase.hasNext, hasNext)
-			require.Equal(t, testCase.next, clearReminderIndex(next))
-			require.Equal(t, testCase.len, reminderScheduler.Len())
+			require.ElementsMatch(t, testCase.expected.due, clearReminderIndexes(due))
+			require.Equal(t, testCase.expected.hasNext, hasNext)
+			require.Equal(t, testCase.expected.next, clearReminderIndex(next))
+			require.Equal(t, testCase.expected.len, reminderScheduler.Len())
+		})
+	}
+}
+
+func TestSchedulerScheduleErrors(t *testing.T) {
+	t.Parallel()
+
+	baseTime := time.Date(2026, time.May, 22, 12, 0, 0, 0, time.UTC)
+	reminder := database.ScheduledReminder{ID: 1, NoteID: 10, RemindAt: baseTime.Add(time.Minute)}
+
+	testCases := []struct {
+		name     string
+		database func(t *testing.T) *mocks.MockDatabase
+		expected scheduleExpectation
+	}{
+		{
+			name: "wraps save reminder database error",
+			database: func(t *testing.T) *mocks.MockDatabase {
+				t.Helper()
+
+				reminderDatabase := mocks.NewMockDatabase(gomock.NewController(t))
+				reminderDatabase.EXPECT().
+					SaveScheduledReminder(gomock.Any(), reminder).
+					Return(errStorageUnavailable)
+
+				return reminderDatabase
+			},
+			expected: scheduleExpectation{
+				errText: "save scheduled reminder: storage unavailable",
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			testClock := clock.NewMock()
+			testClock.Set(baseTime)
+			reminderScheduler := scheduler.New(
+				cache.NewReminderCache(time.Hour),
+				testCase.database(t),
+				scheduler.WithClock(testClock),
+			)
+
+			added, err := reminderScheduler.ScheduleReminder(context.Background(), reminder)
+
+			require.EqualErrorf(t, err, testCase.expected.errText, "unexpected schedule error")
+			require.False(t, added)
+			require.Equal(t, 0, reminderScheduler.Len())
 		})
 	}
 }
@@ -329,21 +459,23 @@ func TestSchedulerRefreshWithMockDatabase(t *testing.T) {
 		window    time.Duration
 		reminders []database.ScheduledReminder
 		err       error
-		errText   string
-		loaded    int
-		next      database.ScheduledReminder
-		hasNext   bool
-		len       int
+		seed      []database.ScheduledReminder
+		checkID   int64
+		expected  refreshExpectation
 	}{
 		{
 			name:      "loads one reminder from database",
 			now:       baseTime,
 			window:    time.Hour,
 			reminders: []database.ScheduledReminder{{ID: 1, NoteID: 10, RemindAt: baseTime.Add(time.Minute)}},
-			loaded:    1,
-			next:      database.ScheduledReminder{ID: 1, NoteID: 10, RemindAt: baseTime.Add(time.Minute)},
-			hasNext:   true,
-			len:       1,
+			checkID:   1,
+			expected: refreshExpectation{
+				loaded:  1,
+				next:    database.ScheduledReminder{ID: 1, NoteID: 10, RemindAt: baseTime.Add(time.Minute)},
+				hasNext: true,
+				len:     1,
+				exists:  true,
+			},
 		},
 		{
 			name:   "loads multiple reminders from database",
@@ -353,52 +485,91 @@ func TestSchedulerRefreshWithMockDatabase(t *testing.T) {
 				{ID: 2, NoteID: 20, RemindAt: baseTime.Add(2 * time.Minute)},
 				{ID: 3, NoteID: 30, RemindAt: baseTime.Add(time.Minute)},
 			},
-			loaded:  2,
-			next:    database.ScheduledReminder{ID: 3, NoteID: 30, RemindAt: baseTime.Add(time.Minute)},
-			hasNext: true,
-			len:     2,
+			checkID: 2,
+			expected: refreshExpectation{
+				loaded:  2,
+				next:    database.ScheduledReminder{ID: 3, NoteID: 30, RemindAt: baseTime.Add(time.Minute)},
+				hasNext: true,
+				len:     2,
+				exists:  true,
+			},
 		},
 		{
 			name:      "loads reminder with text payload",
 			now:       baseTime,
 			window:    time.Hour,
 			reminders: []database.ScheduledReminder{{ID: 4, Text: "payload", RemindAt: baseTime}},
-			loaded:    1,
-			next:      database.ScheduledReminder{ID: 4, Text: "payload", RemindAt: baseTime},
-			hasNext:   true,
-			len:       1,
+			checkID:   4,
+			expected: refreshExpectation{
+				loaded:  1,
+				next:    database.ScheduledReminder{ID: 4, Text: "payload", RemindAt: baseTime},
+				hasNext: true,
+				len:     1,
+				exists:  true,
+			},
 		},
 		{
 			name:      "loads reminder using non default window",
 			now:       baseTime,
 			window:    15 * time.Minute,
 			reminders: []database.ScheduledReminder{{ID: 5, RemindAt: baseTime.Add(15 * time.Minute)}},
-			loaded:    1,
-			next:      database.ScheduledReminder{ID: 5, RemindAt: baseTime.Add(15 * time.Minute)},
-			hasNext:   true,
-			len:       1,
+			checkID:   5,
+			expected: refreshExpectation{
+				loaded:  1,
+				next:    database.ScheduledReminder{ID: 5, RemindAt: baseTime.Add(15 * time.Minute)},
+				hasNext: true,
+				len:     1,
+				exists:  true,
+			},
 		},
 		{
-			name:   "loads no reminders on empty database result boundary",
-			now:    baseTime,
-			window: time.Hour,
+			name:     "loads no reminders on empty database result boundary",
+			now:      baseTime,
+			window:   time.Hour,
+			checkID:  0,
+			expected: refreshExpectation{},
 		},
 		{
 			name:      "passes advanced clock time into database boundary",
 			now:       baseTime.Add(time.Hour),
 			window:    time.Hour,
 			reminders: []database.ScheduledReminder{{ID: 6, RemindAt: baseTime.Add(time.Hour)}},
-			loaded:    1,
-			next:      database.ScheduledReminder{ID: 6, RemindAt: baseTime.Add(time.Hour)},
-			hasNext:   true,
-			len:       1,
+			checkID:   6,
+			expected: refreshExpectation{
+				loaded:  1,
+				next:    database.ScheduledReminder{ID: 6, RemindAt: baseTime.Add(time.Hour)},
+				hasNext: true,
+				len:     1,
+				exists:  true,
+			},
 		},
 		{
-			name:    "wraps database error",
-			now:     baseTime,
-			window:  time.Hour,
-			err:     errStorageUnavailable,
-			errText: "load scheduled reminders: storage unavailable",
+			name:   "replaces stale cache contents with refreshed database window",
+			now:    baseTime,
+			window: time.Hour,
+			seed: []database.ScheduledReminder{
+				{ID: 7, NoteID: 70, RemindAt: baseTime.Add(time.Minute)},
+			},
+			reminders: []database.ScheduledReminder{
+				{ID: 8, NoteID: 80, RemindAt: baseTime.Add(2 * time.Minute)},
+			},
+			checkID: 7,
+			expected: refreshExpectation{
+				loaded:  1,
+				next:    database.ScheduledReminder{ID: 8, NoteID: 80, RemindAt: baseTime.Add(2 * time.Minute)},
+				hasNext: true,
+				len:     1,
+				exists:  false,
+			},
+		},
+		{
+			name:   "wraps database error",
+			now:    baseTime,
+			window: time.Hour,
+			err:    errStorageUnavailable,
+			expected: refreshExpectation{
+				errText: "load scheduled reminders: storage unavailable",
+			},
 		},
 	}
 
@@ -409,7 +580,7 @@ func TestSchedulerRefreshWithMockDatabase(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			reminderDatabase := mocks.NewMockDatabase(ctrl)
 			reminderDatabase.EXPECT().
-				ScheduledReminders(gomock.Any(), testCase.now, testCase.window).
+				ScheduledReminders(gomock.Any(), testCase.now, testCase.now.Add(testCase.window)).
 				Return(testCase.reminders, testCase.err)
 
 			testClock := clock.NewMock()
@@ -420,38 +591,26 @@ func TestSchedulerRefreshWithMockDatabase(t *testing.T) {
 				scheduler.WithClock(testClock),
 			)
 
+			for _, reminder := range testCase.seed {
+				reminderScheduler.UpsertReminder(reminder)
+			}
+
 			loaded, err := reminderScheduler.Refresh(context.Background())
 			next, hasNext := reminderScheduler.Next()
 
-			if testCase.errText != "" {
-				require.EqualErrorf(t, err, testCase.errText, "unexpected refresh error")
+			if testCase.expected.errText != "" {
+				require.EqualErrorf(t, err, testCase.expected.errText, "unexpected refresh error")
 			} else {
 				require.NoError(t, err)
 			}
 
-			require.Equal(t, testCase.loaded, loaded)
-			require.Equal(t, testCase.hasNext, hasNext)
-			require.Equal(t, testCase.next, clearReminderIndex(next))
-			require.Equal(t, testCase.len, reminderScheduler.Len())
+			require.Equal(t, testCase.expected.loaded, loaded)
+			require.Equal(t, testCase.expected.hasNext, hasNext)
+			require.Equal(t, testCase.expected.next, clearReminderIndex(next))
+			require.Equal(t, testCase.expected.len, reminderScheduler.Len())
+			require.Equal(t, testCase.expected.exists, reminderScheduler.Exists(testCase.checkID))
 		})
 	}
-}
-
-func TestSchedulerRefreshWithoutDatabase(t *testing.T) {
-	t.Parallel()
-
-	testClock := clock.NewMock()
-	testClock.Set(time.Date(2026, time.May, 22, 12, 0, 0, 0, time.UTC))
-	reminderScheduler := scheduler.New(
-		cache.NewReminderCache(time.Hour),
-		nil,
-		scheduler.WithClock(testClock),
-	)
-
-	loaded, err := reminderScheduler.Refresh(context.Background())
-
-	require.EqualErrorf(t, err, "scheduler database is not configured", "unexpected refresh error")
-	require.Equal(t, 0, loaded)
 }
 
 func TestSchedulerWithMockCache(t *testing.T) {
@@ -461,22 +620,41 @@ func TestSchedulerWithMockCache(t *testing.T) {
 
 	testCases := []struct {
 		name   string
-		assert func(t *testing.T, reminderScheduler *scheduler.Scheduler, reminderCache *mocks.MockCache)
+		assert func(
+			t *testing.T,
+			reminderScheduler *scheduler.Scheduler,
+			reminderCache *mocks.MockCache,
+			reminderDatabase *mocks.MockDatabase,
+		)
 	}{
 		{
 			name: "schedule reminder passes clock time and reminder to cache",
-			assert: func(t *testing.T, reminderScheduler *scheduler.Scheduler, reminderCache *mocks.MockCache) {
+			assert: func(
+				t *testing.T,
+				reminderScheduler *scheduler.Scheduler,
+				reminderCache *mocks.MockCache,
+				reminderDatabase *mocks.MockDatabase,
+			) {
 				t.Helper()
 
 				reminder := database.ScheduledReminder{ID: 1, RemindAt: baseTime.Add(time.Minute)}
+				reminderDatabase.EXPECT().SaveScheduledReminder(gomock.Any(), reminder).Return(nil)
 				reminderCache.EXPECT().AddIfWithinWindow(baseTime, reminder).Return(true)
 
-				require.True(t, reminderScheduler.ScheduleReminder(reminder))
+				added, err := reminderScheduler.ScheduleReminder(context.Background(), reminder)
+
+				require.NoError(t, err)
+				require.True(t, added)
 			},
 		},
 		{
 			name: "due passes current clock time to cache",
-			assert: func(t *testing.T, reminderScheduler *scheduler.Scheduler, reminderCache *mocks.MockCache) {
+			assert: func(
+				t *testing.T,
+				reminderScheduler *scheduler.Scheduler,
+				reminderCache *mocks.MockCache,
+				_ *mocks.MockDatabase,
+			) {
 				t.Helper()
 
 				reminders := []database.ScheduledReminder{{ID: 2, RemindAt: baseTime}}
@@ -487,7 +665,12 @@ func TestSchedulerWithMockCache(t *testing.T) {
 		},
 		{
 			name: "cancel delegates reminder id to cache",
-			assert: func(t *testing.T, reminderScheduler *scheduler.Scheduler, reminderCache *mocks.MockCache) {
+			assert: func(
+				t *testing.T,
+				reminderScheduler *scheduler.Scheduler,
+				reminderCache *mocks.MockCache,
+				_ *mocks.MockDatabase,
+			) {
 				t.Helper()
 
 				reminderCache.EXPECT().Remove(int64(3)).Return(true)
@@ -497,7 +680,12 @@ func TestSchedulerWithMockCache(t *testing.T) {
 		},
 		{
 			name: "next delay returns false when cache has no next reminder",
-			assert: func(t *testing.T, reminderScheduler *scheduler.Scheduler, reminderCache *mocks.MockCache) {
+			assert: func(
+				t *testing.T,
+				reminderScheduler *scheduler.Scheduler,
+				reminderCache *mocks.MockCache,
+				_ *mocks.MockDatabase,
+			) {
 				t.Helper()
 
 				reminderCache.EXPECT().Next().Return(database.ScheduledReminder{}, false)
@@ -510,7 +698,12 @@ func TestSchedulerWithMockCache(t *testing.T) {
 		},
 		{
 			name: "next delay returns future duration from cache reminder",
-			assert: func(t *testing.T, reminderScheduler *scheduler.Scheduler, reminderCache *mocks.MockCache) {
+			assert: func(
+				t *testing.T,
+				reminderScheduler *scheduler.Scheduler,
+				reminderCache *mocks.MockCache,
+				_ *mocks.MockDatabase,
+			) {
 				t.Helper()
 
 				reminder := database.ScheduledReminder{ID: 4, RemindAt: baseTime.Add(5 * time.Minute)}
@@ -524,7 +717,12 @@ func TestSchedulerWithMockCache(t *testing.T) {
 		},
 		{
 			name: "next delay returns zero for overdue cache reminder",
-			assert: func(t *testing.T, reminderScheduler *scheduler.Scheduler, reminderCache *mocks.MockCache) {
+			assert: func(
+				t *testing.T,
+				reminderScheduler *scheduler.Scheduler,
+				reminderCache *mocks.MockCache,
+				_ *mocks.MockDatabase,
+			) {
 				t.Helper()
 
 				reminder := database.ScheduledReminder{ID: 5, RemindAt: baseTime.Add(-time.Minute)}
@@ -538,7 +736,12 @@ func TestSchedulerWithMockCache(t *testing.T) {
 		},
 		{
 			name: "window delegates to cache",
-			assert: func(t *testing.T, reminderScheduler *scheduler.Scheduler, reminderCache *mocks.MockCache) {
+			assert: func(
+				t *testing.T,
+				reminderScheduler *scheduler.Scheduler,
+				reminderCache *mocks.MockCache,
+				_ *mocks.MockDatabase,
+			) {
 				t.Helper()
 
 				reminderCache.EXPECT().Window().Return(time.Hour)
@@ -548,7 +751,12 @@ func TestSchedulerWithMockCache(t *testing.T) {
 		},
 		{
 			name: "len delegates to cache",
-			assert: func(t *testing.T, reminderScheduler *scheduler.Scheduler, reminderCache *mocks.MockCache) {
+			assert: func(
+				t *testing.T,
+				reminderScheduler *scheduler.Scheduler,
+				reminderCache *mocks.MockCache,
+				_ *mocks.MockDatabase,
+			) {
 				t.Helper()
 
 				reminderCache.EXPECT().Len().Return(2)
@@ -564,11 +772,12 @@ func TestSchedulerWithMockCache(t *testing.T) {
 
 			ctrl := gomock.NewController(t)
 			reminderCache := mocks.NewMockCache(ctrl)
+			reminderDatabase := mocks.NewMockDatabase(ctrl)
 			testClock := clock.NewMock()
 			testClock.Set(baseTime)
-			reminderScheduler := scheduler.New(reminderCache, nil, scheduler.WithClock(testClock))
+			reminderScheduler := scheduler.New(reminderCache, reminderDatabase, scheduler.WithClock(testClock))
 
-			testCase.assert(t, reminderScheduler, reminderCache)
+			testCase.assert(t, reminderScheduler, reminderCache, reminderDatabase)
 		})
 	}
 }
@@ -583,30 +792,35 @@ func TestSchedulerLoadWithRealCache(t *testing.T) {
 		reminderCount int
 		window        time.Duration
 		dueAt         time.Duration
-		expectedDue   int
-		expectedRest  int
+		expected      loadExpectation
 	}{
 		{
 			name:          "loads one thousand reminders and drains all of them",
 			reminderCount: 1_000,
 			window:        24 * time.Hour,
 			dueAt:         24 * time.Hour,
-			expectedDue:   1_000,
+			expected: loadExpectation{
+				due: 1_000,
+			},
 		},
 		{
 			name:          "loads ten thousand reminders and drains all of them",
 			reminderCount: 10_000,
 			window:        24 * time.Hour,
 			dueAt:         24 * time.Hour,
-			expectedDue:   10_000,
+			expected: loadExpectation{
+				due: 10_000,
+			},
 		},
 		{
 			name:          "keeps half of ten thousand reminders outside due point",
 			reminderCount: 10_000,
 			window:        24 * time.Hour,
 			dueAt:         12 * time.Hour,
-			expectedDue:   5_001,
-			expectedRest:  4_999,
+			expected: loadExpectation{
+				due:  5_001,
+				rest: 4_999,
+			},
 		},
 	}
 
@@ -616,9 +830,16 @@ func TestSchedulerLoadWithRealCache(t *testing.T) {
 
 			testClock := clock.NewMock()
 			testClock.Set(baseTime)
+
+			reminderDatabase := mocks.NewMockDatabase(gomock.NewController(t))
+			reminderDatabase.EXPECT().
+				SaveScheduledReminder(gomock.Any(), gomock.Any()).
+				Return(nil).
+				AnyTimes()
+
 			reminderScheduler := scheduler.New(
 				cache.NewReminderCache(testCase.window),
-				nil,
+				reminderDatabase,
 				scheduler.WithClock(testClock),
 			)
 
@@ -627,12 +848,13 @@ func TestSchedulerLoadWithRealCache(t *testing.T) {
 				reminderOffset := time.Duration(index%testCase.reminderCount) * testCase.window /
 					time.Duration(testCase.reminderCount)
 
-				added := reminderScheduler.ScheduleReminder(database.ScheduledReminder{
+				added, err := reminderScheduler.ScheduleReminder(context.Background(), database.ScheduledReminder{
 					ID:       reminderID,
 					NoteID:   reminderID,
 					RemindAt: baseTime.Add(reminderOffset),
 				})
 
+				require.NoError(t, err)
 				require.True(t, added)
 			}
 
@@ -640,8 +862,101 @@ func TestSchedulerLoadWithRealCache(t *testing.T) {
 
 			due := reminderScheduler.Due()
 
-			require.Len(t, due, testCase.expectedDue)
-			require.Equal(t, testCase.expectedRest, reminderScheduler.Len())
+			require.Len(t, due, testCase.expected.due)
+			require.Equal(t, testCase.expected.rest, reminderScheduler.Len())
+		})
+	}
+}
+
+func TestSchedulerConcurrentScheduleWithRealCache(t *testing.T) {
+	t.Parallel()
+
+	baseTime := time.Date(2026, time.May, 22, 12, 0, 0, 0, time.UTC)
+
+	testCases := []struct {
+		name     string
+		parallel int
+		expected concurrentExpectation
+	}{
+		{
+			name:     "schedules eight hundred concurrent reminders",
+			parallel: 800,
+			expected: concurrentExpectation{
+				len:   800,
+				added: 800,
+			},
+		},
+		{
+			name:     "schedules nine hundred concurrent reminders",
+			parallel: 900,
+			expected: concurrentExpectation{
+				len:   900,
+				added: 900,
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			testClock := clock.NewMock()
+			testClock.Set(baseTime)
+
+			reminderDatabase := mocks.NewMockDatabase(gomock.NewController(t))
+			reminderDatabase.EXPECT().
+				SaveScheduledReminder(gomock.Any(), gomock.Any()).
+				Return(nil).
+				AnyTimes()
+
+			reminderScheduler := scheduler.New(
+				cache.NewReminderCache(24*time.Hour),
+				reminderDatabase,
+				scheduler.WithClock(testClock),
+			)
+
+			var (
+				added     atomic.Int64
+				waitGroup sync.WaitGroup
+			)
+
+			errs := make(chan error, testCase.parallel)
+
+			for index := range testCase.parallel {
+				waitGroup.Add(1)
+
+				go func(index int) {
+					defer waitGroup.Done()
+
+					reminderID := int64(index + 1)
+					reminder := database.ScheduledReminder{
+						ID:       reminderID,
+						NoteID:   reminderID,
+						RemindAt: baseTime.Add(time.Duration(index) * time.Second),
+					}
+
+					wasAdded, err := reminderScheduler.ScheduleReminder(context.Background(), reminder)
+					if err != nil {
+						errs <- err
+
+						return
+					}
+
+					if wasAdded {
+						added.Add(1)
+					}
+				}(index)
+			}
+
+			waitGroup.Wait()
+			close(errs)
+
+			for err := range errs {
+				require.NoError(t, err)
+			}
+
+			require.Equal(t, testCase.expected.added, added.Load())
+			require.Equal(t, testCase.expected.len, reminderScheduler.Len())
 		})
 	}
 }
@@ -652,20 +967,28 @@ func BenchmarkSchedulerScheduleAndDrainWithRealCache(b *testing.B) {
 	for range b.N {
 		testClock := clock.NewMock()
 		testClock.Set(baseTime)
+
+		reminderDatabase := mocks.NewMockDatabase(gomock.NewController(b))
+		reminderDatabase.EXPECT().
+			SaveScheduledReminder(gomock.Any(), gomock.Any()).
+			Return(nil).
+			AnyTimes()
+
 		reminderScheduler := scheduler.New(
 			cache.NewReminderCache(24*time.Hour),
-			nil,
+			reminderDatabase,
 			scheduler.WithClock(testClock),
 		)
 
 		for index := range 10_000 {
 			reminderID := int64(index + 1)
 
-			reminderScheduler.ScheduleReminder(database.ScheduledReminder{
+			_, err := reminderScheduler.ScheduleReminder(context.Background(), database.ScheduledReminder{
 				ID:       reminderID,
 				NoteID:   reminderID,
 				RemindAt: baseTime.Add(time.Duration(index) * time.Second),
 			})
+			require.NoError(b, err)
 		}
 
 		testClock.Add(24 * time.Hour)
@@ -687,4 +1010,14 @@ func clearReminderIndex(reminder database.ScheduledReminder) database.ScheduledR
 	reminder.Index = 0
 
 	return reminder
+}
+
+func expectedScheduledReminder(note database.Note, reminder database.Reminder) database.ScheduledReminder {
+	return database.ScheduledReminder{
+		ID:             reminder.ID,
+		NoteID:         reminder.NoteID,
+		TelegramChatID: note.TelegramChatID,
+		Text:           note.Text,
+		RemindAt:       reminder.RemindAt,
+	}
 }

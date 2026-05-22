@@ -1,22 +1,90 @@
-version: 0.2.0
+version: 0.4.0
 
-## v0.2.0 - добавлен кеш напоминаний и строгие проверки репозитория
+## v0.4.0 - scheduler uses database as source of truth
 
-### Что было сделано
+### What was done
 
-Был расширен слой кеша напоминаний: добавлены heap-примитивы для планирования и unit-тесты.
+The scheduler branch introduced a service-facing scheduler facade above the database cache layer.
 
-Был добавлен конфиг golangci-lint, а существующий код был приведен к настроенным проверкам.
+The scheduler now persists every scheduled reminder through the `Database` interface before trying to cache it.
 
-Были добавлены миграция базы данных и общие типы базы данных для заметок и напоминаний.
+The cache can now replace its whole reminder window during refresh, so refreshed database windows remove stale cache entries.
 
-### Изменения API
+Scheduler tests were rewritten as table-driven tests with `github.com/benbjohnson/clock`, real cache coverage, and generated `go.uber.org/mock` mocks.
 
-Публичный HTTP API и внешний API приложения не изменялись.
+Scheduler load coverage was added for 1,000 and 10,000 reminder scenarios, plus a benchmark for schedule-and-drain behavior.
 
-Внутренние API базы данных и кеша были расширены для хранения и получения напоминаний.
+Concurrent scheduler coverage was added for 800 and 900 parallel scheduling calls.
 
-### Затронутые файлы
+### API changes
+
+`scheduler.Database` now exposes `SaveScheduledReminder(ctx, reminder)` and `ScheduledReminders(ctx, from, to)`.
+
+`scheduler.Cache` now exposes `Replace(reminders)`.
+
+`Scheduler.Schedule` and `Scheduler.ScheduleReminder` now accept `context.Context` and return `(bool, error)`.
+
+`Scheduler.Refresh` now loads the `[now, now + cacheWindow]` database window and replaces the cache contents.
+
+### Affected files
+
+- `CHANGELIST.md`
+- `README.md`
+- `README_RU.md`
+- `.gitignore`
+- `go.mod`
+- `go.sum`
+- `src/database/cache/heap.go`
+- `src/database/cache/reminder_cache.go`
+- `src/database/cache/reminder_cache_test.go`
+- `src/database/types.go`
+- `src/scheduler/clock.go`
+- `src/scheduler/dependencies.go`
+- `src/scheduler/mocks/scheduler_mock.go`
+- `src/scheduler/scheduler.go`
+- `src/scheduler/scheduler_test.go`
+
+## v0.3.0 - added pull request CI and versioned build artifacts
+
+### What was done
+
+GitHub Actions CI was added for pull requests.
+
+The pipeline builds the Go application, uploads a versioned binary artifact, runs golangci-lint from the repository config, runs unit tests, and builds/pushes the Docker image to GHCR.
+
+The CI artifact and Docker image tags use the version from `CHANGELIST.md`.
+
+### API changes
+
+No runtime API changes were introduced.
+
+The delivery contract changed: CI artifacts and Docker image tags are versioned from the changelist.
+
+### Affected files
+
+- `.dockerignore`
+- `.github/workflows/ci.yml`
+- `CHANGELIST.md`
+- `Dockerfile`
+- `README.md`
+
+## v0.2.0 - added reminder cache and repository quality checks
+
+### What was done
+
+The reminder cache layer was extended with heap-based scheduling primitives and unit test coverage.
+
+The repository lint configuration was added and existing code was adjusted to match the configured checks.
+
+The database migration and shared database types for notes and reminders were added.
+
+### API changes
+
+No public HTTP or external API changes were introduced.
+
+The internal database and cache APIs were extended for reminder storage and retrieval.
+
+### Affected files
 
 - `.gitignore`
 - `.golangci.yml`
@@ -32,25 +100,25 @@ version: 0.2.0
 - `src/database/types.go`
 - `src/logger/logger.go`
 
-## v0.1.0 - создана базовая структура приложения
+## v0.1.0 - created base application structure
 
-### Что было сделано
+### What was done
 
-Были созданы Go-модуль и точка входа приложения.
+The initial Go module and application entrypoint were created.
 
-Был добавлен базовый загрузчик конфигурации с чтением YAML, значениями по умолчанию и валидацией.
+The base configuration loader was added with YAML parsing, defaults, and validation.
 
-Были добавлены абстракция логгера и реализация на Zap.
+The logger abstraction and Zap-based implementation were added.
 
-Была добавлена первая реализация кеша напоминаний.
+The first reminder cache implementation was added.
 
-### Изменения API
+### API changes
 
-Публичный HTTP API и внешний API приложения не добавлялись.
+No public HTTP or external API was introduced.
 
-Были добавлены первые внутренние API конфигурации, логгера и кеша напоминаний.
+The initial internal configuration, logger, and reminder cache APIs were introduced.
 
-### Затронутые файлы
+### Affected files
 
 - `.gitignore`
 - `config/config.yaml`

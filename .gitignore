@@ -32,3 +32,5 @@ go.work.sum
 # .vscode/
 *.log
 *NTS.md
+.gocache
+.golangci-cache

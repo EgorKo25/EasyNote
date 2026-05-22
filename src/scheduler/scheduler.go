@@ -31,35 +31,34 @@ type Scheduler struct {
 	clock    Clock
 }
 
-func (s *Scheduler) Schedule(note database.Note, reminder database.Reminder) bool {
-	return s.ScheduleReminder(scheduledReminder(note, reminder))
+func (s *Scheduler) Schedule(ctx context.Context, note database.Note, reminder database.Reminder) (bool, error) {
+	return s.ScheduleReminder(ctx, scheduledReminder(note, reminder))
 }
 
-func (s *Scheduler) ScheduleReminder(reminder database.ScheduledReminder) bool {
+func (s *Scheduler) ScheduleReminder(ctx context.Context, reminder database.ScheduledReminder) (bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	return s.cache.AddIfWithinWindow(s.clock.Now(), reminder)
+	if err := s.database.SaveScheduledReminder(ctx, reminder); err != nil {
+		return false, fmt.Errorf("save scheduled reminder: %w", err)
+	}
+
+	return s.cache.AddIfWithinWindow(s.clock.Now(), reminder), nil
 }
 
 func (s *Scheduler) Refresh(ctx context.Context) (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.database == nil {
-		return 0, ErrDatabaseNotConfigured
-	}
-
 	now := s.clock.Now()
+	to := now.Add(s.cache.Window())
 
-	reminders, err := s.database.ScheduledReminders(ctx, now, s.cache.Window())
+	reminders, err := s.database.ScheduledReminders(ctx, now, to)
 	if err != nil {
 		return 0, fmt.Errorf("load scheduled reminders: %w", err)
 	}
 
-	for _, reminder := range reminders {
-		s.cache.Upsert(reminder)
-	}
+	s.cache.Replace(reminders)
 
 	return len(reminders), nil
 }
