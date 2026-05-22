@@ -1,0 +1,13 @@
+.git
+.github
+.idea
+.gocache
+logs
+dist
+*.log
+*.out
+*.test
+coverage.*
+*.coverprofile
+profile.cov
+README.md
