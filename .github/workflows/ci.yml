@@ -47,7 +47,7 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: build-${{ env.APP_NAME }}-${{ steps.version.outputs.version }}.${{ github.sha }}
+          name: build-${{ env.APP_NAME }}-${{ steps.version.outputs.version }}
           path: dist/${{ env.APP_NAME }}
           if-no-files-found: error
           retention-days: 14
@@ -159,6 +159,8 @@ jobs:
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
+        env:
+          DOCKER_BUILD_RECORD_UPLOAD: false
         with:
           context: .
           push: true
