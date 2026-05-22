@@ -2,8 +2,9 @@ package cache
 
 import (
 	"container/heap"
-	"github.com/EgorKo25/EasyNote/src/database"
 	"time"
+
+	"github.com/EgorKo25/EasyNote/src/database"
 )
 
 func NewScheduledReminder(note database.Note, reminder database.Reminder) ScheduledReminder {
@@ -98,7 +99,11 @@ func (c *ReminderCache) PopDue(now time.Time) []ScheduledReminder {
 			break
 		}
 
-		item := heap.Pop(&c.heap).(*ScheduledReminder)
+		item, ok := heap.Pop(&c.heap).(*ScheduledReminder)
+		if !ok {
+			continue
+		}
+
 		delete(c.byID, item.ID)
 
 		due = append(due, *item)
@@ -107,14 +112,14 @@ func (c *ReminderCache) PopDue(now time.Time) []ScheduledReminder {
 	return due
 }
 
-func (c *ReminderCache) Remove(id int64) bool {
-	item, ok := c.byID[id]
+func (c *ReminderCache) Remove(elementID int64) bool {
+	item, ok := c.byID[elementID]
 	if !ok {
 		return false
 	}
 
 	heap.Remove(&c.heap, item.index)
-	delete(c.byID, id)
+	delete(c.byID, elementID)
 
 	return true
 }

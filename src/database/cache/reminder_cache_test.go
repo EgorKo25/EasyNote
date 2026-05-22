@@ -1,11 +1,12 @@
+//nolint:cyclop,dupl,testpackage // linters was disabled because a long functions make tests better and more readable
 package cache
 
 import (
 	"container/heap"
-	"github.com/EgorKo25/EasyNote/src/database"
 	"testing"
 	"time"
 
+	"github.com/EgorKo25/EasyNote/src/database"
 	"github.com/stretchr/testify/require"
 )
 
@@ -42,7 +43,8 @@ func TestNewScheduledReminder(t *testing.T) {
 				note:     database.Note{ID: 8, TelegramChatID: 102, Text: "Купить молоко, хлеб и сыр!"},
 				reminder: database.Reminder{ID: 12, NoteID: 8, RemindAt: baseTime.Add(30 * time.Minute)},
 			},
-			expected: expected{reminder: fixtureReminder(12, 8, 102, "Купить молоко, хлеб и сыр!", baseTime.Add(30*time.Minute))},
+			expected: expected{reminder: fixtureReminder(12, 8, 102,
+				"Купить молоко, хлеб и сыр!", baseTime.Add(30*time.Minute))},
 		},
 		{
 			name: "keeps zero values when note and reminder identifiers are empty",
@@ -58,7 +60,8 @@ func TestNewScheduledReminder(t *testing.T) {
 				note:     database.Note{ID: 90, TelegramChatID: 103, Text: "Detached reminder"},
 				reminder: database.Reminder{ID: 13, NoteID: 91, RemindAt: baseTime.Add(45 * time.Minute)},
 			},
-			expected: expected{reminder: fixtureReminder(13, 91, 103, "Detached reminder", baseTime.Add(45*time.Minute))},
+			expected: expected{reminder: fixtureReminder(
+				13, 91, 103, "Detached reminder", baseTime.Add(45*time.Minute))},
 		},
 		{
 			name: "does not synthesize chat id when note has zero chat identifier",
@@ -66,7 +69,8 @@ func TestNewScheduledReminder(t *testing.T) {
 				note:     database.Note{ID: 10, Text: "Missing chat"},
 				reminder: database.Reminder{ID: 14, NoteID: 10, RemindAt: baseTime.Add(1 * time.Hour)},
 			},
-			expected: expected{reminder: fixtureReminder(14, 10, 0, "Missing chat", baseTime.Add(1*time.Hour))},
+			expected: expected{reminder: fixtureReminder(
+				14, 10, 0, "Missing chat", baseTime.Add(1*time.Hour))},
 		},
 		{
 			name: "does not alter past reminder timestamps",
@@ -114,7 +118,7 @@ func TestReminderHeapOperations(t *testing.T) {
 	}{
 		{
 			name: "push assigns sequential indexes for multiple reminders",
-			beforeScript: func(t *testing.T, h *reminderHeap, insertedByID map[int64]*ScheduledReminder) {
+			beforeScript: func(t *testing.T, rHeap *reminderHeap, insertedByID map[int64]*ScheduledReminder) {
 				t.Helper()
 
 				items := []ScheduledReminder{
@@ -125,7 +129,7 @@ func TestReminderHeapOperations(t *testing.T) {
 
 				for _, item := range items {
 					reminder := item
-					heap.Push(h, &reminder)
+					heap.Push(rHeap, &reminder)
 					insertedByID[reminder.ID] = &reminder
 				}
 			},
@@ -140,7 +144,7 @@ func TestReminderHeapOperations(t *testing.T) {
 		{
 			name:      "less returns true when first reminder is scheduled earlier",
 			checkLess: &[2]int{0, 1},
-			beforeScript: func(t *testing.T, h *reminderHeap, insertedByID map[int64]*ScheduledReminder) {
+			beforeScript: func(t *testing.T, rHeap *reminderHeap, insertedByID map[int64]*ScheduledReminder) {
 				t.Helper()
 
 				items := []ScheduledReminder{
@@ -150,7 +154,7 @@ func TestReminderHeapOperations(t *testing.T) {
 
 				for _, item := range items {
 					reminder := item
-					heap.Push(h, &reminder)
+					heap.Push(rHeap, &reminder)
 					insertedByID[reminder.ID] = &reminder
 				}
 			},
@@ -167,7 +171,7 @@ func TestReminderHeapOperations(t *testing.T) {
 			name:       "swap exchanges reminders and refreshes both indexes",
 			swapFirst:  0,
 			swapSecond: 1,
-			beforeScript: func(t *testing.T, h *reminderHeap, insertedByID map[int64]*ScheduledReminder) {
+			beforeScript: func(t *testing.T, rHeap *reminderHeap, insertedByID map[int64]*ScheduledReminder) {
 				t.Helper()
 
 				items := []ScheduledReminder{
@@ -177,7 +181,7 @@ func TestReminderHeapOperations(t *testing.T) {
 
 				for _, item := range items {
 					reminder := item
-					heap.Push(h, &reminder)
+					heap.Push(rHeap, &reminder)
 					insertedByID[reminder.ID] = &reminder
 				}
 			},
@@ -192,7 +196,7 @@ func TestReminderHeapOperations(t *testing.T) {
 		{
 			name:     "pop removes reminders from the tail and marks their index as removed",
 			popCount: 2,
-			beforeScript: func(t *testing.T, h *reminderHeap, insertedByID map[int64]*ScheduledReminder) {
+			beforeScript: func(t *testing.T, rHeap *reminderHeap, insertedByID map[int64]*ScheduledReminder) {
 				t.Helper()
 
 				items := []ScheduledReminder{
@@ -203,7 +207,7 @@ func TestReminderHeapOperations(t *testing.T) {
 
 				for _, item := range items {
 					reminder := item
-					heap.Push(h, &reminder)
+					heap.Push(rHeap, &reminder)
 					insertedByID[reminder.ID] = &reminder
 				}
 			},
@@ -218,7 +222,7 @@ func TestReminderHeapOperations(t *testing.T) {
 		{
 			name:      "less returns false when reminders have identical timestamps",
 			checkLess: &[2]int{0, 1},
-			beforeScript: func(t *testing.T, h *reminderHeap, insertedByID map[int64]*ScheduledReminder) {
+			beforeScript: func(t *testing.T, rHeap *reminderHeap, insertedByID map[int64]*ScheduledReminder) {
 				t.Helper()
 
 				items := []ScheduledReminder{
@@ -228,7 +232,7 @@ func TestReminderHeapOperations(t *testing.T) {
 
 				for _, item := range items {
 					reminder := item
-					heap.Push(h, &reminder)
+					heap.Push(rHeap, &reminder)
 					insertedByID[reminder.ID] = &reminder
 				}
 			},
@@ -264,36 +268,38 @@ func TestReminderHeapOperations(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			h := make(reminderHeap, 0)
+			rHeap := make(reminderHeap, 0)
 			insertedByID := make(map[int64]*ScheduledReminder)
 
 			if testCase.beforeScript != nil {
-				testCase.beforeScript(t, &h, insertedByID)
+				testCase.beforeScript(t, &rHeap, insertedByID)
 			}
 
-			require.Equal(t, testCase.expected.lenAfterPush, h.Len())
+			require.Equal(t, testCase.expected.lenAfterPush, rHeap.Len())
 
 			if testCase.checkLess != nil {
-				require.Equal(t, testCase.expected.lessResult, h.Less(testCase.checkLess[0], testCase.checkLess[1]))
+				require.Equal(t, testCase.expected.lessResult, rHeap.Less(testCase.checkLess[0], testCase.checkLess[1]))
 			}
 
 			if testCase.swapFirst != testCase.swapSecond || testCase.swapFirst != 0 {
-				h.Swap(testCase.swapFirst, testCase.swapSecond)
+				rHeap.Swap(testCase.swapFirst, testCase.swapSecond)
 			}
 
 			if testCase.expected.lenAfterPop > 0 {
-				require.Equal(t, testCase.expected.firstID, h[0].ID)
+				require.Equal(t, testCase.expected.firstID, rHeap[0].ID)
 			}
 
 			poppedIDs := make([]int64, 0, testCase.popCount)
-			for i := 0; i < testCase.popCount; i++ {
-				item := h.Pop().(*ScheduledReminder)
+			for range testCase.popCount {
+				item, ok := rHeap.Pop().(*ScheduledReminder)
+				require.True(t, ok)
+
 				poppedIDs = append(poppedIDs, item.ID)
 				require.Equal(t, -1, item.index)
 			}
 
 			require.Equal(t, testCase.expected.poppedIDs, poppedIDs)
-			require.Equal(t, testCase.expected.lenAfterPop, h.Len())
+			require.Equal(t, testCase.expected.lenAfterPop, rHeap.Len())
 
 			actualIndexes := make(map[int64]int, len(insertedByID))
 			for id := range testCase.expected.indexes {
@@ -393,8 +399,9 @@ func TestReminderCacheAddIfWithinWindow(t *testing.T) {
 			name:        "past due reminder is still accepted because it is inside the window",
 			cacheWindow: 15 * time.Minute,
 			input: input{
-				now:       baseTime,
-				reminders: []ScheduledReminder{fixtureReminder(16, 116, 1016, "past due", baseTime.Add(-1*time.Minute))},
+				now: baseTime,
+				reminders: []ScheduledReminder{fixtureReminder(
+					16, 116, 1016, "past due", baseTime.Add(-1*time.Minute))},
 			},
 			expected: expected{
 				addedResults: []bool{true},
@@ -765,6 +772,7 @@ func TestReminderCachePopDue(t *testing.T) {
 			}
 
 			popped := cache.PopDue(testCase.popAt)
+
 			poppedIDs := make([]int64, 0, len(popped))
 			for _, reminder := range popped {
 				poppedIDs = append(poppedIDs, reminder.ID)
@@ -924,6 +932,7 @@ func TestReminderCachePopDueWithIdenticalTime(t *testing.T) {
 			}
 
 			popped := cache.PopDue(testCase.popAt)
+
 			poppedIDs := make([]int64, 0, len(popped))
 			for _, reminder := range popped {
 				poppedIDs = append(poppedIDs, reminder.ID)
@@ -1123,6 +1132,7 @@ func TestReminderCacheEmptyState(t *testing.T) {
 			name: "next on empty cache returns no reminder",
 			runScript: func(t *testing.T, cache *ReminderCache) ([]bool, []int64) {
 				t.Helper()
+
 				return []bool{}, []int64{}
 			},
 			expected: expected{
@@ -1139,11 +1149,14 @@ func TestReminderCacheEmptyState(t *testing.T) {
 			name: "pop due on empty cache returns empty slice",
 			runScript: func(t *testing.T, cache *ReminderCache) ([]bool, []int64) {
 				t.Helper()
+
 				popped := cache.PopDue(baseTime)
+
 				poppedIDs := make([]int64, 0, len(popped))
 				for _, reminder := range popped {
 					poppedIDs = append(poppedIDs, reminder.ID)
 				}
+
 				return []bool{}, poppedIDs
 			},
 			expected: expected{
@@ -1160,6 +1173,7 @@ func TestReminderCacheEmptyState(t *testing.T) {
 			name: "window is retained even when cache has no reminders",
 			runScript: func(t *testing.T, cache *ReminderCache) ([]bool, []int64) {
 				t.Helper()
+
 				return []bool{}, []int64{}
 			},
 			expected: expected{
@@ -1176,6 +1190,7 @@ func TestReminderCacheEmptyState(t *testing.T) {
 			name: "empty cache never reports nonexistent ids as present",
 			runScript: func(t *testing.T, cache *ReminderCache) ([]bool, []int64) {
 				t.Helper()
+
 				return []bool{}, []int64{}
 			},
 			expected: expected{
@@ -1192,6 +1207,7 @@ func TestReminderCacheEmptyState(t *testing.T) {
 			name: "remove on empty cache returns false",
 			runScript: func(t *testing.T, cache *ReminderCache) ([]bool, []int64) {
 				t.Helper()
+
 				return []bool{cache.Remove(1)}, []int64{}
 			},
 			expected: expected{
@@ -1208,11 +1224,14 @@ func TestReminderCacheEmptyState(t *testing.T) {
 			name: "multiple empty operations preserve empty state",
 			runScript: func(t *testing.T, cache *ReminderCache) ([]bool, []int64) {
 				t.Helper()
+
 				popped := cache.PopDue(baseTime)
+
 				poppedIDs := make([]int64, 0, len(popped))
 				for _, reminder := range popped {
 					poppedIDs = append(poppedIDs, reminder.ID)
 				}
+
 				return []bool{cache.Remove(10)}, poppedIDs
 			},
 			expected: expected{
