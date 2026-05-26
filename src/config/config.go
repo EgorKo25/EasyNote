@@ -58,10 +58,10 @@ type Config struct {
 }
 
 type SchedulerConfig struct {
-	CacheWindow     time.Duration `default:"24h" validate:"required,gt=0"  yaml:"cache_window"`
-	RefreshInterval time.Duration `default:"5m"  validate:"required,gt=0"  yaml:"refresh_interval"`
-	LockTimeout     time.Duration `default:"1m"  validate:"required,gt=0"  yaml:"lock_timeout"`
-	MaxAttempts     int           `default:"5"   validate:"required,min=1" yaml:"max_attempts"`
+	CacheWindow  time.Duration `default:"24h" validate:"required,gt=0"  yaml:"cache_window"`
+	PollInterval time.Duration `default:"1m"  validate:"required,gt=0"  yaml:"poll_interval"`
+	LockTimeout  time.Duration `default:"1m"  validate:"required,gt=0"  yaml:"lock_timeout"`
+	MaxAttempts  int           `default:"5"   validate:"required,min=1" yaml:"max_attempts"`
 }
 
 type AppConfig struct {
