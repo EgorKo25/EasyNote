@@ -19,7 +19,7 @@ logger:
 
 scheduler:
   cache_window: 24h
-  refresh_interval: 5m
+  poll_interval: 1m
   lock_timeout: 1m
   max_attempts: 5
 
