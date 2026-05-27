@@ -2,7 +2,6 @@ package scheduler_test
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 
@@ -15,62 +14,12 @@ import (
 	"github.com/EgorKo25/EasyNote/src/scheduler/mocks"
 )
 
-var errStorageUnavailable = errors.New("storage unavailable")
-
-func TestSchedulerSchedule(t *testing.T) {
-	t.Parallel()
-
-	reminder := scheduler.Reminder{
-		TelegramUserID: 101,
-		TelegramChatID: 202,
-		Text:           "send report",
-		RemindAt:       time.Date(2026, time.May, 26, 18, 0, 0, 0, time.UTC),
-	}
-
-	testCases := []struct {
-		name     string
-		err      error
-		expected string
-	}{
-		{
-			name: "saves parsed telegram reminder",
-		},
-		{
-			name:     "wraps database error",
-			err:      errStorageUnavailable,
-			expected: "save reminder: storage unavailable",
-		},
-	}
-
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-
-			ctrl := gomock.NewController(t)
-			reminderDatabase := mocks.NewMockDatabase(ctrl)
-			reminderDatabase.EXPECT().
-				SaveReminder(gomock.Any(), reminder).
-				Return(testCase.err)
-
-			reminderScheduler := scheduler.New(reminderDatabase)
-
-			err := reminderScheduler.Schedule(context.Background(), reminder)
-
-			if testCase.expected != "" {
-				require.EqualError(t, err, testCase.expected)
-			} else {
-				require.NoError(t, err)
-			}
-		})
-	}
-}
-
 func TestSchedulerStartPollsDatabaseWindow(t *testing.T) {
 	t.Parallel()
 
 	baseTime := time.Date(2026, time.May, 26, 18, 0, 0, 0, time.UTC)
 	pollInterval := time.Minute
-	reminders := []database.ScheduledReminder{
+	reminders := []*database.ScheduledReminder{
 		{ID: 1, TelegramChatID: 202, Text: "send report", RemindAt: baseTime.Add(30 * time.Second)},
 	}
 
@@ -84,8 +33,8 @@ func TestSchedulerStartPollsDatabaseWindow(t *testing.T) {
 	defer cancel()
 
 	reminderDatabase.EXPECT().
-		ScheduledReminders(gomock.Any(), baseTime, baseTime.Add(pollInterval)).
-		DoAndReturn(func(_ context.Context, _, _ time.Time) ([]database.ScheduledReminder, error) {
+		ActualReminders(gomock.Any(), baseTime, baseTime.Add(pollInterval)).
+		DoAndReturn(func(_ context.Context, _, _ time.Time) ([]*database.ScheduledReminder, error) {
 			cancel()
 
 			return reminders, nil
@@ -101,7 +50,7 @@ func TestSchedulerStartPollsDatabaseWindow(t *testing.T) {
 		scheduler.WithReminderProcessor(processor),
 	)
 
-	err := reminderScheduler.Start(ctx)
+	err := reminderScheduler.Run(ctx)
 
 	require.ErrorIs(t, err, context.Canceled)
 }

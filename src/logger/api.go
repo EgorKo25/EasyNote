@@ -5,6 +5,7 @@ type Logger interface {
 	Info(msg string, attrs ...Attr)
 	Warn(msg string, attrs ...Attr)
 	Error(msg string, err error, attrs ...Attr)
+	Fatal(msg string, err error, attrs ...Attr)
 
 	With(attrs ...Attr) Logger
 	Named(name string) Logger
