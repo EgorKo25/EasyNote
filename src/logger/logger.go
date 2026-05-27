@@ -15,13 +15,17 @@ import (
 
 var errUnsupportedLoggerOutput = errors.New("unsupported logger output")
 
-func New(app config.AppConfig, cfg config.LoggerConfig) (Logger, error) {
+var globalLogger Logger = &zapLogger{
+	log: zap.NewNop(),
+}
+
+func Initialize(app config.AppConfig, cfg config.Logger) error {
 	cores := make([]zapcore.Core, 0, len(cfg.Cores))
 
 	for _, coreCfg := range cfg.Cores {
 		core, err := newCore(coreCfg)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		cores = append(cores, core)
@@ -37,16 +41,22 @@ func New(app config.AppConfig, cfg config.LoggerConfig) (Logger, error) {
 		),
 	)
 
-	return &zapLogger{
+	globalLogger = &zapLogger{
 		log: log,
-	}, nil
+	}
+
+	return nil
+}
+
+func Get(name string) Logger {
+	return globalLogger.Named(name)
 }
 
 type zapLogger struct {
 	log *zap.Logger
 }
 
-func newCore(cfg config.LoggerCoreConfig) (zapcore.Core, error) {
+func newCore(cfg config.LoggerCore) (zapcore.Core, error) {
 	level := zapcore.InfoLevel
 	if err := level.Set(cfg.Level); err != nil {
 		return nil, fmt.Errorf("set logger level %q: %w", cfg.Level, err)
@@ -77,7 +87,7 @@ func newEncoder(encoding string, cfg zapcore.EncoderConfig) zapcore.Encoder {
 	return zapcore.NewJSONEncoder(cfg)
 }
 
-func newOutput(cfg config.LoggerCoreConfig) (zapcore.WriteSyncer, error) {
+func newOutput(cfg config.LoggerCore) (zapcore.WriteSyncer, error) {
 	switch cfg.Output {
 	case "stdout":
 		return zapcore.Lock(zapcore.AddSync(os.Stdout)), nil
@@ -133,6 +143,13 @@ func (l *zapLogger) Error(msg string, err error, attrs ...Attr) {
 	fields = append(fields, zap.Error(err))
 
 	l.log.Error(msg, fields...)
+}
+
+func (l *zapLogger) Fatal(msg string, err error, attrs ...Attr) {
+	fields := attrsToZapFields(attrs)
+	fields = append(fields, zap.Error(err))
+
+	l.log.Fatal(msg, fields...)
 }
 
 func (l *zapLogger) With(attrs ...Attr) Logger {

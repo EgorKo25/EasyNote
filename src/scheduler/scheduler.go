@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/EgorKo25/EasyNote/src/database"
 )
 
 func New(reminderDatabase Database, opts ...Option) *Scheduler {
@@ -31,7 +33,11 @@ type Scheduler struct {
 	pollInterval time.Duration
 }
 
-func (s *Scheduler) Schedule(ctx context.Context, reminder Reminder) error {
+func (s *Scheduler) Info() string {
+	return fmt.Sprintf("runed scheduler, with poll interval: %s", s.pollInterval)
+}
+
+func (s *Scheduler) Schedule(ctx context.Context, reminder *database.Reminder) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

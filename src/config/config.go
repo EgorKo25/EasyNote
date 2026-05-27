@@ -51,13 +51,13 @@ func validate(cfg Config) error {
 }
 
 type Config struct {
-	AppConfig       `validate:"required" yaml:"app"`
-	LoggerConfig    `validate:"required" yaml:"logger"`
-	SchedulerConfig `validate:"required" yaml:"scheduler"`
-	DatabaseConfig  `validate:"required" yaml:"database"`
+	AppConfig `validate:"required" yaml:"app"`
+	Logger    `validate:"required" yaml:"logger"`
+	Scheduler `validate:"required" yaml:"scheduler"`
+	Database  `validate:"required" yaml:"database"`
 }
 
-type SchedulerConfig struct {
+type Scheduler struct {
 	CacheWindow  time.Duration `default:"24h" validate:"required,gt=0"  yaml:"cache_window"`
 	PollInterval time.Duration `default:"1m"  validate:"required,gt=0"  yaml:"poll_interval"`
 	LockTimeout  time.Duration `default:"1m"  validate:"required,gt=0"  yaml:"lock_timeout"`
@@ -69,11 +69,11 @@ type AppConfig struct {
 	Environment string `default:"local"     validate:"required,oneof=local dev test stage production" yaml:"environment"`
 }
 
-type LoggerConfig struct {
-	Cores []LoggerCoreConfig `validate:"required,min=1,dive" yaml:"cores"`
+type Logger struct {
+	Cores []LoggerCore `validate:"required,min=1,dive" yaml:"cores"`
 }
 
-type LoggerCoreConfig struct {
+type LoggerCore struct {
 	Name       string `validate:"required"                                                yaml:"name"`
 	Level      string `validate:"required,oneof=debug info warn error dpanic panic fatal" yaml:"level"       default:"info"`
 	Encoding   string `validate:"required,oneof=json console"                             yaml:"encoding"    default:"json"`
@@ -81,7 +81,7 @@ type LoggerCoreConfig struct {
 	Path       string `validate:"required_if=Output file"                                 yaml:"path"`
 	TimeFormat string `validate:"required,oneof=utc local"                                yaml:"time_format" default:"utc"`
 }
-type DatabaseConfig struct {
+type Database struct {
 	Host     string `default:"localhost"     validate:"required"                                             yaml:"host"`
 	Port     int    `default:"5432"          validate:"required,min=1,max=65535"                             yaml:"port"`
 	User     string `default:"enote"         validate:"required"                                             yaml:"user"`
