@@ -41,7 +41,7 @@ func (s *Scheduler) Info() string {
 
 func (s *Scheduler) Next(ctx context.Context) (*database.ScheduledReminder, error) {
 	stopContextWatch := context.AfterFunc(ctx, func() {
-		s.queueReдady.Broadcast()
+		s.queueReady.Broadcast()
 	})
 	defer stopContextWatch()
 

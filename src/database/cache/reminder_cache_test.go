@@ -32,7 +32,7 @@ func TestNewScheduledReminder(t *testing.T) {
 		{
 			name: "copies all note and reminder fields into scheduled reminder",
 			input: input{
-				note:     database.Note{ID: 7, TelegramChatID: 101, Text: "Pay utilities"},
+				note:     database.Note{ID: 7, TelegramChatID: 101, Title: "Pay utilities"},
 				reminder: database.Reminder{ID: 11, NoteID: 7, RemindAt: baseTime.Add(10 * time.Minute)},
 			},
 			expected: expected{reminder: fixtureReminder(11, 7, 101, "Pay utilities", baseTime.Add(10*time.Minute))},
@@ -40,7 +40,7 @@ func TestNewScheduledReminder(t *testing.T) {
 		{
 			name: "preserves unicode and punctuation in reminder text",
 			input: input{
-				note:     database.Note{ID: 8, TelegramChatID: 102, Text: "Купить молоко, хлеб и сыр!"},
+				note:     database.Note{ID: 8, TelegramChatID: 102, Title: "Купить молоко, хлеб и сыр!"},
 				reminder: database.Reminder{ID: 12, NoteID: 8, RemindAt: baseTime.Add(30 * time.Minute)},
 			},
 			expected: expected{reminder: fixtureReminder(12, 8, 102,
@@ -57,7 +57,7 @@ func TestNewScheduledReminder(t *testing.T) {
 		{
 			name: "uses reminder note identifier instead of note primary key",
 			input: input{
-				note:     database.Note{ID: 90, TelegramChatID: 103, Text: "Detached reminder"},
+				note:     database.Note{ID: 90, TelegramChatID: 103, Title: "Detached reminder"},
 				reminder: database.Reminder{ID: 13, NoteID: 91, RemindAt: baseTime.Add(45 * time.Minute)},
 			},
 			expected: expected{reminder: fixtureReminder(
@@ -66,7 +66,7 @@ func TestNewScheduledReminder(t *testing.T) {
 		{
 			name: "does not synthesize chat id when note has zero chat identifier",
 			input: input{
-				note:     database.Note{ID: 10, Text: "Missing chat"},
+				note:     database.Note{ID: 10, Title: "Missing chat"},
 				reminder: database.Reminder{ID: 14, NoteID: 10, RemindAt: baseTime.Add(1 * time.Hour)},
 			},
 			expected: expected{reminder: fixtureReminder(
@@ -75,7 +75,7 @@ func TestNewScheduledReminder(t *testing.T) {
 		{
 			name: "does not alter past reminder timestamps",
 			input: input{
-				note:     database.Note{ID: 11, TelegramChatID: 104, Text: "Past reminder"},
+				note:     database.Note{ID: 11, TelegramChatID: 104, Title: "Past reminder"},
 				reminder: database.Reminder{ID: 15, NoteID: 11, RemindAt: baseTime.Add(-15 * time.Minute)},
 			},
 			expected: expected{reminder: fixtureReminder(15, 11, 104, "Past reminder", baseTime.Add(-15*time.Minute))},
@@ -1281,7 +1281,7 @@ func fixtureReminder(id, noteID, chatID int64, text string, remindAt time.Time) 
 		ID:             id,
 		NoteID:         noteID,
 		TelegramChatID: chatID,
-		Text:           text,
+		Title:          text,
 		RemindAt:       remindAt,
 	}
 }

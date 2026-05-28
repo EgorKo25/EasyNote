@@ -14,7 +14,8 @@ func NewScheduledReminder(note database.Note, reminder database.Reminder) Schedu
 		ID:             reminder.ID,
 		NoteID:         reminder.NoteID,
 		TelegramChatID: note.TelegramChatID,
-		Text:           note.Text,
+		Title:          note.Title,
+		Description:    note.Description,
 		RemindAt:       reminder.RemindAt,
 	}
 }
@@ -51,7 +52,8 @@ func (c *ReminderCache) Upsert(reminder ScheduledReminder) {
 	if item, ok := c.byID[reminder.ID]; ok {
 		item.NoteID = reminder.NoteID
 		item.TelegramChatID = reminder.TelegramChatID
-		item.Text = reminder.Text
+		item.Title = reminder.Title
+		item.Description = reminder.Description
 		item.RemindAt = reminder.RemindAt
 
 		heap.Fix(&c.heap, item.Index)
@@ -63,7 +65,8 @@ func (c *ReminderCache) Upsert(reminder ScheduledReminder) {
 		ID:             reminder.ID,
 		NoteID:         reminder.NoteID,
 		TelegramChatID: reminder.TelegramChatID,
-		Text:           reminder.Text,
+		Title:          reminder.Title,
+		Description:    reminder.Description,
 		RemindAt:       reminder.RemindAt,
 	}
 

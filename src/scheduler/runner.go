@@ -15,6 +15,7 @@ func (s *Scheduler) Run(ctx context.Context) error {
 		}
 
 		now := s.clock.Now()
+
 		reminders, err := s.database.ActualReminders(ctx, now, now.Add(s.pollInterval))
 		if err != nil {
 			return fmt.Errorf("load scheduled reminders: %w", err)

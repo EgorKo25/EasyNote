@@ -7,7 +7,8 @@ import (
 	"github.com/EgorKo25/EasyNote/src/config"
 	"github.com/EgorKo25/EasyNote/src/database/postgresql"
 	"github.com/EgorKo25/EasyNote/src/logger"
-	"github.com/EgorKo25/EasyNote/src/scheduler"
+	"github.com/EgorKo25/EasyNote/src/service"
+	"github.com/EgorKo25/EasyNote/src/telegram"
 )
 
 func main() {
@@ -22,32 +23,45 @@ func main() {
 
 	log := logger.Get("main")
 
-	defer func() {
-		err = log.Sync()
-		if err != nil {
-			panic(err)
-		}
-	}()
-
 	log.With(logger.Any("config", cfg)).Info("the application configuration is initialized")
 
-	database, err := postgresql.NewDatabase(cfg.Database)
+	ctx := context.Background()
+
+	database, err := postgresql.NewDatabase(ctx, cfg.Database)
 	if err != nil {
 		log.Error("cannot connect to database", err)
 		panic(err)
 	}
-
-	ctx := context.Background()
 
 	if err = database.Migrate(ctx); err != nil {
 		log.Error("cannot migrate database", err)
 		panic(err)
 	}
 
+	telegramSender, err := telegram.NewSender(ctx, cfg.Telegram)
+	if err != nil {
+		log.Error("cannot initialize telegram sender", err)
+		panic(err)
+	}
+
+	reminderService := service.NewReminderService(database)
+	reminderWorker := service.NewReminderWorker(database, telegramSender, cfg.Scheduler)
+	reminderBot := telegram.NewReminderBot(telegramSender, reminderService, cfg.Telegram)
+
 	runner := background.NewRunner()
 
 	runner.Run(
 		ctx,
-		scheduler.New(database, cfg.PollInterval),
+		reminderWorker,
+		reminderBot,
 	)
+
+	if err = runner.Wait(); err != nil {
+		log.Error("background process failed", err)
+		panic(err)
+	}
+
+	if err := log.Sync(); err != nil {
+		panic(err)
+	}
 }

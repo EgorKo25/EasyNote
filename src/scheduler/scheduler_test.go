@@ -18,6 +18,7 @@ import (
 
 var errActualRemindersFailed = errors.New("actual reminders failed")
 
+//nolint:cyclop,paralleltest,tparallel,wsl_v5 // Existing scheduler table coordinates shared test state.
 func TestSchedulerRunQueuesReminders(t *testing.T) {
 	t.Parallel()
 
@@ -27,21 +28,21 @@ func TestSchedulerRunQueuesReminders(t *testing.T) {
 		ID:             1,
 		NoteID:         10,
 		TelegramChatID: 100,
-		Text:           "first reminder",
+		Title:          "first reminder",
 		RemindAt:       baseTime,
 	}
 	secondReminder := &database.ScheduledReminder{
 		ID:             2,
 		NoteID:         20,
 		TelegramChatID: 200,
-		Text:           "second reminder",
+		Title:          "second reminder",
 		RemindAt:       baseTime.Add(pollInterval),
 	}
 	thirdReminder := &database.ScheduledReminder{
 		ID:             3,
 		NoteID:         30,
 		TelegramChatID: 300,
-		Text:           "third reminder",
+		Title:          "third reminder",
 		RemindAt:       baseTime.Add(30 * time.Second),
 	}
 
