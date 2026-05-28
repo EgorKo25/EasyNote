@@ -130,6 +130,10 @@ func (l *zapLogger) Debug(msg string, attrs ...Attr) {
 	l.log.Debug(msg, attrsToZapFields(attrs)...)
 }
 
+func (l *zapLogger) Debugf(format string, args ...any) {
+	l.log.Debug(fmt.Sprintf(format, args...))
+}
+
 func (l *zapLogger) Info(msg string, attrs ...Attr) {
 	l.log.Info(msg, attrsToZapFields(attrs)...)
 }
@@ -143,6 +147,10 @@ func (l *zapLogger) Error(msg string, err error, attrs ...Attr) {
 	fields = append(fields, zap.Error(err))
 
 	l.log.Error(msg, fields...)
+}
+
+func (l *zapLogger) Errorf(format string, args ...any) {
+	l.log.Error(fmt.Sprintf(format, args...))
 }
 
 func (l *zapLogger) Fatal(msg string, err error, attrs ...Attr) {

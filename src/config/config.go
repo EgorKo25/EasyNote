@@ -54,13 +54,14 @@ type Config struct {
 	AppConfig `validate:"required" yaml:"app"`
 	Logger    `validate:"required" yaml:"logger"`
 	Scheduler `validate:"required" yaml:"scheduler"`
+	Telegram  `validate:"required" yaml:"telegram"`
 	Database  `validate:"required" yaml:"database"`
 }
 
 type Scheduler struct {
 	CacheWindow  time.Duration `default:"24h" validate:"required,gt=0"  yaml:"cache_window"`
 	PollInterval time.Duration `default:"1m"  validate:"required,gt=0"  yaml:"poll_interval"`
-	LockTimeout  time.Duration `default:"1m"  validate:"required,gt=0"  yaml:"lock_timeout"`
+	BatchLimit   int           `default:"50"  validate:"required,min=1" yaml:"batch_limit"`
 	MaxAttempts  int           `default:"5"   validate:"required,min=1" yaml:"max_attempts"`
 }
 
@@ -81,11 +82,33 @@ type LoggerCore struct {
 	Path       string `validate:"required_if=Output file"                                 yaml:"path"`
 	TimeFormat string `validate:"required,oneof=utc local"                                yaml:"time_format" default:"utc"`
 }
+
+type Telegram struct {
+	TokenEnv            string        `default:"TELEGRAM_BOT_TOKEN"       validate:"required"       yaml:"token_env"`
+	APIBaseURL          string        `default:"https://api.telegram.org" validate:"required,url"   yaml:"api_base_url"`
+	RequestTimeout      time.Duration `default:"10s"                      validate:"required,gt=0"  yaml:"request_timeout"`
+	DebugMode           bool          `default:"false"                                              yaml:"debug_mode"`
+	Warnings            bool          `default:"true"                                               yaml:"warnings"`
+	HealthCheck         bool          `default:"false"                                              yaml:"health_check"`
+	LongPollingBuffer   uint          `default:"100"                      validate:"required,min=1" yaml:"long_polling_buffer"`
+	LongPollingInterval time.Duration `default:"0s"                       validate:"min=0"          yaml:"long_polling_interval"`
+	LongPollingRetry    time.Duration `default:"8s"                       validate:"required,gt=0"  yaml:"long_polling_retry"`
+	ParseMode           string        `                                                             yaml:"parse_mode"`
+	DisableNotification bool          `default:"false"                                              yaml:"disable_notification"`
+	ProtectContent      bool          `default:"false"                                              yaml:"protect_content"`
+}
+
 type Database struct {
-	Host     string `default:"localhost"     validate:"required"                                             yaml:"host"`
-	Port     int    `default:"5432"          validate:"required,min=1,max=65535"                             yaml:"port"`
-	User     string `default:"enote"         validate:"required"                                             yaml:"user"`
-	Password string `default:"enotePassword" validate:"required"                                             yaml:"password"`
-	Name     string `default:"easy_note"     validate:"required"                                             yaml:"name"`
-	SSLMode  string `default:"disable"       validate:"required,oneof=disable require verify-ca verify-full" yaml:"ssl_mode"`
+	Host              string        `default:"localhost"     validate:"required"                                             yaml:"host"`
+	Port              int           `default:"5432"          validate:"required,min=1,max=65535"                             yaml:"port"`
+	User              string        `default:"enote"         validate:"required"                                             yaml:"user"`
+	Password          string        `default:"enotePassword" validate:"required"                                             yaml:"password"`
+	Name              string        `default:"easy_note"     validate:"required"                                             yaml:"name"`
+	SSLMode           string        `default:"disable"       validate:"required,oneof=disable require verify-ca verify-full" yaml:"ssl_mode"`
+	MigrationDialect  string        `default:"postgres"      validate:"required"                                             yaml:"migration_dialect"`
+	MaxConns          int32         `default:"4"             validate:"required,min=1"                                       yaml:"max_conns"`
+	MinConns          int32         `default:"0"             validate:"min=0"                                                yaml:"min_conns"`
+	MaxConnLifetime   time.Duration `default:"1h"            validate:"required,gt=0"                                        yaml:"max_conn_lifetime"`
+	MaxConnIdleTime   time.Duration `default:"30m"           validate:"required,gt=0"                                        yaml:"max_conn_idle_time"`
+	HealthCheckPeriod time.Duration `default:"1m"            validate:"required,gt=0"                                        yaml:"health_check_period"`
 }
