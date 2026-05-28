@@ -31,21 +31,23 @@ func main() {
 
 	log.With(logger.Any("config", cfg)).Info("the application configuration is initialized")
 
+	database, err := postgresql.NewDatabase(cfg.Database)
+	if err != nil {
+		log.Error("cannot connect to database", err)
+		panic(err)
+	}
+
 	ctx := context.Background()
+
+	if err = database.Migrate(ctx); err != nil {
+		log.Error("cannot migrate database", err)
+		panic(err)
+	}
 
 	runner := background.NewRunner()
 
-	db, err := postgresql.NewDatabase(cfg.Database)
-	if err != nil {
-		log.Fatal("cannot connect to database", err)
-	}
-
-	if err = db.Migrate(); err != nil {
-		log.Fatal("cannot migrate database", err)
-	}
-
-	runner.Run(ctx,
-		scheduler.New(db, scheduler.WithPollInterval(cfg.PollInterval)),
+	runner.Run(
+		ctx,
+		scheduler.New(database, cfg.PollInterval),
 	)
-
 }

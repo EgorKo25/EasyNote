@@ -15,7 +15,7 @@ func NewDatabase(_ config.Database) (*Database, error) {
 type Database struct {
 }
 
-func (*Database) Migrate() error {
+func (*Database) Migrate(_ context.Context) error {
 	return nil
 }
 

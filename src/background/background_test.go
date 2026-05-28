@@ -20,6 +20,7 @@ type ProcessFunc func(ctx context.Context) error
 func (f ProcessFunc) Run(ctx context.Context) error {
 	return f(ctx)
 }
+func (f ProcessFunc) Info() string { return "test info" }
 
 func TestWaitReturnsProcessError(t *testing.T) {
 	t.Parallel()

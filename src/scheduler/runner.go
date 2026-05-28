@@ -14,14 +14,13 @@ func (s *Scheduler) Run(ctx context.Context) error {
 			return fmt.Errorf("check scheduler context: %w", err)
 		}
 
-		reminders, err := s.loadPollingWindow(ctx)
+		now := s.clock.Now()
+		reminders, err := s.database.ActualReminders(ctx, now, now.Add(s.pollInterval))
 		if err != nil {
-			return err
+			return fmt.Errorf("load scheduled reminders: %w", err)
 		}
 
-		if err = s.processor.ProcessReminders(ctx, reminders); err != nil {
-			return fmt.Errorf("process due reminders: %w", err)
-		}
+		s.enqueue(reminders)
 
 		if err = s.sleep(ctx, s.pollInterval); err != nil {
 			return err
@@ -29,18 +28,16 @@ func (s *Scheduler) Run(ctx context.Context) error {
 	}
 }
 
-func (s *Scheduler) loadPollingWindow(ctx context.Context) ([]*database.ScheduledReminder, error) {
+func (s *Scheduler) enqueue(reminders []*database.ScheduledReminder) {
+	if len(reminders) == 0 {
+		return
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	now := s.clock.Now()
-
-	reminders, err := s.database.ActualReminders(ctx, now, now.Add(s.pollInterval))
-	if err != nil {
-		return nil, fmt.Errorf("load scheduled reminders: %w", err)
-	}
-
-	return reminders, nil
+	s.queue = append(s.queue, reminders...)
+	s.queueReady.Broadcast()
 }
 
 func (s *Scheduler) sleep(ctx context.Context, delay time.Duration) error {
