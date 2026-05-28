@@ -15,7 +15,3 @@ type Database interface {
 		from, to time.Time,
 	) ([]*database.ScheduledReminder, error)
 }
-
-type ReminderProcessor interface {
-	ProcessReminders(ctx context.Context, reminders []*database.ScheduledReminder) error
-}
