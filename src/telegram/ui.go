@@ -9,20 +9,26 @@ import (
 	tu "github.com/mymmrac/telego/telegoutil"
 )
 
-const buttonStart = "Старт"
-const buttonCreateReminder = "Создать напоминание"
-const buttonReminderList = "Список напоминаний"
+const (
+	buttonStart          = "Старт"
+	buttonCreateReminder = "Создать напоминание"
+	buttonReminderList   = "Список напоминаний"
+)
+const (
+	callbackDraftTitle       = "draft:title"
+	callbackDraftDescription = "draft:description"
+	callbackDraftTime        = "draft:time"
+	callbackDraftSave        = "draft:save"
+	callbackDraftCancel      = "draft:cancel"
+	callbackDeletePrefix     = "reminder:delete:"
+)
+const (
+	fieldTitle       draftField = "title"
+	fieldDescription draftField = "description"
+	fieldTime        draftField = "time"
+)
 
-const callbackDraftTitle = "draft:title"
-const callbackDraftDescription = "draft:description"
-const callbackDraftTime = "draft:time"
-const callbackDraftSave = "draft:save"
-const callbackDraftCancel = "draft:cancel"
-const callbackDeletePrefix = "reminder:delete:"
-
-const fieldTitle draftField = "title"
-const fieldDescription draftField = "description"
-const fieldTime draftField = "time"
+const emptyFieldText = "не задано"
 
 func mainKeyboard() *telego.ReplyKeyboardMarkup {
 	return tu.Keyboard(
@@ -51,17 +57,16 @@ func deleteKeyboard(reminderID int64) *telego.InlineKeyboardMarkup {
 }
 
 func draftText(draft reminderDraft) string {
-	remindAt := "не задано"
+	remindAt, title, description := emptyFieldText, emptyFieldText, emptyFieldText
+
 	if !draft.remindAt.IsZero() {
 		remindAt = draft.remindAt.Format(time.DateTime)
 	}
 
-	title := "не задано"
 	if draft.title != "" {
 		title = draft.title
 	}
 
-	description := "не задано"
 	if draft.description != "" {
 		description = draft.description
 	}
