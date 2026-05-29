@@ -183,14 +183,26 @@ jobs:
       APP_IMAGE: ${{ needs.dockerize.outputs.image-name }}:beta
       GHCR_USERNAME: ${{ github.actor }}
       GHCR_TOKEN: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+      POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      POSTGRES_HOST_PORT: ${{ secrets.POSTGRES_HOST_PORT }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
       - name: Validate deployment variables
+        env:
+          BETA_SSH_KEY: ${{ secrets.BETA_SSH_KEY }}
         run: |
           test -n "${DEPLOY_PATH}" || (echo "BETA_DEPLOY_PATH variable is required" >&2; exit 1)
           test -n "${GHCR_TOKEN}" || (echo "GHCR_TOKEN or GITHUB_TOKEN is required" >&2; exit 1)
+          test -n "${BETA_SSH_KEY}" || (echo "BETA_SSH_KEY secret is required" >&2; exit 1)
+          test -n "${TELEGRAM_BOT_TOKEN}" || (echo "TELEGRAM_BOT_TOKEN secret is required" >&2; exit 1)
+          test -n "${POSTGRES_DB}" || (echo "POSTGRES_DB secret is required" >&2; exit 1)
+          test -n "${POSTGRES_USER}" || (echo "POSTGRES_USER secret is required" >&2; exit 1)
+          test -n "${POSTGRES_PASSWORD}" || (echo "POSTGRES_PASSWORD secret is required" >&2; exit 1)
 
       - name: Ensure deployment directory exists
         uses: appleboy/ssh-action@v1.2.2
@@ -199,9 +211,9 @@ jobs:
           username: ${{ secrets.BETA_SSH_USERNAME }}
           key: ${{ secrets.BETA_SSH_KEY }}
           port: ${{ secrets.BETA_SSH_PORT || 22 }}
-          script_stop: true
           envs: DEPLOY_PATH
           script: |
+            set -e
             mkdir -p "${DEPLOY_PATH}"
 
       - name: Upload Docker Compose file
@@ -222,10 +234,18 @@ jobs:
           username: ${{ secrets.BETA_SSH_USERNAME }}
           key: ${{ secrets.BETA_SSH_KEY }}
           port: ${{ secrets.BETA_SSH_PORT || 22 }}
-          script_stop: true
-          envs: DEPLOY_PATH,APP_IMAGE,GHCR_USERNAME,GHCR_TOKEN
+          envs: DEPLOY_PATH,APP_IMAGE,GHCR_USERNAME,GHCR_TOKEN,TELEGRAM_BOT_TOKEN,POSTGRES_DB,POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_HOST_PORT
           script: |
+            set -e
             cd "${DEPLOY_PATH}"
+            {
+              printf 'TELEGRAM_BOT_TOKEN=%s\n' "${TELEGRAM_BOT_TOKEN}"
+              printf 'POSTGRES_DB=%s\n' "${POSTGRES_DB}"
+              printf 'POSTGRES_USER=%s\n' "${POSTGRES_USER}"
+              printf 'POSTGRES_PASSWORD=%s\n' "${POSTGRES_PASSWORD}"
+              printf 'POSTGRES_HOST_PORT=%s\n' "${POSTGRES_HOST_PORT:-5432}"
+            } > .env
+            chmod 600 .env
             echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USERNAME}" --password-stdin
             APP_IMAGE="${APP_IMAGE}" docker compose pull app
             APP_IMAGE="${APP_IMAGE}" docker compose up -d --no-deps app
