@@ -123,7 +123,7 @@ func TestReminderWorkerStopsOnContextCancellation(t *testing.T) {
 		mocks.NewMockReminderRepository(ctrl),
 		mocks.NewMockReminderSender(ctrl),
 		config.Scheduler{
-			PollInterval: time.Nanosecond,
+			PollInterval: time.Hour,
 			BatchLimit:   50,
 			MaxAttempts:  5,
 		},
