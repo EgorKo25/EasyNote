@@ -7,27 +7,17 @@ import (
 	"github.com/EgorKo25/EasyNote/src/database"
 )
 
+type ScheduledReminder = database.ScheduledReminder
+
 func NewScheduledReminder(note database.Note, reminder database.Reminder) ScheduledReminder {
 	return ScheduledReminder{
 		ID:             reminder.ID,
 		NoteID:         reminder.NoteID,
 		TelegramChatID: note.TelegramChatID,
-		Text:           note.Text,
+		Title:          note.Title,
+		Description:    note.Description,
 		RemindAt:       reminder.RemindAt,
 	}
-}
-
-type ScheduledReminder struct {
-	ID int64
-
-	NoteID int64
-
-	TelegramChatID int64
-	Text           string
-
-	RemindAt time.Time
-
-	index int
 }
 
 func NewReminderCache(cacheWindow time.Duration) *ReminderCache {
@@ -62,10 +52,11 @@ func (c *ReminderCache) Upsert(reminder ScheduledReminder) {
 	if item, ok := c.byID[reminder.ID]; ok {
 		item.NoteID = reminder.NoteID
 		item.TelegramChatID = reminder.TelegramChatID
-		item.Text = reminder.Text
+		item.Title = reminder.Title
+		item.Description = reminder.Description
 		item.RemindAt = reminder.RemindAt
 
-		heap.Fix(&c.heap, item.index)
+		heap.Fix(&c.heap, item.Index)
 
 		return
 	}
@@ -74,12 +65,23 @@ func (c *ReminderCache) Upsert(reminder ScheduledReminder) {
 		ID:             reminder.ID,
 		NoteID:         reminder.NoteID,
 		TelegramChatID: reminder.TelegramChatID,
-		Text:           reminder.Text,
+		Title:          reminder.Title,
+		Description:    reminder.Description,
 		RemindAt:       reminder.RemindAt,
 	}
 
 	heap.Push(&c.heap, item)
 	c.byID[item.ID] = item
+}
+
+func (c *ReminderCache) Replace(reminders []ScheduledReminder) {
+	c.heap = make(reminderHeap, 0, len(reminders))
+	c.byID = make(map[int64]*ScheduledReminder, len(reminders))
+	heap.Init(&c.heap)
+
+	for _, reminder := range reminders {
+		c.Upsert(reminder)
+	}
 }
 
 func (c *ReminderCache) Next() (ScheduledReminder, bool) {
@@ -118,7 +120,7 @@ func (c *ReminderCache) Remove(elementID int64) bool {
 		return false
 	}
 
-	heap.Remove(&c.heap, item.index)
+	heap.Remove(&c.heap, item.Index)
 	delete(c.byID, elementID)
 
 	return true

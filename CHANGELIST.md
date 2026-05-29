@@ -1,22 +1,231 @@
-version: 0.2.0
+version: 1.0.0
 
-## v0.2.0 - добавлен кеш напоминаний и строгие проверки репозитория
+## v1.0.0 - beta deployment ready
 
-### Что было сделано
+### What was done
 
-Был расширен слой кеша напоминаний: добавлены heap-примитивы для планирования и unit-тесты.
+The branch is now ready for a manually triggered beta deployment.
 
-Был добавлен конфиг golangci-lint, а существующий код был приведен к настроенным проверкам.
+The Docker Compose deployment uses the GHCR `beta` image tag and keeps PostgreSQL as a persistent service that is not restarted during application-only deploys.
 
-Были добавлены миграция базы данных и общие типы базы данных для заметок и напоминаний.
+The manual GitHub Actions CD job validates deployment variables, uploads the Compose file to the configured server path, pulls the latest application image, and restarts only the application container.
 
-### Изменения API
+### API changes
 
-Публичный HTTP API и внешний API приложения не изменялись.
+No public HTTP API was introduced.
 
-Внутренние API базы данных и кеша были расширены для хранения и получения напоминаний.
+The operational deployment contract is now stable for beta:
 
-### Затронутые файлы
+- `BETA_DEPLOY_PATH` defines where Compose is placed on the server.
+- `BETA_SSH_HOST`, `BETA_SSH_USERNAME`, and `BETA_SSH_KEY` define server access.
+- `TELEGRAM_BOT_TOKEN` must exist in the server `.env`, otherwise the application does not start.
+
+### Affected files
+
+- `.github/workflows/ci.yml`
+- `deploy/docker/.env.example`
+- `deploy/docker/docker-compose.yaml`
+
+## v0.9.0 - manual CD through GitHub Actions
+
+### What was done
+
+The CI workflow was extended with `workflow_dispatch` so beta deployment is a deliberate manual action.
+
+The Docker build step now uses the Dockerfile from `deploy/docker` and publishes a `beta` image tag for manual deployment runs.
+
+The deploy job copies the Compose file to the server and runs `docker compose pull app` plus `docker compose up -d --no-deps app`.
+
+### API changes
+
+No runtime API changes were introduced.
+
+The CI/CD contract changed: beta deployment is available only from a manual workflow run.
+
+### Affected files
+
+- `.github/workflows/ci.yml`
+
+## v0.8.0 - Docker deployment layout
+
+### What was done
+
+Docker deployment files were moved into `deploy/docker`.
+
+The deployment Dockerfile now builds the real root application package and copies the existing `config` directory into the runtime image.
+
+The old root Dockerfile was removed so Docker-related files are grouped in one deployment directory.
+
+The Compose file defines the application and PostgreSQL services, persistent database and log volumes, and a required Telegram token variable.
+
+### API changes
+
+No application API changes were introduced.
+
+The Docker build command now uses `deploy/docker/EasyNote.Dockerfile`.
+
+### Affected files
+
+- `Dockerfile`
+- `deploy/docker/.env.example`
+- `deploy/docker/EasyNote.Dockerfile`
+- `deploy/docker/docker-compose.yaml`
+
+## v0.7.0 - environment-backed runtime configuration
+
+### What was done
+
+Configuration loading now applies environment variable overrides after defaults and YAML parsing.
+
+The environment parser uses `github.com/caarlos0/env/v11` instead of hand-written `os.Getenv` mapping.
+
+Database connection settings and application environment can be supplied by deployment environment variables.
+
+### API changes
+
+The following environment variables can override YAML configuration:
+
+- `APP_ENVIRONMENT`
+- `DATABASE_HOST`
+- `DATABASE_PORT`
+- `DATABASE_USER`
+- `DATABASE_PASSWORD`
+- `DATABASE_NAME`
+- `DATABASE_SSL_MODE`
+
+### Affected files
+
+- `go.mod`
+- `go.sum`
+- `src/config/config.go`
+
+## v0.6.0 - Telegram token supplied from configuration
+
+### What was done
+
+Telegram sender initialization reads the token from the environment variable named by `telegram.token_env`.
+
+The default token environment variable is `TELEGRAM_BOT_TOKEN`.
+
+Application startup fails during Telegram sender initialization when the token is missing.
+
+### API changes
+
+`telegram.token_env` is the configuration key for the Telegram token environment variable name.
+
+### Affected files
+
+- `config/config.yaml`
+- `src/config/config.go`
+- `src/telegram/sender.go`
+
+## v0.5.0 - background reminder runtime
+
+### What was done
+
+The application runtime was wired around background processes for reminder sending and Telegram long polling.
+
+The reminder worker polls the database for due reminders, sends them through Telegram, and updates reminder status.
+
+The background runner owns long-lived process lifecycle and shared cancellation.
+
+### API changes
+
+The active reminder sending path is database-driven and does not require restarting or rebuilding an in-memory scheduler queue.
+
+### Affected files
+
+- `main.go`
+- `src/background/background.go`
+- `src/service/reminder_worker.go`
+- `src/telegram/reminder_bot.go`
+- `src/telegram/sender.go`
+
+## v0.4.0 - scheduler uses database as source of truth
+
+### What was done
+
+The scheduler branch introduced a service-facing scheduler facade above the database cache layer.
+
+The scheduler now persists every scheduled reminder through the `Database` interface before trying to cache it.
+
+The cache can now replace its whole reminder window during refresh, so refreshed database windows remove stale cache entries.
+
+Scheduler tests were rewritten as table-driven tests with `github.com/benbjohnson/clock`, real cache coverage, and generated `go.uber.org/mock` mocks.
+
+Scheduler load coverage was added for 1,000 and 10,000 reminder scenarios, plus a benchmark for schedule-and-drain behavior.
+
+Concurrent scheduler coverage was added for 800 and 900 parallel scheduling calls.
+
+### API changes
+
+`scheduler.Database` now exposes `SaveScheduledReminder(ctx, reminder)` and `ScheduledReminders(ctx, from, to)`.
+
+`scheduler.Cache` now exposes `Replace(reminders)`.
+
+`Scheduler.Schedule` and `Scheduler.ScheduleReminder` now accept `context.Context` and return `(bool, error)`.
+
+`Scheduler.Refresh` now loads the `[now, now + cacheWindow]` database window and replaces the cache contents.
+
+### Affected files
+
+- `CHANGELIST.md`
+- `README.md`
+- `README_RU.md`
+- `.gitignore`
+- `go.mod`
+- `go.sum`
+- `src/database/cache/heap.go`
+- `src/database/cache/reminder_cache.go`
+- `src/database/cache/reminder_cache_test.go`
+- `src/database/types.go`
+- `src/scheduler/clock.go`
+- `src/scheduler/dependencies.go`
+- `src/scheduler/mocks/scheduler_mock.go`
+- `src/scheduler/scheduler.go`
+- `src/scheduler/scheduler_test.go`
+
+## v0.3.0 - added pull request CI and versioned build artifacts
+
+### What was done
+
+GitHub Actions CI was added for pull requests.
+
+The pipeline builds the Go application, uploads a versioned binary artifact, runs golangci-lint from the repository config, runs unit tests, and builds/pushes the Docker image to GHCR.
+
+The CI artifact and Docker image tags use the version from `CHANGELIST.md`.
+
+### API changes
+
+No runtime API changes were introduced.
+
+The delivery contract changed: CI artifacts and Docker image tags are versioned from the changelist.
+
+### Affected files
+
+- `.dockerignore`
+- `.github/workflows/ci.yml`
+- `CHANGELIST.md`
+- `Dockerfile`
+- `README.md`
+
+## v0.2.0 - added reminder cache and repository quality checks
+
+### What was done
+
+The reminder cache layer was extended with heap-based scheduling primitives and unit test coverage.
+
+The repository lint configuration was added and existing code was adjusted to match the configured checks.
+
+The database migration and shared database types for notes and reminders were added.
+
+### API changes
+
+No public HTTP or external API changes were introduced.
+
+The internal database and cache APIs were extended for reminder storage and retrieval.
+
+### Affected files
 
 - `.gitignore`
 - `.golangci.yml`
@@ -32,25 +241,25 @@ version: 0.2.0
 - `src/database/types.go`
 - `src/logger/logger.go`
 
-## v0.1.0 - создана базовая структура приложения
+## v0.1.0 - created base application structure
 
-### Что было сделано
+### What was done
 
-Были созданы Go-модуль и точка входа приложения.
+The initial Go module and application entrypoint were created.
 
-Был добавлен базовый загрузчик конфигурации с чтением YAML, значениями по умолчанию и валидацией.
+The base configuration loader was added with YAML parsing, defaults, and validation.
 
-Были добавлены абстракция логгера и реализация на Zap.
+The logger abstraction and Zap-based implementation were added.
 
-Была добавлена первая реализация кеша напоминаний.
+The first reminder cache implementation was added.
 
-### Изменения API
+### API changes
 
-Публичный HTTP API и внешний API приложения не добавлялись.
+No public HTTP or external API was introduced.
 
-Были добавлены первые внутренние API конфигурации, логгера и кеша напоминаний.
+The initial internal configuration, logger, and reminder cache APIs were introduced.
 
-### Затронутые файлы
+### Affected files
 
 - `.gitignore`
 - `config/config.yaml`
