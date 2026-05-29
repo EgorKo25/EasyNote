@@ -6,7 +6,7 @@ Telegram reminder bot for routine tasks.
 
 The source of truth for the application version is `CHANGELIST.md`.
 
-Current version: `0.4.0`.
+Current version: `1.0.0`.
 
 ## Tests
 
@@ -15,6 +15,14 @@ Focused verification commands:
 ```bash
 go test ./src/scheduler ./src/database/cache ./src/database ./src/config -cover
 golangci-lint run ./src/scheduler ./src/database/cache ./src/database ./src/config
+```
+
+Deployment-focused checks:
+
+```bash
+go test ./src/config ./src/telegram -count=1
+golangci-lint run --config ./.golangci.yml ./src/config
+docker build --check -f deploy/docker/EasyNote.Dockerfile .
 ```
 
 ### Package `src/scheduler`
@@ -106,6 +114,72 @@ Data flow:
 
 The design keeps business rules above storage details and lets the cache stay disposable.
 
+## Deployment
+
+Docker deployment files live in `deploy/docker`.
+
+Local or server-side Compose startup:
+
+```bash
+cd deploy/docker
+docker compose up -d postgres
+docker compose up -d app
+```
+
+Required application environment:
+
+| Variable | Purpose |
+|---|---|
+| `APP_IMAGE` | Application image used by Compose, for example `ghcr.io/owner/repository:beta` |
+| `TELEGRAM_BOT_TOKEN` | Telegram bot token; startup fails when it is missing |
+| `POSTGRES_DB` | PostgreSQL database name |
+| `POSTGRES_USER` | PostgreSQL user |
+| `POSTGRES_PASSWORD` | PostgreSQL password |
+| `POSTGRES_HOST_PORT` | Optional host port for PostgreSQL |
+
+The application config is loaded in this order:
+
+1. Struct defaults.
+2. `config/config.yaml`.
+3. Environment overrides parsed by `github.com/caarlos0/env/v11`.
+4. Validator checks.
+
+Supported deployment overrides:
+
+| Variable | Config field |
+|---|---|
+| `APP_ENVIRONMENT` | `app.environment` |
+| `DATABASE_HOST` | `database.host` |
+| `DATABASE_PORT` | `database.port` |
+| `DATABASE_USER` | `database.user` |
+| `DATABASE_PASSWORD` | `database.password` |
+| `DATABASE_NAME` | `database.name` |
+| `DATABASE_SSL_MODE` | `database.ssl_mode` |
+
+### Beta CD
+
+The GitHub Actions workflow has a manual `workflow_dispatch` beta deployment path.
+
+Repository/environment variables and secrets required by the beta job:
+
+| Name | Type | Purpose |
+|---|---|---|
+| `BETA_DEPLOY_PATH` | variable | Directory on the server where `docker-compose.yaml` is uploaded |
+| `BETA_SSH_HOST` | secret | Server host |
+| `BETA_SSH_USERNAME` | secret | SSH user |
+| `BETA_SSH_KEY` | secret | SSH private key |
+| `BETA_SSH_PORT` | secret, optional | SSH port, defaults to `22` |
+| `GHCR_TOKEN` | secret, optional | GHCR token; falls back to `GITHUB_TOKEN` |
+
+The deploy job pushes the `beta` image tag, uploads the Compose file, pulls the new application image, and restarts only the application service:
+
+```bash
+docker compose pull app
+docker compose up -d --no-deps app
+```
+
+PostgreSQL is not restarted by the beta CD job.
+
 ### Cache in practice
 
 ![EasyNote cache and heap flow](./pictures/cache-heap-flow.png)
@@ -135,7 +209,46 @@ This is why the heap can be very small while the database can keep the full remi
 ## Changelist
 
 <div style="max-height: 420px; overflow-y: auto; border: 1px solid #d0d7de; border-radius: 6px; padding: 16px;">
-<p><strong>version: 0.4.0</strong></p>
+<p><strong>version: 1.0.0</strong></p>
+
+<h2>v1.0.0 - beta deployment ready</h2>
+<ul>
+  <li>The beta deployment path is ready for manual GitHub Actions runs.</li>
+  <li>The deploy job updates only the application container and keeps PostgreSQL running.</li>
+  <li>The server path and SSH connection are supplied by GitHub variables and secrets.</li>
+</ul>
+
+<h2>v0.9.0 - manual CD through GitHub Actions</h2>
+<ul>
+  <li>`workflow_dispatch` was added for deliberate beta deployments.</li>
+  <li>The Docker image receives a `beta` tag during manual runs.</li>
+  <li>The deploy step uploads Compose, pulls the app image, and runs `docker compose up -d --no-deps app`.</li>
+</ul>
+
+<h2>v0.8.0 - Docker deployment layout</h2>
+<ul>
+  <li>Docker files were grouped under `deploy/docker`.</li>
+  <li>The deployment Dockerfile now builds the root application package and copies the existing config directory.</li>
+  <li>The Compose file defines app, PostgreSQL, persistent database data, and logs.</li>
+</ul>
+
+<h2>v0.7.0 - environment-backed runtime configuration</h2>
+<ul>
+  <li>Environment overrides are parsed with `github.com/caarlos0/env/v11` after defaults and YAML.</li>
+  <li>Database and application environment settings can be supplied by deployment env vars.</li>
+</ul>
+
+<h2>v0.6.0 - Telegram token supplied from configuration</h2>
+<ul>
+  <li>The Telegram token is read from the environment variable named by `telegram.token_env`.</li>
+  <li>The default token variable is `TELEGRAM_BOT_TOKEN`, and startup fails if it is missing.</li>
+</ul>
+
+<h2>v0.5.0 - background reminder runtime</h2>
+<ul>
+  <li>The runtime now uses background processes for reminder sending and Telegram long polling.</li>
+  <li>The reminder worker polls the database for due reminders and updates delivery status.</li>
+</ul>
 
 <h2>v0.4.0 - scheduler uses database as source of truth</h2>
 <ul>

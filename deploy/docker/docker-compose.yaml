@@ -1,6 +1,6 @@
 services:
   app:
-    image: ${APP_IMAGE:-easy-note:local}
+    image: ${APP_IMAGE:-easynote:local}
     container_name: easy-note-app
     restart: unless-stopped
     env_file:
@@ -9,7 +9,7 @@ services:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?TELEGRAM_BOT_TOKEN is required}
 
       DATABASE_HOST: postgres
-      DATABASE_PORT: 5432
+      DATABASE_PORT: "5432"
       DATABASE_USER: ${POSTGRES_USER:-postgres}
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       DATABASE_NAME: ${POSTGRES_DB:-notes}

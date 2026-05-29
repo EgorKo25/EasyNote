@@ -1,4 +1,145 @@
-version: 0.4.0
+version: 1.0.0
+
+## v1.0.0 - beta deployment ready
+
+### What was done
+
+The branch is now ready for a manually triggered beta deployment.
+
+The Docker Compose deployment uses the GHCR `beta` image tag and keeps PostgreSQL as a persistent service that is not restarted during application-only deploys.
+
+The manual GitHub Actions CD job validates deployment variables, uploads the Compose file to the configured server path, pulls the latest application image, and restarts only the application container.
+
+### API changes
+
+No public HTTP API was introduced.
+
+The operational deployment contract is now stable for beta:
+
+- `BETA_DEPLOY_PATH` defines where Compose is placed on the server.
+- `BETA_SSH_HOST`, `BETA_SSH_USERNAME`, and `BETA_SSH_KEY` define server access.
+- `TELEGRAM_BOT_TOKEN` must exist in the server `.env`, otherwise the application does not start.
+
+### Affected files
+
+- `.github/workflows/ci.yml`
+- `deploy/docker/.env.example`
+- `deploy/docker/docker-compose.yaml`
+
+## v0.9.0 - manual CD through GitHub Actions
+
+### What was done
+
+The CI workflow was extended with `workflow_dispatch` so beta deployment is a deliberate manual action.
+
+The Docker build step now uses the Dockerfile from `deploy/docker` and publishes a `beta` image tag for manual deployment runs.
+
+The deploy job copies the Compose file to the server and runs `docker compose pull app` plus `docker compose up -d --no-deps app`.
+
+### API changes
+
+No runtime API changes were introduced.
+
+The CI/CD contract changed: beta deployment is available only from a manual workflow run.
+
+### Affected files
+
+- `.github/workflows/ci.yml`
+
+## v0.8.0 - Docker deployment layout
+
+### What was done
+
+Docker deployment files were moved into `deploy/docker`.
+
+The deployment Dockerfile now builds the real root application package and copies the existing `config` directory into the runtime image.
+
+The old root Dockerfile was removed so Docker-related files are grouped in one deployment directory.
+
+The Compose file defines the application and PostgreSQL services, persistent database and log volumes, and a required Telegram token variable.
+
+### API changes
+
+No application API changes were introduced.
+
+The Docker build command now uses `deploy/docker/EasyNote.Dockerfile`.
+
+### Affected files
+
+- `Dockerfile`
+- `deploy/docker/.env.example`
+- `deploy/docker/EasyNote.Dockerfile`
+- `deploy/docker/docker-compose.yaml`
+
+## v0.7.0 - environment-backed runtime configuration
+
+### What was done
+
+Configuration loading now applies environment variable overrides after defaults and YAML parsing.
+
+The environment parser uses `github.com/caarlos0/env/v11` instead of hand-written `os.Getenv` mapping.
+
+Database connection settings and application environment can be supplied by deployment environment variables.
+
+### API changes
+
+The following environment variables can override YAML configuration:
+
+- `APP_ENVIRONMENT`
+- `DATABASE_HOST`
+- `DATABASE_PORT`
+- `DATABASE_USER`
+- `DATABASE_PASSWORD`
+- `DATABASE_NAME`
+- `DATABASE_SSL_MODE`
+
+### Affected files
+
+- `go.mod`
+- `go.sum`
+- `src/config/config.go`
+
+## v0.6.0 - Telegram token supplied from configuration
+
+### What was done
+
+Telegram sender initialization reads the token from the environment variable named by `telegram.token_env`.
+
+The default token environment variable is `TELEGRAM_BOT_TOKEN`.
+
+Application startup fails during Telegram sender initialization when the token is missing.
+
+### API changes
+
+`telegram.token_env` is the configuration key for the Telegram token environment variable name.
+
+### Affected files
+
+- `config/config.yaml`
+- `src/config/config.go`
+- `src/telegram/sender.go`
+
+## v0.5.0 - background reminder runtime
+
+### What was done
+
+The application runtime was wired around background processes for reminder sending and Telegram long polling.
+
+The reminder worker polls the database for due reminders, sends them through Telegram, and updates reminder status.
+
+The background runner owns long-lived process lifecycle and shared cancellation.
+
+### API changes
+
+The active reminder sending path is database-driven and does not require restarting or rebuilding an in-memory scheduler queue.
+
+### Affected files
+
+- `main.go`
+- `src/background/background.go`
+- `src/service/reminder_worker.go`
+- `src/telegram/reminder_bot.go`
+- `src/telegram/sender.go`
 
 ## v0.4.0 - scheduler uses database as source of truth
 
