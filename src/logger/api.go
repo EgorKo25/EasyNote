@@ -2,9 +2,12 @@ package logger
 
 type Logger interface {
 	Debug(msg string, attrs ...Attr)
+	Debugf(format string, args ...any)
 	Info(msg string, attrs ...Attr)
 	Warn(msg string, attrs ...Attr)
 	Error(msg string, err error, attrs ...Attr)
+	Errorf(format string, args ...any)
+	Fatal(msg string, err error, attrs ...Attr)
 
 	With(attrs ...Attr) Logger
 	Named(name string) Logger
