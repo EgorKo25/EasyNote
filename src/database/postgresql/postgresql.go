@@ -32,6 +32,7 @@ func NewDatabase(ctx context.Context, cfg config.Database) (*Database, error) {
 		cfg.Name,
 		cfg.SSLMode,
 	)
+
 	poolCfg, err := pgxpool.ParseConfig(connectionString)
 	if err != nil {
 		return nil, fmt.Errorf("parse postgres pool config: %w", err)
@@ -238,6 +239,13 @@ func (d *Database) FindRemindersReadyToSend(
 		return nil, fmt.Errorf("begin find reminders ready to send transaction: %w", err)
 	}
 
+	defer func() {
+		if rollbackErr := transaction.Rollback(ctx); rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
+			logger.Get("database/postgresql").
+				Error("cannot rollback find reminders ready to send transaction", rollbackErr)
+		}
+	}()
+
 	query := `
 		WITH due AS (
 			SELECT r.id
@@ -264,33 +272,17 @@ func (d *Database) FindRemindersReadyToSend(
 
 	rows, err := transaction.Query(ctx, query, now, maxAttempts, limit)
 	if err != nil {
-		if rollbackErr := transaction.Rollback(ctx); rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
-			logger.Get("database/postgresql").
-				Error("cannot rollback find reminders ready to send transaction", rollbackErr)
-		}
-
 		return nil, fmt.Errorf("query reminders ready to send: %w", err)
 	}
 
+	defer rows.Close()
+
 	reminders, err := scanScheduledReminders(rows)
 	if err != nil {
-		rows.Close()
-		if rollbackErr := transaction.Rollback(ctx); rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
-			logger.Get("database/postgresql").
-				Error("cannot rollback find reminders ready to send transaction", rollbackErr)
-		}
-
 		return nil, err
 	}
 
-	rows.Close()
-
 	if err = rows.Err(); err != nil {
-		if rollbackErr := transaction.Rollback(ctx); rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
-			logger.Get("database/postgresql").
-				Error("cannot rollback find reminders ready to send transaction", rollbackErr)
-		}
-
 		return nil, fmt.Errorf("close reminder rows ready to send: %w", err)
 	}
 
