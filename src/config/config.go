@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/caarlos0/env/v11"
 	"github.com/creasty/defaults"
 	"github.com/go-playground/validator/v10"
 	"gopkg.in/yaml.v3"
@@ -31,6 +32,10 @@ func New() (*Config, error) {
 
 	if err = yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("parsing the configuration file %q: %w", localConfigPath, err)
+	}
+
+	if err = env.Parse(&cfg); err != nil {
+		return nil, fmt.Errorf("parsing environment configuration: %w", err)
 	}
 
 	if err = validate(cfg); err != nil {
@@ -67,7 +72,7 @@ type Scheduler struct {
 
 type AppConfig struct {
 	Name        string `default:"easy-note" validate:"required"                                       yaml:"name"`
-	Environment string `default:"local"     validate:"required,oneof=local dev test stage production" yaml:"environment"`
+	Environment string `default:"local"     validate:"required,oneof=local dev test stage production" yaml:"environment" env:"APP_ENVIRONMENT"`
 }
 
 type Logger struct {
@@ -99,12 +104,12 @@ type Telegram struct {
 }
 
 type Database struct {
-	Host              string        `default:"localhost"     validate:"required"                                             yaml:"host"`
-	Port              int           `default:"5432"          validate:"required,min=1,max=65535"                             yaml:"port"`
-	User              string        `default:"enote"         validate:"required"                                             yaml:"user"`
-	Password          string        `default:"enotePassword" validate:"required"                                             yaml:"password"`
-	Name              string        `default:"easy_note"     validate:"required"                                             yaml:"name"`
-	SSLMode           string        `default:"disable"       validate:"required,oneof=disable require verify-ca verify-full" yaml:"ssl_mode"`
+	Host              string        `default:"localhost"     validate:"required"                                             yaml:"host"                env:"DATABASE_HOST"`
+	Port              int           `default:"5432"          validate:"required,min=1,max=65535"                             yaml:"port"                env:"DATABASE_PORT"`
+	User              string        `default:"enote"         validate:"required"                                             yaml:"user"                env:"DATABASE_USER"`
+	Password          string        `default:"enotePassword" validate:"required"                                             yaml:"password"            env:"DATABASE_PASSWORD"`
+	Name              string        `default:"easy_note"     validate:"required"                                             yaml:"name"                env:"DATABASE_NAME"`
+	SSLMode           string        `default:"disable"       validate:"required,oneof=disable require verify-ca verify-full" yaml:"ssl_mode"            env:"DATABASE_SSL_MODE"`
 	MigrationDialect  string        `default:"postgres"      validate:"required"                                             yaml:"migration_dialect"`
 	MaxConns          int32         `default:"4"             validate:"required,min=1"                                       yaml:"max_conns"`
 	MinConns          int32         `default:"0"             validate:"min=0"                                                yaml:"min_conns"`

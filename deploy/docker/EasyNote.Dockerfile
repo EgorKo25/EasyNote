@@ -1,4 +1,4 @@
-FROM golang:1.25-alpine AS builder
+FROM golang:1.25.7-alpine AS builder
 
 WORKDIR /src
 
@@ -9,9 +9,8 @@ RUN go mod download
 
 COPY . .
 
-ARG APP_PACKAGE=./cmd/easynote
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-    go build -trimpath -ldflags="-s -w" -o /out/easy-note ${APP_PACKAGE}
+    go build -trimpath -ldflags="-s -w" -o /out/easy-note .
 
 FROM alpine:3.22
 
@@ -21,7 +20,6 @@ RUN apk add --no-cache ca-certificates tzdata && \
     mkdir -p /app/logs
 
 COPY --from=builder /out/easy-note /app/easy-note
-COPY config.yaml /app/config.yaml
+COPY config ./config
 
 ENTRYPOINT ["/app/easy-note"]
-CMD ["--config", "/app/config.yaml"]

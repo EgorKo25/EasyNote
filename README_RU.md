@@ -6,7 +6,7 @@ Telegram-бот для напоминаний о рутинных задачах
 
 Источник версии приложения - `CHANGELIST.md`.
 
-Текущая версия: `0.4.0`.
+Текущая версия: `1.0.0`.
 
 ## Тесты
 
@@ -15,6 +15,14 @@ Telegram-бот для напоминаний о рутинных задачах
 ```bash
 go test ./src/scheduler ./src/database/cache ./src/database ./src/config -cover
 golangci-lint run ./src/scheduler ./src/database/cache ./src/database ./src/config
+```
+
+Проверки для деплоя:
+
+```bash
+go test ./src/config ./src/telegram -count=1
+golangci-lint run --config ./.golangci.yml ./src/config
+docker build --check -f deploy/docker/EasyNote.Dockerfile .
 ```
 
 ### Пакет `src/scheduler`
@@ -132,10 +140,115 @@ Cache в этом приложении не является источнико�
 
 Поэтому heap может оставаться маленьким, а база данных хранит всю историю напоминаний.
 
+## Деплой
+
+Docker-файлы для деплоя лежат в `deploy/docker`.
+
+Compose-запуск:
+
+```bash
+cd deploy/docker
+docker compose up -d postgres
+docker compose up -d app
+```
+
+Переменные окружения для Compose:
+
+| Переменная | Назначение |
+|---|---|
+| `APP_IMAGE` | Docker image приложения, например `ghcr.io/owner/repository:beta` |
+| `TELEGRAM_BOT_TOKEN` | Telegram token; без него приложение не стартует |
+| `POSTGRES_DB` | Имя базы PostgreSQL |
+| `POSTGRES_USER` | Пользователь PostgreSQL |
+| `POSTGRES_PASSWORD` | Пароль PostgreSQL |
+| `POSTGRES_HOST_PORT` | Порт PostgreSQL на host-стороне |
+
+Конфиг грузится в таком порядке:
+
+1. Значения по умолчанию из struct tags.
+2. `config/config.yaml`.
+3. Env overrides через `github.com/caarlos0/env/v11`.
+4. Validator checks.
+
+Поддержанные env overrides:
+
+| Переменная | Поле конфига |
+|---|---|
+| `APP_ENVIRONMENT` | `app.environment` |
+| `DATABASE_HOST` | `database.host` |
+| `DATABASE_PORT` | `database.port` |
+| `DATABASE_USER` | `database.user` |
+| `DATABASE_PASSWORD` | `database.password` |
+| `DATABASE_NAME` | `database.name` |
+| `DATABASE_SSL_MODE` | `database.ssl_mode` |
+
+### Beta CD
+
+GitHub Actions имеет ручной `workflow_dispatch` job для beta-деплоя.
+
+Нужные variables/secrets:
+
+| Имя | Тип | Назначение |
+|---|---|---|
+| `BETA_DEPLOY_PATH` | variable | Папка на сервере для `docker-compose.yaml` |
+| `BETA_SSH_HOST` | secret | SSH host |
+| `BETA_SSH_USERNAME` | secret | SSH user |
+| `BETA_SSH_KEY` | secret | SSH private key |
+| `BETA_SSH_PORT` | secret, optional | SSH port, по умолчанию `22` |
+| `GHCR_TOKEN` | secret, optional | GHCR token; fallback - `GITHUB_TOKEN` |
+
+CD job публикует image tag `beta`, загружает Compose на сервер, забирает новый image и перезапускает только `app`:
+
+```bash
+docker compose pull app
+docker compose up -d --no-deps app
+```
+
+PostgreSQL не перезапускается в beta CD.
+
 ## Changelist
 
 <div style="max-height: 420px; overflow-y: auto; border: 1px solid #d0d7de; border-radius: 6px; padding: 16px;">
-<p><strong>version: 0.4.0</strong></p>
+<p><strong>version: 1.0.0</strong></p>
+
+<h2>v1.0.0 - beta deployment ready</h2>
+<ul>
+  <li>Beta deployment path is ready for manual GitHub Actions runs.</li>
+  <li>The deploy job updates only the application container and does not restart PostgreSQL.</li>
+  <li>Server path and SSH access are supplied through GitHub variables and secrets.</li>
+</ul>
+
+<h2>v0.9.0 - manual CD through GitHub Actions</h2>
+<ul>
+  <li>`workflow_dispatch` was added for deliberate beta deployments.</li>
+  <li>Manual runs publish the `beta` image tag.</li>
+  <li>The deploy step uploads Compose, pulls the app image, and runs `docker compose up -d --no-deps app`.</li>
+</ul>
+
+<h2>v0.8.0 - Docker deployment layout</h2>
+<ul>
+  <li>Docker files were grouped under `deploy/docker`.</li>
+  <li>The deployment Dockerfile builds the root application package and copies the existing config directory.</li>
+  <li>Compose defines the application, PostgreSQL, persistent database data, and logs.</li>
+</ul>
+
+<h2>v0.7.0 - environment-backed runtime configuration</h2>
+<ul>
+  <li>Environment overrides are parsed with `github.com/caarlos0/env/v11` after defaults and YAML.</li>
+  <li>Database and application environment settings can be supplied by deployment env vars.</li>
+</ul>
+
+<h2>v0.6.0 - Telegram token supplied from configuration</h2>
+<ul>
+  <li>The Telegram token is read from the environment variable named by `telegram.token_env`.</li>
+  <li>The default token variable is `TELEGRAM_BOT_TOKEN`, and startup fails if it is missing.</li>
+</ul>
+
+<h2>v0.5.0 - background reminder runtime</h2>
+<ul>
+  <li>The runtime uses background processes for reminder sending and Telegram long polling.</li>
+  <li>The reminder worker polls the database for due reminders and updates delivery status.</li>
+</ul>
 
 <h2>v0.4.0 - scheduler uses database as source of truth</h2>
 <ul>
