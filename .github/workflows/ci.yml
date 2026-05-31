@@ -184,7 +184,6 @@ jobs:
       GHCR_USERNAME: ${{ github.actor }}
       GHCR_TOKEN: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-      TELEGRAM_USER_TIMEZONE: ${{ secrets.TELEGRAM_USER_TIMEZONE || 'Europe/Moscow' }}
       TZ: ${{ secrets.TZ || 'Europe/Moscow' }}
       POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
       POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
@@ -239,13 +238,12 @@ jobs:
           username: ${{ secrets.BETA_SSH_USERNAME }}
           key: ${{ secrets.BETA_SSH_KEY }}
           port: ${{ secrets.BETA_SSH_PORT || 22 }}
-          envs: DEPLOY_PATH,APP_IMAGE,GHCR_USERNAME,GHCR_TOKEN,TELEGRAM_BOT_TOKEN,TELEGRAM_USER_TIMEZONE,TZ,POSTGRES_DB,POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_HOST_PORT,HTTP_PROXY,HTTPS_PROXY,NO_PROXY
+          envs: DEPLOY_PATH,APP_IMAGE,GHCR_USERNAME,GHCR_TOKEN,TELEGRAM_BOT_TOKEN,TZ,POSTGRES_DB,POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_HOST_PORT,HTTP_PROXY,HTTPS_PROXY,NO_PROXY
           script: |
             set -e
             cd "${DEPLOY_PATH}"
             {
               printf 'TELEGRAM_BOT_TOKEN=%s\n' "${TELEGRAM_BOT_TOKEN}"
-              printf 'TELEGRAM_USER_TIMEZONE=%s\n' "${TELEGRAM_USER_TIMEZONE:-Europe/Moscow}"
               printf 'TZ=%s\n' "${TZ:-Europe/Moscow}"
               printf 'HTTP_PROXY=%s\n' "${HTTP_PROXY}"
               printf 'HTTPS_PROXY=%s\n' "${HTTPS_PROXY}"
