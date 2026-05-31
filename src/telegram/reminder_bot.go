@@ -156,7 +156,7 @@ func (b *ReminderBot) handleCallback(ctx context.Context, query telego.CallbackQ
 
 	messageID := query.Message.GetMessageID()
 	if query.Data == callbackMainMenu {
-		return b.editUI(ctx, chatID, messageID, mainMenuText(), nil)
+		return b.replaceUI(ctx, chatID, mainMenuText(), mainKeyboard())
 	}
 
 	if handled, err := b.handleDraftCommandCallback(ctx, chatID, messageID, query.Data); handled {
@@ -233,7 +233,7 @@ func (b *ReminderBot) handleDraftFinalCommandCallback(
 	case callbackDraftCancel:
 		b.deleteDraft(chatID)
 
-		return true, b.editUI(ctx, chatID, messageID, "Создание напоминания отменено.", nil)
+		return true, b.replaceUI(ctx, chatID, "Создание напоминания отменено.\n\n"+mainMenuText(), mainKeyboard())
 	default:
 		return false, nil
 	}

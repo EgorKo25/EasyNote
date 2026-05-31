@@ -3,7 +3,6 @@ package telegram
 import (
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/EgorKo25/EasyNote/src/database"
@@ -287,25 +286,7 @@ func reminderListText(reminders []database.ReminderView, location *time.Location
 		return "Активных напоминаний пока нет.\n\nСоздайте первое напоминание на основной клавиатуре."
 	}
 
-	var builder strings.Builder
-	builder.WriteString("Активные напоминания\n")
-
-	for index, reminder := range reminders {
-		description := reminder.Description
-		if description == "" {
-			description = "без описания"
-		}
-
-		builder.WriteString(fmt.Sprintf(
-			"\n%d. %s\n%s\n%s\n",
-			index+1,
-			reminder.RemindAt.In(location).Format("02.01.2006 15:04"),
-			reminder.Title,
-			description,
-		))
-	}
-
-	return builder.String()
+	return "Активные напоминания\n\nВыберите напоминание кнопкой ниже."
 }
 
 func monthDayRows(month time.Time, now time.Time) [][]telego.InlineKeyboardButton {
