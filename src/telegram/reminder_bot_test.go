@@ -181,8 +181,7 @@ func TestReminderDraftAppliesDateCallbacks(t *testing.T) {
 	t.Parallel()
 
 	chatID := int64(200)
-	location, err := time.LoadLocation("Europe/Moscow")
-	require.NoError(t, err)
+	location := time.Local
 
 	tests := []struct {
 		name     string
@@ -279,10 +278,7 @@ func TestReminderDraftAppliesDateCallbacks(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			bot := &ReminderBot{
-				cfg:         config.Telegram{UserTimezone: "Europe/Moscow"},
-				draftByChat: map[int64]reminderDraft{chatID: test.draft},
-			}
+			bot := &ReminderBot{draftByChat: map[int64]reminderDraft{chatID: test.draft}}
 
 			applied := bot.applyDraftDateCallback(chatID, test.data)
 			draft := bot.draft(chatID)
@@ -397,7 +393,8 @@ func TestReminderUIBuildsExpectedKeyboards(t *testing.T) {
 		name     string
 		action   func() *telego.InlineKeyboardMarkup
 		expected struct {
-			rowCount int
+			rowCount        int
+			firstButtonText string
 		}
 	}{
 		{
@@ -405,14 +402,20 @@ func TestReminderUIBuildsExpectedKeyboards(t *testing.T) {
 			action: func() *telego.InlineKeyboardMarkup {
 				return draftKeyboard(reminderDraft{}, now)
 			},
-			expected: struct{ rowCount int }{rowCount: 3},
+			expected: struct {
+				rowCount        int
+				firstButtonText string
+			}{rowCount: 3},
 		},
 		{
 			name: "date choice keyboard is compact",
 			action: func() *telego.InlineKeyboardMarkup {
 				return draftKeyboard(reminderDraft{screen: draftScreenDate}, now)
 			},
-			expected: struct{ rowCount int }{rowCount: 3},
+			expected: struct {
+				rowCount        int
+				firstButtonText string
+			}{rowCount: 3},
 		},
 		{
 			name: "calendar keyboard opens explicit calendar grid",
@@ -422,7 +425,10 @@ func TestReminderUIBuildsExpectedKeyboards(t *testing.T) {
 					calendarMonth: time.Date(2026, 6, 1, 0, 0, 0, 0, time.Local),
 				}, now)
 			},
-			expected: struct{ rowCount int }{rowCount: 8},
+			expected: struct {
+				rowCount        int
+				firstButtonText string
+			}{rowCount: 8},
 		},
 		{
 			name: "time keyboard has future presets, steppers and done",
@@ -433,21 +439,33 @@ func TestReminderUIBuildsExpectedKeyboards(t *testing.T) {
 					hour:   9, minute: 30,
 				}, now)
 			},
-			expected: struct{ rowCount int }{rowCount: 4},
+			expected: struct {
+				rowCount        int
+				firstButtonText string
+			}{rowCount: 4},
 		},
 		{
 			name: "empty reminder list keyboard still has main menu",
 			action: func() *telego.InlineKeyboardMarkup {
 				return reminderListKeyboard(nil)
 			},
-			expected: struct{ rowCount int }{rowCount: 1},
+			expected: struct {
+				rowCount        int
+				firstButtonText string
+			}{rowCount: 1},
 		},
 		{
-			name: "reminder list keyboard has view delete buttons and main menu",
+			name: "reminder list keyboard opens reminders by title buttons",
 			action: func() *telego.InlineKeyboardMarkup {
-				return reminderListKeyboard([]database.ReminderView{{ID: 1}, {ID: 2}})
+				return reminderListKeyboard([]database.ReminderView{
+					{ID: 1, Title: "Pay rent"},
+					{ID: 2, Title: "Call mom"},
+				})
 			},
-			expected: struct{ rowCount int }{rowCount: 3},
+			expected: struct {
+				rowCount        int
+				firstButtonText string
+			}{rowCount: 3, firstButtonText: "Pay rent"},
 		},
 	}
 
@@ -458,6 +476,10 @@ func TestReminderUIBuildsExpectedKeyboards(t *testing.T) {
 			keyboard := test.action()
 
 			require.Len(t, keyboard.InlineKeyboard, test.expected.rowCount)
+
+			if test.expected.firstButtonText != "" {
+				require.Equal(t, test.expected.firstButtonText, keyboard.InlineKeyboard[0][0].Text)
+			}
 		})
 	}
 }
@@ -710,7 +732,8 @@ func TestReminderBotHandlesMessages(t *testing.T) {
 			draft:   reminderDraft{waitingFor: fieldTitle},
 			before: func(caller *telegoapimock.MockCaller, _ *telegrammocks.MockReminderService) {
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(testTelegramResponse(t, telego.Message{MessageID: 4}), nil)
+					Return(testTelegramResponse(t, telego.Message{MessageID: 4}), nil).
+					Times(2)
 			},
 			expected: struct {
 				expectedErr error
@@ -1037,7 +1060,6 @@ func TestReminderBotSavesDraft(t *testing.T) {
 
 			bot := &ReminderBot{
 				bot:         botAPI,
-				cfg:         config.Telegram{UserTimezone: "UTC"},
 				service:     service,
 				draftByChat: map[int64]reminderDraft{chatID: test.draft},
 				uiByChat:    map[int64]int{chatID: messageID},
@@ -1118,21 +1140,11 @@ func TestReminderBotConfigurationHelpers(t *testing.T) {
 			},
 		},
 		{
-			name: "configured timezone is loaded",
+			name: "bot uses server local timezone when telegram has no user timezone",
 			action: func(t *testing.T) {
 				t.Helper()
 
-				location := (&ReminderBot{cfg: config.Telegram{UserTimezone: "Europe/Moscow"}}).location()
-
-				require.Equal(t, "Europe/Moscow", location.String())
-			},
-		},
-		{
-			name: "invalid timezone falls back to local timezone",
-			action: func(t *testing.T) {
-				t.Helper()
-
-				location := (&ReminderBot{cfg: config.Telegram{UserTimezone: "bad/timezone"}}).location()
+				location := (&ReminderBot{}).location()
 
 				require.Equal(t, time.Local, location)
 			},

@@ -128,7 +128,13 @@ func (b *ReminderBot) handleMessage(ctx context.Context, message telego.Message)
 	}
 
 	if b.applyDraftText(chatID, text) {
-		return b.editDraft(ctx, chatID, b.currentUIMessageID(chatID))
+		if err := b.editDraft(ctx, chatID, b.currentUIMessageID(chatID)); err != nil {
+			return err
+		}
+
+		b.deleteMessage(ctx, chatID, message.MessageID)
+
+		return nil
 	}
 
 	return b.replaceUI(ctx, chatID, "Выберите действие на клавиатуре ниже.", mainKeyboard())
@@ -698,11 +704,6 @@ func (b *ReminderBot) deleteMessage(ctx context.Context, chatID int64, messageID
 }
 
 func (b *ReminderBot) location() *time.Location {
-	location, err := time.LoadLocation(b.cfg.UserTimezone)
-	if err == nil {
-		return location
-	}
-
 	return time.Local
 }
 

@@ -168,7 +168,6 @@ docker compose up -d app
 |---|---|
 | `APP_IMAGE` | Docker image приложения, например `ghcr.io/owner/repository:beta` |
 | `TELEGRAM_BOT_TOKEN` | Telegram token; без него приложение не стартует |
-| `TELEGRAM_USER_TIMEZONE` | Часовой пояс для пользовательского времени напоминаний; по умолчанию `Europe/Moscow` |
 | `POSTGRES_DB` | Имя базы PostgreSQL |
 | `POSTGRES_USER` | Пользователь PostgreSQL |
 | `POSTGRES_PASSWORD` | Пароль PostgreSQL |

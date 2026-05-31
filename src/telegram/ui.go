@@ -173,12 +173,10 @@ func timeKeyboard(draft reminderDraft, now time.Time) *telego.InlineKeyboardMark
 
 func reminderListKeyboard(reminders []database.ReminderView) *telego.InlineKeyboardMarkup {
 	rows := make([][]telego.InlineKeyboardButton, 0, len(reminders)+1)
-	for index, reminder := range reminders {
+	for _, reminder := range reminders {
 		rows = append(rows, tu.InlineKeyboardRow(
-			tu.InlineKeyboardButton(fmt.Sprintf("Открыть #%d", index+1)).
+			tu.InlineKeyboardButton(reminder.Title).
 				WithCallbackData(fmt.Sprintf("%s%d", callbackViewPrefix, reminder.ID)),
-			tu.InlineKeyboardButton(fmt.Sprintf("Удалить #%d", index+1)).
-				WithCallbackData(fmt.Sprintf("%s%d", callbackDeletePrefix, reminder.ID)),
 		))
 	}
 

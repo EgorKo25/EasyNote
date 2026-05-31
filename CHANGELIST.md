@@ -1,14 +1,14 @@
 version: 1.0.3
 
-## v1.0.3 - Telegram timezone and reminder navigation fixes
+## v1.0.3 - Telegram reminder UI and delivery fixes
 
 ### What was done
 
-Telegram reminder dates and times are now interpreted and displayed in the configured user timezone. The default is `Europe/Moscow`, and deployments can override it with `TELEGRAM_USER_TIMEZONE`.
-
 Reminder creation no longer offers manual time input. The date step starts with `Сегодня`, `Завтра`, and `Выбрать дату`; the calendar is opened only on demand, past calendar days are disabled, and saving a reminder in the past is rejected with a clear message.
 
-The reminder UI now has explicit navigation from reminder details back to the active reminder list, and the success screen offers main menu, active reminders, and creating another reminder.
+The reminder UI now has explicit navigation from reminder details back to the active reminder list, shows active reminders as title buttons, deletes user messages that contain reminder title or description, and offers main menu, active reminders, and creating another reminder after a reminder is created.
+
+Due reminder delivery was fixed by correcting the SQL query that loads reminders ready to send.
 
 ### API changes
 
