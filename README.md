@@ -142,6 +142,7 @@ Required application environment:
 |---|---|
 | `APP_IMAGE` | Application image used by Compose, for example `ghcr.io/owner/repository:beta` |
 | `TELEGRAM_BOT_TOKEN` | Telegram bot token; startup fails when it is missing |
+| `TELEGRAM_USER_TIMEZONE` | User-facing reminder timezone; defaults to `Europe/Moscow` |
 | `POSTGRES_DB` | PostgreSQL database name |
 | `POSTGRES_USER` | PostgreSQL user |
 | `POSTGRES_PASSWORD` | PostgreSQL password |

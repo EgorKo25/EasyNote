@@ -98,6 +98,7 @@ type Telegram struct {
 	LongPollingBuffer   uint          `default:"100"                      validate:"required,min=1" yaml:"long_polling_buffer"`
 	LongPollingInterval time.Duration `default:"0s"                       validate:"min=0"          yaml:"long_polling_interval"`
 	LongPollingRetry    time.Duration `default:"8s"                       validate:"required,gt=0"  yaml:"long_polling_retry"`
+	UserTimezone        string        `default:"Europe/Moscow"            validate:"required"       yaml:"user_timezone"         env:"TELEGRAM_USER_TIMEZONE"`
 	ParseMode           string        `                                                             yaml:"parse_mode"`
 	DisableNotification bool          `default:"false"                                              yaml:"disable_notification"`
 	ProtectContent      bool          `default:"false"                                              yaml:"protect_content"`
