@@ -184,10 +184,14 @@ jobs:
       GHCR_USERNAME: ${{ github.actor }}
       GHCR_TOKEN: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TZ: ${{ secrets.TZ || 'Europe/Moscow' }}
       POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
       POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
       POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
       POSTGRES_HOST_PORT: ${{ secrets.POSTGRES_HOST_PORT }}
+      HTTP_PROXY: ${{ secrets.HTTP_PROXY }}
+      HTTPS_PROXY: ${{ secrets.HTTPS_PROXY }}
+      NO_PROXY: ${{ secrets.NO_PROXY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -234,12 +238,16 @@ jobs:
           username: ${{ secrets.BETA_SSH_USERNAME }}
           key: ${{ secrets.BETA_SSH_KEY }}
           port: ${{ secrets.BETA_SSH_PORT || 22 }}
-          envs: DEPLOY_PATH,APP_IMAGE,GHCR_USERNAME,GHCR_TOKEN,TELEGRAM_BOT_TOKEN,POSTGRES_DB,POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_HOST_PORT
+          envs: DEPLOY_PATH,APP_IMAGE,GHCR_USERNAME,GHCR_TOKEN,TELEGRAM_BOT_TOKEN,TZ,POSTGRES_DB,POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_HOST_PORT,HTTP_PROXY,HTTPS_PROXY,NO_PROXY
           script: |
             set -e
             cd "${DEPLOY_PATH}"
             {
               printf 'TELEGRAM_BOT_TOKEN=%s\n' "${TELEGRAM_BOT_TOKEN}"
+              printf 'TZ=%s\n' "${TZ:-Europe/Moscow}"
+              printf 'HTTP_PROXY=%s\n' "${HTTP_PROXY}"
+              printf 'HTTPS_PROXY=%s\n' "${HTTPS_PROXY}"
+              printf 'NO_PROXY=%s\n' "${NO_PROXY}"
               printf 'POSTGRES_DB=%s\n' "${POSTGRES_DB}"
               printf 'POSTGRES_USER=%s\n' "${POSTGRES_USER}"
               printf 'POSTGRES_PASSWORD=%s\n' "${POSTGRES_PASSWORD}"

@@ -85,7 +85,7 @@ func (d *Database) SaveReminder(ctx context.Context, reminder *database.Reminder
 	`
 
 	if reminder.Status == "" {
-		reminder.Status = database.ReminderStatusPending
+		reminder.Status = database.ReminderStatusNew
 	}
 
 	if err := d.pool.QueryRow(
@@ -147,7 +147,7 @@ func (d *Database) FindRemindersByChat(ctx context.Context, telegramChatID int64
 		FROM reminders r
 		JOIN notes n ON n.id = r.note_id
 		WHERE n.telegram_chat_id = $1
-			AND r.status IN ('pending', 'processing', 'failed')
+			AND r.status = 'new'
 		ORDER BY r.remind_at, r.id
 	`
 
@@ -190,7 +190,7 @@ func (d *Database) CancelReminder(ctx context.Context, telegramChatID int64, rem
 		WHERE n.id = r.note_id
 			AND n.telegram_chat_id = $1
 			AND r.id = $2
-			AND r.status IN ('pending', 'processing', 'failed')
+			AND r.status = 'new'
 	`
 
 	tag, err := d.pool.Exec(ctx, query, telegramChatID, reminderID)
@@ -216,7 +216,7 @@ func (d *Database) ActualReminders(
 		JOIN notes n ON n.id = r.note_id
 		WHERE r.remind_at >= $1
 			AND r.remind_at <= $2
-			AND r.status IN ('pending', 'failed')
+			AND r.status = 'new'
 		ORDER BY r.remind_at, r.id
 	`
 
@@ -251,23 +251,17 @@ func (d *Database) FindRemindersReadyToSend(
 			SELECT r.id
 			FROM reminders r
 			WHERE r.remind_at <= $1
-				AND r.status IN ('pending', 'failed')
+				AND r.status = 'new'
 				AND r.attempts < $2
 			ORDER BY r.remind_at, r.id
 			LIMIT $3
 			FOR UPDATE SKIP LOCKED
 		),
-		locked AS (
-			UPDATE reminders r
-			SET status = 'processing'
-			FROM due
-			WHERE r.id = due.id
-			RETURNING r.id, r.note_id, r.remind_at
-		)
-		SELECT l.id, l.note_id, n.telegram_chat_id, n.title, n.description, l.remind_at
-		FROM locked l
-		JOIN notes n ON n.id = l.note_id
-		ORDER BY l.remind_at, l.id
+		SELECT r.id, r.note_id, n.telegram_chat_id, n.title, n.description, r.remind_at
+		FROM reminders r
+		JOIN due d ON d.id = r.id
+		JOIN notes n ON n.id = r.note_id
+		ORDER BY r.remind_at, r.id
 	`
 
 	rows, err := transaction.Query(ctx, query, now, maxAttempts, limit)
@@ -308,18 +302,15 @@ func (d *Database) MarkReminderSent(ctx context.Context, reminderID int64, sentA
 	return nil
 }
 
-func (d *Database) MarkReminderFailed(ctx context.Context, reminderID int64, maxAttempts int) error {
+func (d *Database) MarkReminderFailed(ctx context.Context, reminderID int64, _ int) error {
 	query := `
 		UPDATE reminders
 		SET attempts = attempts + 1,
-			status = CASE
-				WHEN attempts + 1 >= $2 THEN 'failed'
-				ELSE 'pending'
-			END
+			status = 'failed'
 		WHERE id = $1
 	`
 
-	if _, err := d.pool.Exec(ctx, query, reminderID, maxAttempts); err != nil {
+	if _, err := d.pool.Exec(ctx, query, reminderID); err != nil {
 		return fmt.Errorf("mark reminder failed: %w", err)
 	}
 

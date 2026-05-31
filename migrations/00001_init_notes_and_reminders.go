@@ -32,8 +32,8 @@ func upInitNotesAndReminders(ctx context.Context, tx *sql.Tx) error {
 		note_id BIGINT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
 		remind_at TIMESTAMPTZ NOT NULL,
 	
-		status TEXT NOT NULL DEFAULT 'pending'
-			CHECK (status IN ('pending', 'processing', 'sent', 'failed', 'canceled')),
+		status TEXT NOT NULL DEFAULT 'new'
+			CHECK (status IN ('new', 'sent', 'failed', 'canceled')),
 	
 		attempts INT NOT NULL DEFAULT 0 CHECK (attempts >= 0),
 		sent_at TIMESTAMPTZ,
@@ -43,7 +43,7 @@ func upInitNotesAndReminders(ctx context.Context, tx *sql.Tx) error {
 
 	CREATE INDEX reminders_due_idx
 		ON reminders (status, remind_at)
-		WHERE status IN ('pending', 'failed');
+		WHERE status = 'new';
 `)
 	if err != nil {
 		return fmt.Errorf("apply init notes and reminders migration: %w", err)

@@ -118,6 +118,16 @@ The design keeps business rules above storage details and lets the cache stay di
 
 Docker deployment files live in `deploy/docker`.
 
+Local Compose startup from the current working tree:
+
+```bash
+cd deploy/docker
+cp .env .env.local
+# Fill TELEGRAM_BOT_TOKEN in .env.local
+docker compose -f docker-compose.local.yaml up -d --build
+docker compose -f docker-compose.local.yaml logs -f app
+```
+
 Local or server-side Compose startup:
 
 ```bash
@@ -135,7 +145,10 @@ Required application environment:
 | `POSTGRES_DB` | PostgreSQL database name |
 | `POSTGRES_USER` | PostgreSQL user |
 | `POSTGRES_PASSWORD` | PostgreSQL password |
-| `POSTGRES_HOST_PORT` | Optional host port for PostgreSQL |
+| `POSTGRES_HOST_PORT` | Optional host port for PostgreSQL; local Compose defaults to `15432` |
+| `HTTP_PROXY` | Optional proxy URL for Telegram API requests |
+| `HTTPS_PROXY` | Optional proxy URL for Telegram API requests |
+| `NO_PROXY` | Optional comma-separated list of hosts that bypass the proxy |
 
 The application config is loaded in this order:
 
