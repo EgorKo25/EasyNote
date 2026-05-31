@@ -4,6 +4,7 @@ services:
       context: ../..
       dockerfile: deploy/docker/EasyNote.Dockerfile
     image: easynote:local
+    pull_policy: build
     container_name: easy-note-local-app
     restart: unless-stopped
     env_file:
