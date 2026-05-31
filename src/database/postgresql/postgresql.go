@@ -256,7 +256,7 @@ func (d *Database) FindRemindersReadyToSend(
 			ORDER BY r.remind_at, r.id
 			LIMIT $3
 			FOR UPDATE SKIP LOCKED
-		),
+		)
 		SELECT r.id, r.note_id, n.telegram_chat_id, n.title, n.description, r.remind_at
 		FROM reminders r
 		JOIN due d ON d.id = r.id

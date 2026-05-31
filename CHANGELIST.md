@@ -1,4 +1,18 @@
-version: 1.0.2
+version: 1.0.3
+
+## v1.0.3 - Telegram reminder UI and delivery fixes
+
+### What was done
+
+Reminder creation no longer offers manual time input. The date step starts with `Сегодня`, `Завтра`, and `Выбрать дату`; the calendar is opened only on demand, past calendar days are disabled, and saving a reminder in the past is rejected with a clear message.
+
+The reminder UI now has explicit navigation from reminder details back to the active reminder list, shows active reminders as title buttons, deletes user messages that contain reminder title or description, and offers main menu, active reminders, and creating another reminder after a reminder is created.
+
+Due reminder delivery was fixed by correcting the SQL query that loads reminders ready to send.
+
+### API changes
+
+No public HTTP API was introduced.
 
 ## v1.0.2 - Reminder status simplification
 
