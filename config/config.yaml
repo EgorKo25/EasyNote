@@ -33,6 +33,7 @@ telegram:
   long_polling_buffer: 100
   long_polling_interval: 0s
   long_polling_retry: 8s
+  user_timezone: Europe/Moscow
   parse_mode: ""
   disable_notification: false
   protect_content: false

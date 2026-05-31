@@ -161,11 +161,22 @@ func (b *ReminderBot) handleCallback(ctx context.Context, query telego.CallbackQ
 		return b.editDraft(ctx, chatID, messageID)
 	}
 
-	if strings.HasPrefix(query.Data, callbackDeletePrefix) {
-		return b.deleteReminder(ctx, chatID, messageID, query.Data)
-	}
+	return b.handleReminderCallback(ctx, chatID, messageID, query.Data)
+}
 
-	return nil
+func (b *ReminderBot) handleReminderCallback(ctx context.Context, chatID int64, messageID int, data string) error {
+	switch {
+	case data == callbackCreateReminder:
+		return b.startReminderDraftInMessage(ctx, chatID, messageID)
+	case data == callbackReminderList || data == callbackReminderBackList:
+		return b.editReminderList(ctx, chatID, messageID)
+	case strings.HasPrefix(data, callbackDeletePrefix):
+		return b.deleteReminder(ctx, chatID, messageID, data)
+	case strings.HasPrefix(data, callbackViewPrefix):
+		return b.viewReminder(ctx, chatID, messageID, data)
+	default:
+		return nil
+	}
 }
 
 func (b *ReminderBot) handleDraftCommandCallback(
@@ -181,10 +192,6 @@ func (b *ReminderBot) handleDraftCommandCallback(
 		return true, b.editDraft(ctx, chatID, messageID)
 	case callbackDraftDescription:
 		b.setDraftWaitingFor(chatID, fieldDescription)
-
-		return true, b.editDraft(ctx, chatID, messageID)
-	case callbackDraftTimeText:
-		b.setDraftWaitingFor(chatID, fieldTime)
 
 		return true, b.editDraft(ctx, chatID, messageID)
 	case callbackDraftDate:
@@ -232,22 +239,30 @@ func (b *ReminderBot) sendStart(ctx context.Context, chatID int64) error {
 
 func (b *ReminderBot) startReminderDraft(ctx context.Context, chatID int64) error {
 	b.mu.Lock()
-	b.draftByChat[chatID] = newReminderDraft()
+	b.draftByChat[chatID] = newReminderDraft(b.now())
 	b.mu.Unlock()
 
 	return b.replaceDraft(ctx, chatID)
 }
 
+func (b *ReminderBot) startReminderDraftInMessage(ctx context.Context, chatID int64, messageID int) error {
+	b.mu.Lock()
+	b.draftByChat[chatID] = newReminderDraft(b.now())
+	b.mu.Unlock()
+
+	return b.editDraft(ctx, chatID, messageID)
+}
+
 func (b *ReminderBot) replaceDraft(ctx context.Context, chatID int64) error {
 	draft := b.draft(chatID)
 
-	return b.replaceUI(ctx, chatID, draftText(draft), draftKeyboard(draft))
+	return b.replaceUI(ctx, chatID, draftText(draft, b.location()), draftKeyboard(draft, b.now()))
 }
 
 func (b *ReminderBot) editDraft(ctx context.Context, chatID int64, messageID int) error {
 	draft := b.draft(chatID)
 
-	return b.editUI(ctx, chatID, messageID, draftText(draft), draftKeyboard(draft))
+	return b.editUI(ctx, chatID, messageID, draftText(draft, b.location()), draftKeyboard(draft, b.now()))
 }
 
 func (b *ReminderBot) sendReminderList(ctx context.Context, chatID int64) error {
@@ -256,15 +271,30 @@ func (b *ReminderBot) sendReminderList(ctx context.Context, chatID int64) error 
 		return fmt.Errorf("load reminders: %w", err)
 	}
 
-	return b.replaceUI(ctx, chatID, reminderListText(reminders), reminderListKeyboard(reminders))
+	return b.replaceUI(ctx, chatID, reminderListText(reminders, b.location()), reminderListKeyboard(reminders))
+}
+
+func (b *ReminderBot) editReminderList(ctx context.Context, chatID int64, messageID int) error {
+	reminders, err := b.service.Reminders(ctx, chatID)
+	if err != nil {
+		return fmt.Errorf("load reminders: %w", err)
+	}
+
+	return b.editUI(ctx, chatID, messageID, reminderListText(reminders, b.location()), reminderListKeyboard(reminders))
 }
 
 func (b *ReminderBot) saveDraft(ctx context.Context, chatID int64, messageID int) error {
 	draft := b.draft(chatID)
 
-	remindAt := draft.remindAt()
+	remindAt := draft.remindAt(b.location())
 	if draft.title == "" || remindAt.IsZero() {
 		b.setDraftNotice(chatID, "Чтобы сохранить напоминание, добавьте название и дату с временем.")
+
+		return b.editDraft(ctx, chatID, messageID)
+	}
+
+	if !remindAt.After(b.now()) {
+		b.setDraftTimeNotice(chatID, "Это время уже прошло. Выберите будущую дату и время.")
 
 		return b.editDraft(ctx, chatID, messageID)
 	}
@@ -276,7 +306,45 @@ func (b *ReminderBot) saveDraft(ctx context.Context, chatID int64, messageID int
 
 	b.deleteDraft(chatID)
 
-	return b.editUI(ctx, chatID, messageID, "Напоминание создано.\n\n"+reminderViewText(reminder), nil)
+	return b.editUI(
+		ctx,
+		chatID,
+		messageID,
+		"Напоминание создано.\n\n"+reminderViewText(reminder, b.location()),
+		reminderCreatedKeyboard(),
+	)
+}
+
+func (b *ReminderBot) viewReminder(ctx context.Context, chatID int64, messageID int, data string) error {
+	reminderID, err := strconv.ParseInt(strings.TrimPrefix(data, callbackViewPrefix), 10, 64)
+	if err != nil {
+		return fmt.Errorf("parse reminder id: %w", err)
+	}
+
+	reminders, err := b.service.Reminders(ctx, chatID)
+	if err != nil {
+		return fmt.Errorf("load reminders: %w", err)
+	}
+
+	for _, reminder := range reminders {
+		if reminder.ID == reminderID {
+			return b.editUI(
+				ctx,
+				chatID,
+				messageID,
+				reminderViewText(reminder, b.location()),
+				reminderDetailsKeyboard(reminder),
+			)
+		}
+	}
+
+	return b.editUI(
+		ctx,
+		chatID,
+		messageID,
+		"Напоминание не найдено.\n\n"+reminderListText(reminders, b.location()),
+		reminderListKeyboard(reminders),
+	)
 }
 
 func (b *ReminderBot) deleteReminder(ctx context.Context, chatID int64, messageID int, data string) error {
@@ -298,7 +366,7 @@ func (b *ReminderBot) deleteReminder(ctx context.Context, chatID int64, messageI
 		ctx,
 		chatID,
 		messageID,
-		"Напоминание удалено.\n\n"+reminderListText(reminders),
+		"Напоминание удалено.\n\n"+reminderListText(reminders, b.location()),
 		reminderListKeyboard(reminders),
 	)
 }
@@ -366,19 +434,6 @@ func (b *ReminderBot) applyDraftText(chatID int64, text string) bool {
 		draft.title = text
 	case fieldDescription:
 		draft.description = text
-	case fieldTime:
-		parsed, err := time.Parse("15:04", text)
-		if err != nil {
-			draft.notice = "Не понял время. Отправьте его в формате 09:30."
-			draft.waitingFor = fieldTime
-			draft.screen = draftScreenTime
-			b.draftByChat[chatID] = draft
-
-			return true
-		}
-
-		draft.hour = parsed.Hour()
-		draft.minute = parsed.Minute()
 	}
 
 	draft.notice = ""
@@ -418,9 +473,20 @@ func (b *ReminderBot) applyDraftMonth(chatID int64, value string) bool {
 		return false
 	}
 
-	month, err := time.ParseInLocation("2006-01", value, time.Local)
+	location := b.location()
+
+	month, err := time.ParseInLocation("2006-01", value, location)
 	if err != nil {
 		return false
+	}
+
+	nowMonth := firstDayOfMonth(b.now())
+	if firstDayOfMonth(month).Before(nowMonth) {
+		draft.notice = "Эта дата уже прошла. Выберите будущую дату."
+		draft.screen = draftScreenCalendar
+		b.draftByChat[chatID] = draft
+
+		return true
 	}
 
 	draft.calendarMonth = firstDayOfMonth(month)
@@ -440,13 +506,31 @@ func (b *ReminderBot) applyDraftDate(chatID int64, value string) bool {
 		return false
 	}
 
-	date, err := time.ParseInLocation(time.DateOnly, value, time.Local)
+	location := b.location()
+
+	date, err := time.ParseInLocation(time.DateOnly, value, location)
 	if err != nil {
 		return false
 	}
 
+	now := b.now()
+	if date.Before(beginningOfDay(now)) {
+		draft.notice = "Эта дата уже прошла. Выберите сегодняшнюю или будущую дату."
+		draft.screen = draftScreenCalendar
+		b.draftByChat[chatID] = draft
+
+		return true
+	}
+
 	draft.date = date
+
 	draft.calendarMonth = firstDayOfMonth(date)
+	if !draft.remindAt(location).After(now) {
+		next := nextReminderTime(now)
+		draft.hour = next.Hour()
+		draft.minute = next.Minute()
+	}
+
 	draft.notice = ""
 	draft.screen = draftScreenTime
 	b.draftByChat[chatID] = draft
@@ -470,7 +554,13 @@ func (b *ReminderBot) applyDraftTime(chatID int64, value string) bool {
 
 	draft.hour = parsed.Hour()
 	draft.minute = parsed.Minute()
-	draft.notice = ""
+
+	if !draft.remindAt(b.location()).After(b.now()) {
+		draft.notice = "Это время уже прошло. Выберите будущее время."
+	} else {
+		draft.notice = ""
+	}
+
 	draft.screen = draftScreenTime
 	b.draftByChat[chatID] = draft
 
@@ -491,11 +581,17 @@ func (b *ReminderBot) applyDraftTimeShift(chatID int64, value string) bool {
 		return false
 	}
 
-	selectedTime := time.Date(2000, 1, 1, draft.hour, draft.minute, 0, 0, time.Local)
+	selectedTime := time.Date(2000, 1, 1, draft.hour, draft.minute, 0, 0, b.location())
 	shiftedTime := selectedTime.Add(time.Duration(minutes) * time.Minute)
 	draft.hour = shiftedTime.Hour()
 	draft.minute = shiftedTime.Minute()
-	draft.notice = ""
+
+	if !draft.remindAt(b.location()).After(b.now()) {
+		draft.notice = "Это время уже прошло. Выберите будущее время."
+	} else {
+		draft.notice = ""
+	}
+
 	draft.screen = draftScreenTime
 	b.draftByChat[chatID] = draft
 
@@ -524,13 +620,24 @@ func (b *ReminderBot) setDraftNotice(chatID int64, notice string) {
 	b.draftByChat[chatID] = draft
 }
 
+func (b *ReminderBot) setDraftTimeNotice(chatID int64, notice string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	draft := b.draftByChat[chatID]
+	draft.notice = notice
+	draft.waitingFor = ""
+	draft.screen = draftScreenTime
+	b.draftByChat[chatID] = draft
+}
+
 func (b *ReminderBot) setDraftScreen(chatID int64, screen draftScreen) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
 	draft := b.draftByChat[chatID]
 	if draft.calendarMonth.IsZero() {
-		draft.calendarMonth = firstDayOfMonth(time.Now())
+		draft.calendarMonth = firstDayOfMonth(b.now())
 	}
 
 	draft.waitingFor = ""
@@ -590,23 +697,48 @@ func (b *ReminderBot) deleteMessage(ctx context.Context, chatID int64, messageID
 	}
 }
 
-func newReminderDraft() reminderDraft {
-	now := time.Now().Add(time.Hour)
+func (b *ReminderBot) location() *time.Location {
+	location, err := time.LoadLocation(b.cfg.UserTimezone)
+	if err == nil {
+		return location
+	}
+
+	return time.Local
+}
+
+func (b *ReminderBot) now() time.Time {
+	return time.Now().In(b.location())
+}
+
+func newReminderDraft(now time.Time) reminderDraft {
+	next := nextReminderTime(now)
 
 	return reminderDraft{
-		hour:          now.Hour(),
-		minute:        now.Minute() / 5 * 5,
+		hour:          next.Hour(),
+		minute:        next.Minute(),
 		screen:        draftScreenMain,
-		calendarMonth: firstDayOfMonth(now),
+		calendarMonth: firstDayOfMonth(next),
 	}
 }
 
-func (d reminderDraft) remindAt() time.Time {
+func nextReminderTime(now time.Time) time.Time {
+	next := now.Add(time.Hour)
+
+	minute := ((next.Minute() + 4) / 5) * 5
+	if minute >= 60 {
+		next = next.Add(time.Hour)
+		minute = 0
+	}
+
+	return time.Date(next.Year(), next.Month(), next.Day(), next.Hour(), minute, 0, 0, next.Location())
+}
+
+func (d reminderDraft) remindAt(location *time.Location) time.Time {
 	if d.date.IsZero() {
 		return time.Time{}
 	}
 
-	return time.Date(d.date.Year(), d.date.Month(), d.date.Day(), d.hour, d.minute, 0, 0, time.Local)
+	return time.Date(d.date.Year(), d.date.Month(), d.date.Day(), d.hour, d.minute, 0, 0, location)
 }
 
 func (d reminderDraft) selectedTimeText() string {

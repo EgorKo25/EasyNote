@@ -12,6 +12,7 @@ services:
     environment:
       APP_ENVIRONMENT: local
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?TELEGRAM_BOT_TOKEN is required}
+      TELEGRAM_USER_TIMEZONE: ${TELEGRAM_USER_TIMEZONE:-Europe/Moscow}
       TZ: ${TZ:-Europe/Moscow}
       HTTP_PROXY: ${HTTP_PROXY:-}
       HTTPS_PROXY: ${HTTPS_PROXY:-}

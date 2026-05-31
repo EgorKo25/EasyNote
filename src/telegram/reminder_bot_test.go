@@ -44,7 +44,6 @@ func TestReminderDraftAppliesTextInput(t *testing.T) {
 	t.Parallel()
 
 	chatID := int64(100)
-	baseDate := time.Date(2026, 6, 1, 0, 0, 0, 0, time.Local)
 
 	tests := []struct {
 		name     string
@@ -92,9 +91,9 @@ func TestReminderDraftAppliesTextInput(t *testing.T) {
 			}{applied: true, description: "Before lunch", screen: draftScreenMain},
 		},
 		{
-			name:  "morning time is saved from manual input",
-			draft: reminderDraft{date: baseDate, waitingFor: fieldTime, screen: draftScreenTime},
-			input: "09:30",
+			name:  "short title is saved from user message",
+			draft: reminderDraft{waitingFor: fieldTitle},
+			input: "Call",
 			expected: struct {
 				applied     bool
 				title       string
@@ -104,12 +103,12 @@ func TestReminderDraftAppliesTextInput(t *testing.T) {
 				waitingFor  draftField
 				screen      draftScreen
 				notice      string
-			}{applied: true, hour: 9, minute: 30, screen: draftScreenMain},
+			}{applied: true, title: "Call", screen: draftScreenMain},
 		},
 		{
-			name:  "late evening time is saved from manual input",
-			draft: reminderDraft{date: baseDate, waitingFor: fieldTime, screen: draftScreenTime},
-			input: "23:55",
+			name:  "long description is saved from user message",
+			draft: reminderDraft{waitingFor: fieldDescription},
+			input: "Prepare documents before lunch",
 			expected: struct {
 				applied     bool
 				title       string
@@ -119,7 +118,7 @@ func TestReminderDraftAppliesTextInput(t *testing.T) {
 				waitingFor  draftField
 				screen      draftScreen
 				notice      string
-			}{applied: true, hour: 23, minute: 55, screen: draftScreenMain},
+			}{applied: true, description: "Prepare documents before lunch", screen: draftScreenMain},
 		},
 		{
 			name:  "message is ignored when draft does not wait for text",
@@ -137,9 +136,8 @@ func TestReminderDraftAppliesTextInput(t *testing.T) {
 			}{applied: false, screen: draftScreenMain},
 		},
 		{
-			name:  "invalid manual time keeps time input mode",
-			draft: reminderDraft{date: baseDate, waitingFor: fieldTime, screen: draftScreenTime},
-			input: "25:99",
+			name:  "message is ignored when draft does not exist",
+			input: "ignored",
 			expected: struct {
 				applied     bool
 				title       string
@@ -149,12 +147,7 @@ func TestReminderDraftAppliesTextInput(t *testing.T) {
 				waitingFor  draftField
 				screen      draftScreen
 				notice      string
-			}{
-				applied:    true,
-				waitingFor: fieldTime,
-				screen:     draftScreenTime,
-				notice:     "Не понял время. Отправьте его в формате 09:30.",
-			},
+			}{applied: false},
 		},
 	}
 
@@ -162,7 +155,12 @@ func TestReminderDraftAppliesTextInput(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			bot := &ReminderBot{draftByChat: map[int64]reminderDraft{chatID: test.draft}}
+			drafts := map[int64]reminderDraft{}
+			if test.draft.waitingFor != "" || test.draft.screen != "" {
+				drafts[chatID] = test.draft
+			}
+
+			bot := &ReminderBot{draftByChat: drafts}
 
 			applied := bot.applyDraftText(chatID, test.input)
 			draft := bot.draft(chatID)
@@ -183,6 +181,8 @@ func TestReminderDraftAppliesDateCallbacks(t *testing.T) {
 	t.Parallel()
 
 	chatID := int64(200)
+	location, err := time.LoadLocation("Europe/Moscow")
+	require.NoError(t, err)
 
 	tests := []struct {
 		name     string
@@ -206,7 +206,7 @@ func TestReminderDraftAppliesDateCallbacks(t *testing.T) {
 				hour    int
 				minute  int
 				screen  draftScreen
-			}{applied: true, date: time.Date(2026, 6, 2, 0, 0, 0, 0, time.Local), screen: draftScreenTime},
+			}{applied: true, date: time.Date(2026, 6, 2, 0, 0, 0, 0, location), screen: draftScreenTime},
 		},
 		{
 			name:  "month callback changes calendar month",
@@ -222,7 +222,7 @@ func TestReminderDraftAppliesDateCallbacks(t *testing.T) {
 		},
 		{
 			name:  "time preset callback changes selected time",
-			draft: reminderDraft{date: time.Date(2026, 6, 2, 0, 0, 0, 0, time.Local), screen: draftScreenTime},
+			draft: reminderDraft{date: time.Date(2026, 6, 2, 0, 0, 0, 0, location), screen: draftScreenTime},
 			data:  "time:set:18:00",
 			expected: struct {
 				applied bool
@@ -230,12 +230,12 @@ func TestReminderDraftAppliesDateCallbacks(t *testing.T) {
 				hour    int
 				minute  int
 				screen  draftScreen
-			}{applied: true, date: time.Date(2026, 6, 2, 0, 0, 0, 0, time.Local), hour: 18, screen: draftScreenTime},
+			}{applied: true, date: time.Date(2026, 6, 2, 0, 0, 0, 0, location), hour: 18, screen: draftScreenTime},
 		},
 		{
 			name: "time shift callback moves selected time",
 			draft: reminderDraft{
-				date:   time.Date(2026, 6, 2, 0, 0, 0, 0, time.Local),
+				date:   time.Date(2026, 6, 2, 0, 0, 0, 0, location),
 				hour:   10,
 				minute: 5,
 				screen: draftScreenTime,
@@ -247,7 +247,7 @@ func TestReminderDraftAppliesDateCallbacks(t *testing.T) {
 				hour    int
 				minute  int
 				screen  draftScreen
-			}{applied: true, date: time.Date(2026, 6, 2, 0, 0, 0, 0, time.Local), hour: 10, screen: draftScreenTime},
+			}{applied: true, date: time.Date(2026, 6, 2, 0, 0, 0, 0, location), hour: 10, screen: draftScreenTime},
 		},
 		{
 			name:  "invalid date callback is rejected",
@@ -279,7 +279,10 @@ func TestReminderDraftAppliesDateCallbacks(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			bot := &ReminderBot{draftByChat: map[int64]reminderDraft{chatID: test.draft}}
+			bot := &ReminderBot{
+				cfg:         config.Telegram{UserTimezone: "Europe/Moscow"},
+				draftByChat: map[int64]reminderDraft{chatID: test.draft},
+			}
 
 			applied := bot.applyDraftDateCallback(chatID, test.data)
 			draft := bot.draft(chatID)
@@ -296,11 +299,12 @@ func TestReminderDraftAppliesDateCallbacks(t *testing.T) {
 func TestReminderUITextsAndKeyboards(t *testing.T) {
 	t.Parallel()
 
+	location := time.FixedZone("MSK", 3*60*60)
 	reminder := database.ReminderView{
 		ID:          10,
 		Title:       "Pay rent",
 		Description: "Before lunch",
-		RemindAt:    time.Date(2026, 6, 2, 9, 30, 0, 0, time.Local),
+		RemindAt:    time.Date(2026, 6, 2, 6, 30, 0, 0, time.UTC),
 	}
 
 	tests := []struct {
@@ -323,10 +327,10 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 				return draftText(reminderDraft{
 					title:       "Pay rent",
 					description: "Before lunch",
-					date:        time.Date(2026, 6, 2, 0, 0, 0, 0, time.Local),
+					date:        time.Date(2026, 6, 2, 0, 0, 0, 0, location),
 					hour:        9,
 					minute:      30,
-				})
+				}, location)
 			},
 			expected: struct {
 				expectedText string
@@ -338,7 +342,7 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 		{
 			name: "reminder view text includes description",
 			action: func() string {
-				return reminderViewText(reminder)
+				return reminderViewText(reminder, location)
 			},
 			expected: struct {
 				expectedText string
@@ -347,7 +351,7 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 		{
 			name: "reminder list text includes active reminder",
 			action: func() string {
-				return reminderListText([]database.ReminderView{reminder})
+				return reminderListText([]database.ReminderView{reminder}, location)
 			},
 			expected: struct {
 				expectedText string
@@ -356,7 +360,7 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 		{
 			name: "empty draft text shows missing fields",
 			action: func() string {
-				return draftText(reminderDraft{})
+				return draftText(reminderDraft{}, location)
 			},
 			expected: struct {
 				expectedText string
@@ -368,7 +372,7 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 		{
 			name: "empty reminder list explains next action",
 			action: func() string {
-				return reminderListText(nil)
+				return reminderListText(nil, location)
 			},
 			expected: struct {
 				expectedText string
@@ -388,6 +392,7 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 func TestReminderUIBuildsExpectedKeyboards(t *testing.T) {
 	t.Parallel()
 
+	now := time.Date(2026, 6, 1, 8, 30, 0, 0, time.Local)
 	tests := []struct {
 		name     string
 		action   func() *telego.InlineKeyboardMarkup
@@ -398,14 +403,14 @@ func TestReminderUIBuildsExpectedKeyboards(t *testing.T) {
 		{
 			name: "main draft keyboard has three command rows",
 			action: func() *telego.InlineKeyboardMarkup {
-				return draftKeyboard(reminderDraft{})
+				return draftKeyboard(reminderDraft{}, now)
 			},
 			expected: struct{ rowCount int }{rowCount: 3},
 		},
 		{
 			name: "date choice keyboard is compact",
 			action: func() *telego.InlineKeyboardMarkup {
-				return draftKeyboard(reminderDraft{screen: draftScreenDate})
+				return draftKeyboard(reminderDraft{screen: draftScreenDate}, now)
 			},
 			expected: struct{ rowCount int }{rowCount: 3},
 		},
@@ -415,16 +420,20 @@ func TestReminderUIBuildsExpectedKeyboards(t *testing.T) {
 				return draftKeyboard(reminderDraft{
 					screen:        draftScreenCalendar,
 					calendarMonth: time.Date(2026, 6, 1, 0, 0, 0, 0, time.Local),
-				})
+				}, now)
 			},
 			expected: struct{ rowCount int }{rowCount: 8},
 		},
 		{
-			name: "time keyboard has presets, steppers, manual input and done",
+			name: "time keyboard has future presets, steppers and done",
 			action: func() *telego.InlineKeyboardMarkup {
-				return draftKeyboard(reminderDraft{screen: draftScreenTime, hour: 9, minute: 30})
+				return draftKeyboard(reminderDraft{
+					screen: draftScreenTime,
+					date:   time.Date(2026, 6, 1, 0, 0, 0, 0, time.Local),
+					hour:   9, minute: 30,
+				}, now)
 			},
-			expected: struct{ rowCount int }{rowCount: 5},
+			expected: struct{ rowCount int }{rowCount: 4},
 		},
 		{
 			name: "empty reminder list keyboard still has main menu",
@@ -434,7 +443,7 @@ func TestReminderUIBuildsExpectedKeyboards(t *testing.T) {
 			expected: struct{ rowCount int }{rowCount: 1},
 		},
 		{
-			name: "reminder list keyboard has delete buttons and main menu",
+			name: "reminder list keyboard has view delete buttons and main menu",
 			action: func() *telego.InlineKeyboardMarkup {
 				return reminderListKeyboard([]database.ReminderView{{ID: 1}, {ID: 2}})
 			},
@@ -809,14 +818,14 @@ func TestReminderBotCommandCallbacks(t *testing.T) {
 			}{handled: true, screen: draftScreenMain, waiting: fieldDescription},
 		},
 		{
-			name:  "manual time callback waits for time",
-			data:  callbackDraftTimeText,
-			draft: reminderDraft{screen: draftScreenTime},
+			name:  "calendar callback opens calendar",
+			data:  callbackDraftCalendar,
+			draft: reminderDraft{screen: draftScreenDate},
 			expected: struct {
 				handled bool
 				screen  draftScreen
 				waiting draftField
-			}{handled: true, screen: draftScreenMain, waiting: fieldTime},
+			}{handled: true, screen: draftScreenCalendar},
 		},
 		{
 			name:  "date callback opens compact date choice",
@@ -892,6 +901,259 @@ func TestReminderBotCommandCallbacks(t *testing.T) {
 			require.Equal(t, test.expected.handled, handled)
 			require.Equal(t, test.expected.screen, draft.screen)
 			require.Equal(t, test.expected.waiting, draft.waitingFor)
+		})
+	}
+}
+
+func TestReminderBotSavesDraft(t *testing.T) {
+	t.Parallel()
+
+	chatID := int64(500)
+	messageID := 77
+	futureDate := time.Date(2099, 6, 2, 0, 0, 0, 0, time.UTC)
+	pastDate := time.Date(2000, 6, 2, 0, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name     string
+		draft    reminderDraft
+		before   func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService)
+		expected struct {
+			expectedErr error
+			draftExists bool
+			screen      draftScreen
+			notice      string
+		}
+	}{
+		{
+			name:  "valid future draft is created and draft is deleted",
+			draft: reminderDraft{title: "Pay rent", date: futureDate, hour: 9, minute: 30},
+			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService) {
+				service.EXPECT().
+					CreateReminder(gomock.Any(), chatID, "Pay rent", "", gomock.Any()).
+					Return(database.ReminderView{
+						ID:       11,
+						Title:    "Pay rent",
+						RemindAt: futureDate.Add(9*time.Hour + 30*time.Minute),
+					}, nil)
+				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(testTelegramResponse(t, telego.Message{MessageID: messageID}), nil)
+			},
+		},
+		{
+			name:  "valid future draft with description is created",
+			draft: reminderDraft{title: "Call", description: "Mom", date: futureDate, hour: 12},
+			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService) {
+				service.EXPECT().
+					CreateReminder(gomock.Any(), chatID, "Call", "Mom", gomock.Any()).
+					Return(database.ReminderView{
+						ID:          12,
+						Title:       "Call",
+						Description: "Mom",
+						RemindAt:    futureDate.Add(12 * time.Hour),
+					}, nil)
+				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(testTelegramResponse(t, telego.Message{MessageID: messageID}), nil)
+			},
+		},
+		{
+			name:  "valid evening draft is created",
+			draft: reminderDraft{title: "Report", date: futureDate, hour: 18, minute: 5},
+			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService) {
+				service.EXPECT().
+					CreateReminder(gomock.Any(), chatID, "Report", "", gomock.Any()).
+					Return(database.ReminderView{ID: 13, Title: "Report", RemindAt: futureDate.Add(18*time.Hour + 5*time.Minute)}, nil)
+				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(testTelegramResponse(t, telego.Message{MessageID: messageID}), nil)
+			},
+		},
+		{
+			name:  "valid midnight draft is created",
+			draft: reminderDraft{title: "Night task", date: futureDate, hour: 23, minute: 55},
+			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService) {
+				service.EXPECT().
+					CreateReminder(gomock.Any(), chatID, "Night task", "", gomock.Any()).
+					Return(database.ReminderView{
+						ID:       14,
+						Title:    "Night task",
+						RemindAt: futureDate.Add(23*time.Hour + 55*time.Minute),
+					}, nil)
+				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(testTelegramResponse(t, telego.Message{MessageID: messageID}), nil)
+			},
+		},
+		{
+			name:  "draft without title stays open with validation notice",
+			draft: reminderDraft{date: futureDate, hour: 9},
+			before: func(caller *telegoapimock.MockCaller, _ *telegrammocks.MockReminderService) {
+				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(testTelegramResponse(t, telego.Message{MessageID: messageID}), nil)
+			},
+			expected: struct {
+				expectedErr error
+				draftExists bool
+				screen      draftScreen
+				notice      string
+			}{
+				draftExists: true,
+				screen:      draftScreenMain,
+				notice:      "Чтобы сохранить напоминание, добавьте название и дату с временем.",
+			},
+		},
+		{
+			name:  "past draft stays open with time validation notice",
+			draft: reminderDraft{title: "Old task", date: pastDate, hour: 9},
+			before: func(caller *telegoapimock.MockCaller, _ *telegrammocks.MockReminderService) {
+				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(testTelegramResponse(t, telego.Message{MessageID: messageID}), nil)
+			},
+			expected: struct {
+				expectedErr error
+				draftExists bool
+				screen      draftScreen
+				notice      string
+			}{
+				draftExists: true,
+				screen:      draftScreenTime,
+				notice:      "Это время уже прошло. Выберите будущую дату и время.",
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctrl := gomock.NewController(t)
+			caller := telegoapimock.NewMockCaller(ctrl)
+			service := telegrammocks.NewMockReminderService(ctrl)
+			test.before(caller, service)
+
+			botAPI, err := telego.NewBot(
+				"1234567890:aaaabbbbaaaabbbbaaaabbbbaaaabbbbccc",
+				telego.WithAPICaller(caller),
+				telego.WithDiscardLogger(),
+			)
+			require.NoError(t, err)
+
+			bot := &ReminderBot{
+				bot:         botAPI,
+				cfg:         config.Telegram{UserTimezone: "UTC"},
+				service:     service,
+				draftByChat: map[int64]reminderDraft{chatID: test.draft},
+				uiByChat:    map[int64]int{chatID: messageID},
+			}
+
+			err = bot.saveDraft(t.Context(), chatID, messageID)
+
+			if test.expected.expectedErr != nil {
+				require.EqualError(t, err, test.expected.expectedErr.Error())
+
+				return
+			}
+
+			require.NoError(t, err)
+
+			draft, exists := bot.draftByChat[chatID]
+			require.Equal(t, test.expected.draftExists, exists)
+			require.Equal(t, test.expected.screen, draft.screen)
+			require.Equal(t, test.expected.notice, draft.notice)
+		})
+	}
+}
+
+func TestReminderBotConfigurationHelpers(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		action   func(t *testing.T)
+		expected struct {
+			expectedErr error
+		}
+	}{
+		{
+			name: "new reminder bot initializes state maps",
+			action: func(t *testing.T) {
+				t.Helper()
+
+				ctrl := gomock.NewController(t)
+				caller := telegoapimock.NewMockCaller(ctrl)
+				botAPI, err := telego.NewBot(
+					"1234567890:aaaabbbbaaaabbbbaaaabbbbaaaabbbbccc",
+					telego.WithAPICaller(caller),
+					telego.WithDiscardLogger(),
+				)
+				require.NoError(t, err)
+
+				bot := NewReminderBot(
+					&Sender{bot: botAPI},
+					telegrammocks.NewMockReminderService(ctrl),
+					config.Telegram{},
+				)
+
+				require.NotNil(t, bot.draftByChat)
+				require.NotNil(t, bot.uiByChat)
+			},
+		},
+		{
+			name: "info returns reminder bot description",
+			action: func(t *testing.T) {
+				t.Helper()
+
+				require.Equal(t, "run telegram reminder bot", (&ReminderBot{}).Info())
+			},
+		},
+		{
+			name: "long polling options are built from config",
+			action: func(t *testing.T) {
+				t.Helper()
+
+				bot := &ReminderBot{cfg: config.Telegram{
+					LongPollingBuffer:   10,
+					LongPollingInterval: time.Second,
+					LongPollingRetry:    2 * time.Second,
+				}}
+
+				require.Len(t, bot.longPollingOptions(), 3)
+			},
+		},
+		{
+			name: "configured timezone is loaded",
+			action: func(t *testing.T) {
+				t.Helper()
+
+				location := (&ReminderBot{cfg: config.Telegram{UserTimezone: "Europe/Moscow"}}).location()
+
+				require.Equal(t, "Europe/Moscow", location.String())
+			},
+		},
+		{
+			name: "invalid timezone falls back to local timezone",
+			action: func(t *testing.T) {
+				t.Helper()
+
+				location := (&ReminderBot{cfg: config.Telegram{UserTimezone: "bad/timezone"}}).location()
+
+				require.Equal(t, time.Local, location)
+			},
+		},
+		{
+			name: "next reminder time rolls minutes into next hour",
+			action: func(t *testing.T) {
+				t.Helper()
+
+				next := nextReminderTime(time.Date(2026, 6, 1, 10, 58, 0, 0, time.UTC))
+
+				require.Equal(t, time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC), next)
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			test.action(t)
 		})
 	}
 }
