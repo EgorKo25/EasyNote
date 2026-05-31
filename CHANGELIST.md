@@ -1,4 +1,30 @@
-version: 1.0.0
+version: 1.0.2
+
+## v1.0.2 - Reminder status simplification
+
+### What was done
+
+Reminder statuses were simplified to `new`, `sent`, `failed`, and `canceled`. The temporary `processing` state was removed so active and due reminders are selected from `new` only.
+
+### API changes
+
+No public HTTP API was introduced.
+
+## v1.0.1 - Telegram UI bugfixes
+
+### What was done
+
+Telegram reminder creation no longer requires manual date and time input. The bot now uses an inline date and time picker, edits the active UI message during callbacks, and keeps reminder lists in one message with delete buttons.
+
+The reminder UI now keeps user messages in the chat, has a main-menu action from the active reminder list, and offers a compact time editor with quick presets plus optional manual `HH:MM` input.
+
+Due reminder delivery now retries reminders that were left in `processing` after an interrupted worker run, and terminally failed reminders are no longer shown as active.
+
+Docker Compose and the beta deploy workflow now pass optional proxy variables from GitHub Secrets into the application container so Telegram API requests can use the deployment proxy.
+
+### API changes
+
+No public HTTP API was introduced.
 
 ## v1.0.0 - beta deployment ready
 

@@ -21,11 +21,10 @@ type Note struct {
 type ReminderStatus string
 
 const (
-	ReminderStatusPending    ReminderStatus = "pending"
-	ReminderStatusProcessing ReminderStatus = "processing"
-	ReminderStatusSent       ReminderStatus = "sent"
-	ReminderStatusFailed     ReminderStatus = "failed"
-	ReminderStatusCanceled   ReminderStatus = "canceled"
+	ReminderStatusNew      ReminderStatus = "new"
+	ReminderStatusSent     ReminderStatus = "sent"
+	ReminderStatusFailed   ReminderStatus = "failed"
+	ReminderStatusCanceled ReminderStatus = "canceled"
 )
 
 type Reminder struct {
