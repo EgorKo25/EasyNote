@@ -611,6 +611,7 @@ func TestSenderSendsReminder(t *testing.T) {
 	}
 }
 
+//nolint:gosec
 func TestNewSenderValidatesToken(t *testing.T) {
 	tests := []struct {
 		name     string
