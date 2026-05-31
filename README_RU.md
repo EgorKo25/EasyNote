@@ -144,6 +144,16 @@ Cache в этом приложении не является источнико�
 
 Docker-файлы для деплоя лежат в `deploy/docker`.
 
+Локальный Compose-запуск из текущей рабочей копии:
+
+```bash
+cd deploy/docker
+cp .env .env.local
+# Заполните TELEGRAM_BOT_TOKEN в .env.local
+docker compose -f docker-compose.local.yaml up -d --build
+docker compose -f docker-compose.local.yaml logs -f app
+```
+
 Compose-запуск:
 
 ```bash
@@ -161,7 +171,10 @@ docker compose up -d app
 | `POSTGRES_DB` | Имя базы PostgreSQL |
 | `POSTGRES_USER` | Пользователь PostgreSQL |
 | `POSTGRES_PASSWORD` | Пароль PostgreSQL |
-| `POSTGRES_HOST_PORT` | Порт PostgreSQL на host-стороне |
+| `POSTGRES_HOST_PORT` | Порт PostgreSQL на host-стороне; локальный Compose по умолчанию использует `15432` |
+| `HTTP_PROXY` | Опциональный proxy для запросов к Telegram API |
+| `HTTPS_PROXY` | Опциональный proxy для запросов к Telegram API |
+| `NO_PROXY` | Опциональный список host-ов, которые идут без proxy |
 
 Конфиг грузится в таком порядке:
 
