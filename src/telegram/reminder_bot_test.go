@@ -345,13 +345,13 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 			}{expectedText: "#10: 02.06.2026 09:30\nPay rent\nBefore lunch"},
 		},
 		{
-			name: "reminder list text includes active reminder",
+			name: "reminder list text asks to choose a button",
 			action: func() string {
 				return reminderListText([]database.ReminderView{reminder}, location)
 			},
 			expected: struct {
 				expectedText string
-			}{expectedText: "Активные напоминания\n\n1. 02.06.2026 09:30\nPay rent\nBefore lunch\n"},
+			}{expectedText: "Активные напоминания\n\nВыберите напоминание кнопкой ниже."},
 		},
 		{
 			name: "empty draft text shows missing fields",
