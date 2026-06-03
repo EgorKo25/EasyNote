@@ -153,6 +153,156 @@ func TestReminderServiceCreatesReminder(t *testing.T) {
 	}
 }
 
+func TestReminderServiceCreatesWeekdaysReminder(t *testing.T) {
+	t.Parallel()
+
+	chatID := int64(100)
+	remindAt := time.Date(2026, 6, 2, 9, 30, 0, 0, time.Local)
+
+	tests := []struct {
+		name         string
+		title        string
+		desc         string
+		weekdaysMask int
+		before       func(repository *mocks.MockReminderCommandRepository)
+		expected     struct {
+			reminder        database.ReminderView
+			expectedErrText string
+		}
+	}{
+		{
+			name:         "creates workdays reminder with default workdays mask",
+			title:        "Work standup",
+			desc:         "Daily sync",
+			weekdaysMask: database.WeekdaysMaskWorkdays,
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					CreateRecurringReminder(gomock.Any(), gomock.Any()).
+					DoAndReturn(func(_ context.Context, request database.RecurringReminderRequest) (database.ReminderView, error) {
+						require.Equal(t, database.WeekdaysMaskWorkdays, *request.Rule.WeekdaysMask)
+
+						return database.ReminderView{ID: 1, Title: "Work standup"}, nil
+					})
+			},
+			expected: struct {
+				reminder        database.ReminderView
+				expectedErrText string
+			}{reminder: database.ReminderView{ID: 1, Title: "Work standup"}},
+		},
+		{
+			name:         "creates tuesday and thursday reminder with custom mask",
+			title:        "Training",
+			desc:         "Gym",
+			weekdaysMask: 2 | 8,
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					CreateRecurringReminder(gomock.Any(), gomock.Any()).
+					DoAndReturn(func(_ context.Context, request database.RecurringReminderRequest) (database.ReminderView, error) {
+						require.Equal(t, 2|8, *request.Rule.WeekdaysMask)
+
+						return database.ReminderView{ID: 2, Title: "Training"}, nil
+					})
+			},
+			expected: struct {
+				reminder        database.ReminderView
+				expectedErrText string
+			}{reminder: database.ReminderView{ID: 2, Title: "Training"}},
+		},
+		{
+			name:         "creates weekend reminder with saturday and sunday mask",
+			title:        "Weekend plan",
+			desc:         "",
+			weekdaysMask: 32 | 64,
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					CreateRecurringReminder(gomock.Any(), gomock.Any()).
+					DoAndReturn(func(_ context.Context, request database.RecurringReminderRequest) (database.ReminderView, error) {
+						require.Equal(t, 32|64, *request.Rule.WeekdaysMask)
+
+						return database.ReminderView{ID: 3, Title: "Weekend plan"}, nil
+					})
+			},
+			expected: struct {
+				reminder        database.ReminderView
+				expectedErrText string
+			}{reminder: database.ReminderView{ID: 3, Title: "Weekend plan"}},
+		},
+		{
+			name:         "creates sunday only reminder with single day mask",
+			title:        "Review",
+			desc:         "Weekly",
+			weekdaysMask: 64,
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					CreateRecurringReminder(gomock.Any(), gomock.Any()).
+					DoAndReturn(func(_ context.Context, request database.RecurringReminderRequest) (database.ReminderView, error) {
+						require.Equal(t, 64, *request.Rule.WeekdaysMask)
+
+						return database.ReminderView{ID: 4, Title: "Review"}, nil
+					})
+			},
+			expected: struct {
+				reminder        database.ReminderView
+				expectedErrText string
+			}{reminder: database.ReminderView{ID: 4, Title: "Review"}},
+		},
+		{
+			name:         "empty title returns validation error",
+			title:        " ",
+			desc:         "Weekly",
+			weekdaysMask: 64,
+			before: func(_ *mocks.MockReminderCommandRepository) {
+			},
+			expected: struct {
+				reminder        database.ReminderView
+				expectedErrText string
+			}{expectedErrText: "create weekdays reminder: reminder title is empty"},
+		},
+		{
+			name:         "empty weekdays mask returns validation error",
+			title:        "Review",
+			desc:         "Weekly",
+			weekdaysMask: 0,
+			before: func(_ *mocks.MockReminderCommandRepository) {
+			},
+			expected: struct {
+				reminder        database.ReminderView
+				expectedErrText string
+			}{expectedErrText: "create weekdays reminder: weekdays mask is empty"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctrl := gomock.NewController(t)
+			repository := mocks.NewMockReminderCommandRepository(ctrl)
+			test.before(repository)
+
+			reminderService := service.NewReminderService(repository)
+			reminder, err := reminderService.CreateWeekdaysReminder(
+				context.Background(),
+				chatID,
+				test.title,
+				test.desc,
+				remindAt,
+				test.weekdaysMask,
+			)
+
+			if test.expected.expectedErrText != "" {
+				require.EqualError(t, err, test.expected.expectedErrText)
+				require.Equal(t, test.expected.reminder, reminder)
+
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, test.expected.reminder, reminder)
+		})
+	}
+}
+
 func TestReminderServiceLoadsReminders(t *testing.T) {
 	t.Parallel()
 

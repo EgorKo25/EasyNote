@@ -37,11 +37,24 @@ func TestReminderWorkerSendsReadyReminders(t *testing.T) {
 			FindRemindersReadyToSend(gomock.Any(), gomock.Any(), 50, 5).
 			Return([]*database.ScheduledReminder{&firstReminder, &secondReminder}, nil),
 		sender.EXPECT().SendReminder(gomock.Any(), firstReminder).Return(nil),
-		repository.EXPECT().MarkReminderSent(gomock.Any(), firstReminder.ID, gomock.Any()).Return(nil),
+		repository.EXPECT().
+			CompleteReminder(gomock.Any(), gomock.Any()).
+			DoAndReturn(func(_ context.Context, request database.ReminderCompletionRequest) error {
+				require.Equal(t, firstReminder.ID, request.ReminderID)
+				require.Equal(t, database.ReminderCompletionStatusSent, request.Status)
+				require.NotNil(t, request.SentAt)
+				require.NotNil(t, request.Next)
+
+				return nil
+			}),
 		sender.EXPECT().SendReminder(gomock.Any(), secondReminder).Return(nil),
 		repository.EXPECT().
-			MarkReminderSent(gomock.Any(), secondReminder.ID, gomock.Any()).
-			DoAndReturn(func(context.Context, int64, time.Time) error {
+			CompleteReminder(gomock.Any(), gomock.Any()).
+			DoAndReturn(func(_ context.Context, request database.ReminderCompletionRequest) error {
+				require.Equal(t, secondReminder.ID, request.ReminderID)
+				require.Equal(t, database.ReminderCompletionStatusSent, request.Status)
+				require.NotNil(t, request.SentAt)
+				require.NotNil(t, request.Next)
 				cancel()
 
 				return nil
@@ -99,8 +112,12 @@ func TestReminderWorkerMarksFailedReminderAfterSendError(t *testing.T) {
 			Return([]*database.ScheduledReminder{&reminder}, nil),
 		sender.EXPECT().SendReminder(gomock.Any(), reminder).Return(errSendReminder),
 		repository.EXPECT().
-			MarkReminderFailed(gomock.Any(), reminder.ID, 5).
-			DoAndReturn(func(context.Context, int64, int) error {
+			CompleteReminder(gomock.Any(), gomock.Any()).
+			DoAndReturn(func(_ context.Context, request database.ReminderCompletionRequest) error {
+				require.Equal(t, reminder.ID, request.ReminderID)
+				require.Equal(t, database.ReminderCompletionStatusFailed, request.Status)
+				require.Equal(t, 5, request.MaxAttempts)
+				require.NotNil(t, request.Next)
 				cancel()
 
 				return nil
