@@ -57,6 +57,51 @@ func (mr *MockReminderServiceMockRecorder) CreateReminder(ctx, telegramChatID, t
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateReminder", reflect.TypeOf((*MockReminderService)(nil).CreateReminder), ctx, telegramChatID, title, description, remindAt)
 }
 
+// CreateIntervalReminder mocks base method.
+func (m *MockReminderService) CreateIntervalReminder(ctx context.Context, telegramChatID int64, title, description string, remindAt time.Time, intervalDays int) (database.ReminderView, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateIntervalReminder", ctx, telegramChatID, title, description, remindAt, intervalDays)
+	ret0, _ := ret[0].(database.ReminderView)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateIntervalReminder indicates an expected call of CreateIntervalReminder.
+func (mr *MockReminderServiceMockRecorder) CreateIntervalReminder(ctx, telegramChatID, title, description, remindAt, intervalDays any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateIntervalReminder", reflect.TypeOf((*MockReminderService)(nil).CreateIntervalReminder), ctx, telegramChatID, title, description, remindAt, intervalDays)
+}
+
+// CreateWeekdaysReminder mocks base method.
+func (m *MockReminderService) CreateWeekdaysReminder(ctx context.Context, telegramChatID int64, title, description string, remindAt time.Time, weekdaysMask int) (database.ReminderView, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateWeekdaysReminder", ctx, telegramChatID, title, description, remindAt, weekdaysMask)
+	ret0, _ := ret[0].(database.ReminderView)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateWeekdaysReminder indicates an expected call of CreateWeekdaysReminder.
+func (mr *MockReminderServiceMockRecorder) CreateWeekdaysReminder(ctx, telegramChatID, title, description, remindAt, weekdaysMask any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateWeekdaysReminder", reflect.TypeOf((*MockReminderService)(nil).CreateWeekdaysReminder), ctx, telegramChatID, title, description, remindAt, weekdaysMask)
+}
+
+// CreateCustomDatesReminder mocks base method.
+func (m *MockReminderService) CreateCustomDatesReminder(ctx context.Context, telegramChatID int64, title, description string, selectedDates []time.Time, hour, minute int, location *time.Location) (database.ReminderView, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateCustomDatesReminder", ctx, telegramChatID, title, description, selectedDates, hour, minute, location)
+	ret0, _ := ret[0].(database.ReminderView)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateCustomDatesReminder indicates an expected call of CreateCustomDatesReminder.
+func (mr *MockReminderServiceMockRecorder) CreateCustomDatesReminder(ctx, telegramChatID, title, description, selectedDates, hour, minute, location any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateCustomDatesReminder", reflect.TypeOf((*MockReminderService)(nil).CreateCustomDatesReminder), ctx, telegramChatID, title, description, selectedDates, hour, minute, location)
+}
+
 // DeleteReminder mocks base method.
 func (m *MockReminderService) DeleteReminder(ctx context.Context, telegramChatID, reminderID int64) error {
 	m.ctrl.T.Helper()

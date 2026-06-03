@@ -17,6 +17,8 @@ import (
 	"github.com/EgorKo25/EasyNote/src/logger"
 )
 
+var ErrUnsupportedReminderCompletionStatus = errors.New("unsupported reminder completion status")
+
 type Database struct {
 	pool *pgxpool.Pool
 	cfg  config.Database
@@ -79,8 +81,8 @@ func (d *Database) Migrate(ctx context.Context) error {
 
 func (d *Database) SaveReminder(ctx context.Context, reminder *database.Reminder) error {
 	query := `
-		INSERT INTO reminders (note_id, remind_at, status, attempts, sent_at)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO reminders (note_id, rule_id, remind_at, status, attempts, sent_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING id, created_at
 	`
 
@@ -92,6 +94,7 @@ func (d *Database) SaveReminder(ctx context.Context, reminder *database.Reminder
 		ctx,
 		query,
 		reminder.NoteID,
+		reminder.RuleID,
 		reminder.RemindAt,
 		reminder.Status,
 		reminder.Attempts,
@@ -141,9 +144,90 @@ func (d *Database) CreateReminder(
 	return reminder, nil
 }
 
+func (d *Database) CreateRecurringReminder(
+	ctx context.Context,
+	request database.RecurringReminderRequest,
+) (database.ReminderView, error) {
+	transaction, err := d.pool.Begin(ctx)
+	if err != nil {
+		return database.ReminderView{}, fmt.Errorf("begin create recurring reminder transaction: %w", err)
+	}
+
+	defer rollbackTransaction(ctx, transaction, "create recurring reminder")
+
+	var noteID int64
+	if err = transaction.QueryRow(
+		ctx,
+		`
+		INSERT INTO 
+		    notes (telegram_chat_id, title, description)
+		VALUES ($1, $2, $3)
+		RETURNING id
+		`,
+		request.TelegramChatID,
+		request.Title,
+		request.Description,
+	).Scan(&noteID); err != nil {
+		return database.ReminderView{}, fmt.Errorf("create recurring reminder note: %w", err)
+	}
+
+	var ruleID int64
+	if err = transaction.QueryRow(
+		ctx,
+		`
+		INSERT INTO 
+    		reminder_rules (type, interval_days, weekdays_mask)
+		VALUES ($1, $2, $3)
+		RETURNING id
+		`,
+		request.Rule.Type,
+		request.Rule.IntervalDays,
+		request.Rule.WeekdaysMask,
+	).Scan(&ruleID); err != nil {
+		return database.ReminderView{}, fmt.Errorf("create reminder rule: %w", err)
+	}
+
+	reminder, err := insertReminder(ctx, transaction, noteID, &ruleID, request.FirstRemindAt)
+	if err != nil {
+		return database.ReminderView{}, err
+	}
+
+	for _, remindDate := range request.CustomDates {
+		generatedReminderID := any(nil)
+		if sameDate(remindDate, request.FirstRemindAt) {
+			generatedReminderID = reminder.ID
+		}
+
+		if _, err = transaction.Exec(
+			ctx,
+			`INSERT INTO reminder_custom_dates (rule_id, remind_date, generated_reminder_id)
+			VALUES ($1, $2, $3)`,
+			ruleID,
+			remindDate,
+			generatedReminderID,
+		); err != nil {
+			return database.ReminderView{}, fmt.Errorf("create custom reminder date: %w", err)
+		}
+	}
+
+	if err = transaction.Commit(ctx); err != nil {
+		return database.ReminderView{}, fmt.Errorf("commit create recurring reminder transaction: %w", err)
+	}
+
+	return database.ReminderView{
+		ID:          reminder.ID,
+		RuleID:      &ruleID,
+		Title:       request.Title,
+		Description: request.Description,
+		RemindAt:    reminder.RemindAt,
+		Status:      reminder.Status,
+		CreatedAt:   reminder.CreatedAt,
+	}, nil
+}
+
 func (d *Database) FindRemindersByChat(ctx context.Context, telegramChatID int64) ([]database.ReminderView, error) {
 	query := `
-		SELECT r.id, n.title, n.description, r.remind_at, r.status, r.created_at
+		SELECT r.id, r.rule_id, n.title, n.description, r.remind_at, r.status, r.created_at
 		FROM reminders r
 		JOIN notes n ON n.id = r.note_id
 		WHERE n.telegram_chat_id = $1
@@ -163,6 +247,7 @@ func (d *Database) FindRemindersByChat(ctx context.Context, telegramChatID int64
 		var reminder database.ReminderView
 		if err = rows.Scan(
 			&reminder.ID,
+			&reminder.RuleID,
 			&reminder.Title,
 			&reminder.Description,
 			&reminder.RemindAt,
@@ -211,7 +296,7 @@ func (d *Database) ActualReminders(
 	until time.Time,
 ) ([]*database.ScheduledReminder, error) {
 	query := `
-		SELECT r.id, r.note_id, n.telegram_chat_id, n.title, n.description, r.remind_at
+		SELECT r.id, r.note_id, r.rule_id, n.telegram_chat_id, n.title, n.description, r.remind_at
 		FROM reminders r
 		JOIN notes n ON n.id = r.note_id
 		WHERE r.remind_at >= $1
@@ -257,7 +342,7 @@ func (d *Database) FindRemindersReadyToSend(
 			LIMIT $3
 			FOR UPDATE SKIP LOCKED
 		)
-		SELECT r.id, r.note_id, n.telegram_chat_id, n.title, n.description, r.remind_at
+		SELECT r.id, r.note_id, r.rule_id, n.telegram_chat_id, n.title, n.description, r.remind_at
 		FROM reminders r
 		JOIN due d ON d.id = r.id
 		JOIN notes n ON n.id = r.note_id
@@ -317,6 +402,115 @@ func (d *Database) MarkReminderFailed(ctx context.Context, reminderID int64, _ i
 	return nil
 }
 
+func (d *Database) CompleteReminder(ctx context.Context, request database.ReminderCompletionRequest) error {
+	transaction, err := d.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin complete reminder transaction: %w", err)
+	}
+
+	defer rollbackTransaction(ctx, transaction, "complete reminder")
+
+	reminder, err := loadScheduledReminderForUpdate(ctx, transaction, request.ReminderID)
+	if err != nil {
+		return err
+	}
+
+	if err = markReminderCompleted(ctx, transaction, request); err != nil {
+		return err
+	}
+
+	if reminder.RuleID == nil {
+		return commitCompleteReminder(ctx, transaction)
+	}
+
+	if err = createNextRecurringReminder(ctx, transaction, request, reminder); err != nil {
+		return err
+	}
+
+	return commitCompleteReminder(ctx, transaction)
+}
+
+func markReminderCompleted(
+	ctx context.Context,
+	transaction pgx.Tx,
+	request database.ReminderCompletionRequest,
+) error {
+	switch request.Status {
+	case database.ReminderCompletionStatusSent:
+		return markReminderSent(ctx, transaction, request.ReminderID, request.SentAt)
+	case database.ReminderCompletionStatusFailed:
+		return markReminderFailed(ctx, transaction, request.ReminderID)
+	default:
+		return fmt.Errorf("%w: %s", ErrUnsupportedReminderCompletionStatus, request.Status)
+	}
+}
+
+func createNextRecurringReminder(
+	ctx context.Context,
+	transaction pgx.Tx,
+	request database.ReminderCompletionRequest,
+	reminder database.ScheduledReminder,
+) error {
+	rule, err := loadReminderRuleForUpdate(ctx, transaction, *reminder.RuleID)
+	if err != nil {
+		return err
+	}
+
+	var customDates []database.CustomReminderDate
+	if rule.Type == database.ReminderRuleTypeCustomDates {
+		customDates, err = loadCustomReminderDatesForUpdate(ctx, transaction, rule.ID)
+		if err != nil {
+			return err
+		}
+	}
+
+	next, err := request.Next(database.ReminderCompletionInput{
+		Reminder:    reminder,
+		Rule:        &rule,
+		CustomDates: customDates,
+	})
+	if err != nil {
+		return fmt.Errorf("calculate next reminder: %w", err)
+	}
+
+	if next.RemindAt != nil {
+		if err = insertNextRecurringReminder(ctx, transaction, reminder, rule, *next.RemindAt); err != nil {
+			return err
+		}
+	}
+
+	if next.CompleteRule {
+		if err = completeReminderRule(ctx, transaction, rule.ID); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func insertNextRecurringReminder(
+	ctx context.Context,
+	transaction pgx.Tx,
+	reminder database.ScheduledReminder,
+	rule database.ReminderRule,
+	remindAt time.Time,
+) error {
+	nextReminder, err := insertReminder(ctx, transaction, reminder.NoteID, reminder.RuleID, remindAt)
+	if err != nil {
+		return err
+	}
+
+	if rule.Type != database.ReminderRuleTypeCustomDates {
+		return nil
+	}
+
+	if err = markCustomDateGenerated(ctx, transaction, rule.ID, remindAt, nextReminder.ID); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func scanScheduledReminders(rows pgx.Rows) ([]*database.ScheduledReminder, error) {
 	reminders := make([]*database.ScheduledReminder, 0)
 
@@ -325,6 +519,7 @@ func scanScheduledReminders(rows pgx.Rows) ([]*database.ScheduledReminder, error
 		if err := rows.Scan(
 			&reminder.ID,
 			&reminder.NoteID,
+			&reminder.RuleID,
 			&reminder.TelegramChatID,
 			&reminder.Title,
 			&reminder.Description,
@@ -341,4 +536,208 @@ func scanScheduledReminders(rows pgx.Rows) ([]*database.ScheduledReminder, error
 	}
 
 	return reminders, nil
+}
+
+func loadScheduledReminderForUpdate(
+	ctx context.Context,
+	transaction pgx.Tx,
+	reminderID int64,
+) (database.ScheduledReminder, error) {
+	query := `
+		SELECT r.id, r.note_id, r.rule_id, n.telegram_chat_id, n.title, n.description, r.remind_at
+		FROM reminders r
+		JOIN notes n ON n.id = r.note_id
+		WHERE r.id = $1
+		FOR UPDATE OF r
+	`
+
+	var reminder database.ScheduledReminder
+	if err := transaction.QueryRow(ctx, query, reminderID).Scan(
+		&reminder.ID,
+		&reminder.NoteID,
+		&reminder.RuleID,
+		&reminder.TelegramChatID,
+		&reminder.Title,
+		&reminder.Description,
+		&reminder.RemindAt,
+	); err != nil {
+		return database.ScheduledReminder{}, fmt.Errorf("load reminder for completion: %w", err)
+	}
+
+	return reminder, nil
+}
+
+func loadReminderRuleForUpdate(ctx context.Context, transaction pgx.Tx, ruleID int64) (database.ReminderRule, error) {
+	query := `
+		SELECT id, type, interval_days, weekdays_mask, status, created_at, updated_at
+		FROM reminder_rules
+		WHERE id = $1
+		FOR UPDATE
+	`
+
+	var rule database.ReminderRule
+	if err := transaction.QueryRow(ctx, query, ruleID).Scan(
+		&rule.ID,
+		&rule.Type,
+		&rule.IntervalDays,
+		&rule.WeekdaysMask,
+		&rule.Status,
+		&rule.CreatedAt,
+		&rule.UpdatedAt,
+	); err != nil {
+		return database.ReminderRule{}, fmt.Errorf("load reminder rule: %w", err)
+	}
+
+	return rule, nil
+}
+
+func loadCustomReminderDatesForUpdate(
+	ctx context.Context,
+	transaction pgx.Tx,
+	ruleID int64,
+) ([]database.CustomReminderDate, error) {
+	query := `
+		SELECT rule_id, remind_date, generated_reminder_id, created_at
+		FROM reminder_custom_dates
+		WHERE rule_id = $1
+		ORDER BY remind_date
+		FOR UPDATE
+	`
+
+	rows, err := transaction.Query(ctx, query, ruleID)
+	if err != nil {
+		return nil, fmt.Errorf("load custom reminder dates: %w", err)
+	}
+	defer rows.Close()
+
+	dates := make([]database.CustomReminderDate, 0)
+
+	for rows.Next() {
+		var date database.CustomReminderDate
+		if err = rows.Scan(&date.RuleID, &date.RemindDate, &date.GeneratedReminderID, &date.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan custom reminder date: %w", err)
+		}
+
+		dates = append(dates, date)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate custom reminder dates: %w", err)
+	}
+
+	return dates, nil
+}
+
+func insertReminder(
+	ctx context.Context,
+	transaction pgx.Tx,
+	noteID int64,
+	ruleID *int64,
+	remindAt time.Time,
+) (database.Reminder, error) {
+	query := `
+		INSERT INTO reminders (note_id, rule_id, remind_at)
+		VALUES ($1, $2, $3)
+		RETURNING id, note_id, rule_id, remind_at, status, attempts, sent_at, created_at
+	`
+
+	var reminder database.Reminder
+	if err := transaction.QueryRow(ctx, query, noteID, ruleID, remindAt).Scan(
+		&reminder.ID,
+		&reminder.NoteID,
+		&reminder.RuleID,
+		&reminder.RemindAt,
+		&reminder.Status,
+		&reminder.Attempts,
+		&reminder.SentAt,
+		&reminder.CreatedAt,
+	); err != nil {
+		return database.Reminder{}, fmt.Errorf("insert reminder: %w", err)
+	}
+
+	return reminder, nil
+}
+
+func markReminderSent(ctx context.Context, transaction pgx.Tx, reminderID int64, sentAt *time.Time) error {
+	query := `
+		UPDATE reminders
+		SET status = 'sent',
+			sent_at = $2
+		WHERE id = $1
+	`
+
+	if _, err := transaction.Exec(ctx, query, reminderID, sentAt); err != nil {
+		return fmt.Errorf("mark reminder sent: %w", err)
+	}
+
+	return nil
+}
+
+func markReminderFailed(ctx context.Context, transaction pgx.Tx, reminderID int64) error {
+	query := `
+		UPDATE reminders
+		SET attempts = attempts + 1,
+			status = 'failed'
+		WHERE id = $1
+	`
+
+	if _, err := transaction.Exec(ctx, query, reminderID); err != nil {
+		return fmt.Errorf("mark reminder failed: %w", err)
+	}
+
+	return nil
+}
+
+func markCustomDateGenerated(
+	ctx context.Context,
+	transaction pgx.Tx,
+	ruleID int64,
+	remindAt time.Time,
+	reminderID int64,
+) error {
+	query := `
+		UPDATE reminder_custom_dates
+		SET generated_reminder_id = $3
+		WHERE rule_id = $1
+			AND remind_date = $2::date
+	`
+
+	if _, err := transaction.Exec(ctx, query, ruleID, remindAt, reminderID); err != nil {
+		return fmt.Errorf("mark custom reminder date generated: %w", err)
+	}
+
+	return nil
+}
+
+func completeReminderRule(ctx context.Context, transaction pgx.Tx, ruleID int64) error {
+	query := `
+		UPDATE reminder_rules
+		SET status = 'completed',
+			updated_at = now()
+		WHERE id = $1
+	`
+
+	if _, err := transaction.Exec(ctx, query, ruleID); err != nil {
+		return fmt.Errorf("complete reminder rule: %w", err)
+	}
+
+	return nil
+}
+
+func commitCompleteReminder(ctx context.Context, transaction pgx.Tx) error {
+	if err := transaction.Commit(ctx); err != nil {
+		return fmt.Errorf("commit complete reminder transaction: %w", err)
+	}
+
+	return nil
+}
+
+func rollbackTransaction(ctx context.Context, transaction pgx.Tx, operation string) {
+	if rollbackErr := transaction.Rollback(ctx); rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
+		logger.Get("database/postgresql").Error("cannot rollback "+operation+" transaction", rollbackErr)
+	}
+}
+
+func sameDate(left time.Time, right time.Time) bool {
+	return left.Year() == right.Year() && left.Month() == right.Month() && left.Day() == right.Day()
 }

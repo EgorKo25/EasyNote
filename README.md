@@ -6,7 +6,7 @@ Telegram reminder bot for routine tasks.
 
 The source of truth for the application version is `CHANGELIST.md`.
 
-Current version: `1.0.0`.
+Current version: `1.1.0`.
 
 ## Tests
 
@@ -98,21 +98,32 @@ These packages are included in the focused command because scheduler and cache d
 
 EasyNote follows a thin clean-architecture style around the reminder flow:
 
-- `service` owns the use case and talks to `scheduler`.
-- `scheduler` coordinates reminder persistence, cache refresh, and due reminder extraction.
-- `database` is the source of truth for reminders and note data.
-- `database/cache` keeps the in-memory heap as a windowed optimization layer.
-- `main` wires concrete implementations into the scheduler and service layers.
+- `service` owns reminder creation, validation, completion, and recurring-date calculation.
+- `database` is the source of truth for notes, concrete reminder firings, recurring rules, and custom dates.
+- `telegram` owns the user flow and delegates reminder persistence to the service layer.
+- `main` wires PostgreSQL, the Telegram sender, the reminder worker, and the Telegram bot.
 
 Data flow:
 
 1. `service` receives a user action from the Telegram bot.
-2. `scheduler` persists the reminder through the database interface.
-3. If the reminder fits the active cache window, `scheduler` also inserts it into cache.
-4. `Refresh` reloads the current window from the database and replaces cache contents.
-5. `Due` drains ready reminders from cache for delivery by the service layer.
+2. PostgreSQL stores the note and one concrete row in `reminders`.
+3. `ReminderWorker` polls `reminders` rows with status `new` and due `remind_at`.
+4. After delivery, worker calls the service/repository completion path instead of updating rows directly.
+5. Completion marks the current row as `sent` or `failed` and, for active recurring rules, creates the next concrete reminder in the same transaction.
 
-The design keeps business rules above storage details and lets the cache stay disposable.
+The design keeps recurrence calculation in Go code and uses PostgreSQL for storage and transactionality.
+
+### Recurring Reminders
+
+One row in `reminders` is one concrete firing at one `remind_at`. Recurring reminders are represented by a separate `reminder_rules` row and a nullable `reminders.rule_id`.
+
+Supported recurrence types:
+
+- Interval rules: every day, every 2 days, and every week.
+- Weekday rules: workdays or a custom selected weekday mask.
+- Custom date rules: several selected calendar dates stored in `reminder_custom_dates`.
+
+The worker never recalculates recurrence itself. It sends due reminders and calls completion logic. Completion is transactional: current reminder status is updated, the rule is checked, and the next reminder is inserted or the rule is completed.
 
 ## Deployment
 
@@ -222,7 +233,14 @@ This is why the heap can be very small while the database can keep the full remi
 ## Changelist
 
 <div style="max-height: 420px; overflow-y: auto; border: 1px solid #d0d7de; border-radius: 6px; padding: 16px;">
-<p><strong>version: 1.0.0</strong></p>
+<p><strong>version: 1.1.0</strong></p>
+
+<h2>v1.1.0 - recurring reminders</h2>
+<ul>
+  <li>Recurring reminders are backed by rule rows and concrete reminder firings.</li>
+  <li>Supported modes include intervals, workdays, custom weekdays, and selected dates.</li>
+  <li>Reminder completion creates the next firing transactionally in PostgreSQL.</li>
+</ul>
 
 <h2>v1.0.0 - beta deployment ready</h2>
 <ul>

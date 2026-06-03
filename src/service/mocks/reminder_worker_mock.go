@@ -57,32 +57,18 @@ func (mr *MockReminderRepositoryMockRecorder) FindRemindersReadyToSend(ctx, now,
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindRemindersReadyToSend", reflect.TypeOf((*MockReminderRepository)(nil).FindRemindersReadyToSend), ctx, now, limit, maxAttempts)
 }
 
-// MarkReminderFailed mocks base method.
-func (m *MockReminderRepository) MarkReminderFailed(ctx context.Context, reminderID int64, maxAttempts int) error {
+// CompleteReminder mocks base method.
+func (m *MockReminderRepository) CompleteReminder(ctx context.Context, request database.ReminderCompletionRequest) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "MarkReminderFailed", ctx, reminderID, maxAttempts)
+	ret := m.ctrl.Call(m, "CompleteReminder", ctx, request)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// MarkReminderFailed indicates an expected call of MarkReminderFailed.
-func (mr *MockReminderRepositoryMockRecorder) MarkReminderFailed(ctx, reminderID, maxAttempts any) *gomock.Call {
+// CompleteReminder indicates an expected call of CompleteReminder.
+func (mr *MockReminderRepositoryMockRecorder) CompleteReminder(ctx, request any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkReminderFailed", reflect.TypeOf((*MockReminderRepository)(nil).MarkReminderFailed), ctx, reminderID, maxAttempts)
-}
-
-// MarkReminderSent mocks base method.
-func (m *MockReminderRepository) MarkReminderSent(ctx context.Context, reminderID int64, sentAt time.Time) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "MarkReminderSent", ctx, reminderID, sentAt)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// MarkReminderSent indicates an expected call of MarkReminderSent.
-func (mr *MockReminderRepositoryMockRecorder) MarkReminderSent(ctx, reminderID, sentAt any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkReminderSent", reflect.TypeOf((*MockReminderRepository)(nil).MarkReminderSent), ctx, reminderID, sentAt)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CompleteReminder", reflect.TypeOf((*MockReminderRepository)(nil).CompleteReminder), ctx, request)
 }
 
 // MockReminderSender is a mock of ReminderSender interface.

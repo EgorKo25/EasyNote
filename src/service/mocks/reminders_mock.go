@@ -71,6 +71,21 @@ func (mr *MockReminderCommandRepositoryMockRecorder) CreateReminder(ctx, telegra
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateReminder", reflect.TypeOf((*MockReminderCommandRepository)(nil).CreateReminder), ctx, telegramChatID, title, description, remindAt)
 }
 
+// CreateRecurringReminder mocks base method.
+func (m *MockReminderCommandRepository) CreateRecurringReminder(ctx context.Context, request database.RecurringReminderRequest) (database.ReminderView, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateRecurringReminder", ctx, request)
+	ret0, _ := ret[0].(database.ReminderView)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateRecurringReminder indicates an expected call of CreateRecurringReminder.
+func (mr *MockReminderCommandRepositoryMockRecorder) CreateRecurringReminder(ctx, request any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateRecurringReminder", reflect.TypeOf((*MockReminderCommandRepository)(nil).CreateRecurringReminder), ctx, request)
+}
+
 // FindRemindersByChat mocks base method.
 func (m *MockReminderCommandRepository) FindRemindersByChat(ctx context.Context, telegramChatID int64) ([]database.ReminderView, error) {
 	m.ctrl.T.Helper()

@@ -33,8 +33,7 @@ type ReminderRepository interface {
 		now time.Time,
 		limit, maxAttempts int,
 	) ([]*database.ScheduledReminder, error)
-	MarkReminderSent(ctx context.Context, reminderID int64, sentAt time.Time) error
-	MarkReminderFailed(ctx context.Context, reminderID int64, maxAttempts int) error
+	CompleteReminder(ctx context.Context, request database.ReminderCompletionRequest) error
 }
 
 type ReminderSender interface {
@@ -83,7 +82,12 @@ func (w *ReminderWorker) sendReadyReminders(ctx context.Context) error {
 		}
 
 		if err = w.sender.SendReminder(ctx, *reminder); err != nil {
-			if markErr := w.repository.MarkReminderFailed(ctx, reminder.ID, w.cfg.MaxAttempts); markErr != nil {
+			if markErr := w.repository.CompleteReminder(ctx, database.ReminderCompletionRequest{
+				ReminderID:  reminder.ID,
+				Status:      database.ReminderCompletionStatusFailed,
+				MaxAttempts: w.cfg.MaxAttempts,
+				Next:        CalculateNextReminder,
+			}); markErr != nil {
 				return fmt.Errorf("mark reminder %d failed after send error %q: %w", reminder.ID, err.Error(), markErr)
 			}
 
@@ -92,7 +96,13 @@ func (w *ReminderWorker) sendReadyReminders(ctx context.Context) error {
 			continue
 		}
 
-		if err = w.repository.MarkReminderSent(ctx, reminder.ID, w.now()); err != nil {
+		sentAt := w.now()
+		if err = w.repository.CompleteReminder(ctx, database.ReminderCompletionRequest{
+			ReminderID: reminder.ID,
+			Status:     database.ReminderCompletionStatusSent,
+			SentAt:     &sentAt,
+			Next:       CalculateNextReminder,
+		}); err != nil {
 			return fmt.Errorf("mark reminder %d sent: %w", reminder.ID, err)
 		}
 	}

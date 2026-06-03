@@ -198,14 +198,14 @@ func TestReminderDraftAppliesDateCallbacks(t *testing.T) {
 		{
 			name:  "date callback selects date and opens time editor",
 			draft: reminderDraft{},
-			data:  "date:2026-06-02",
+			data:  "date:2026-06-04",
 			expected: struct {
 				applied bool
 				date    time.Time
 				hour    int
 				minute  int
 				screen  draftScreen
-			}{applied: true, date: time.Date(2026, 6, 2, 0, 0, 0, 0, location), screen: draftScreenTime},
+			}{applied: true, date: time.Date(2026, 6, 4, 0, 0, 0, 0, location), screen: draftScreenTime},
 		},
 		{
 			name:  "month callback changes calendar month",
@@ -292,6 +292,133 @@ func TestReminderDraftAppliesDateCallbacks(t *testing.T) {
 	}
 }
 
+func TestReminderDraftAppliesWeekdayCallbacks(t *testing.T) {
+	t.Parallel()
+
+	chatID := int64(900)
+
+	tests := []struct {
+		name     string
+		draft    reminderDraft
+		data     string
+		expected struct {
+			applied      bool
+			repeat       reminderRepeat
+			weekdaysMask int
+			screen       draftScreen
+		}
+	}{
+		{
+			name:  "monday callback selects monday for custom weekdays",
+			draft: reminderDraft{},
+			data:  "weekday:1",
+			expected: struct {
+				applied      bool
+				repeat       reminderRepeat
+				weekdaysMask int
+				screen       draftScreen
+			}{applied: true, repeat: reminderRepeatCustomWeekdays, weekdaysMask: 1, screen: draftScreenWeekdays},
+		},
+		{
+			name: "thursday callback adds thursday to existing monday",
+			draft: reminderDraft{
+				repeat:       reminderRepeatCustomWeekdays,
+				weekdaysMask: 1,
+				screen:       draftScreenWeekdays,
+			},
+			data: "weekday:8",
+			expected: struct {
+				applied      bool
+				repeat       reminderRepeat
+				weekdaysMask int
+				screen       draftScreen
+			}{
+				applied:      true,
+				repeat:       reminderRepeatCustomWeekdays,
+				weekdaysMask: 1 | 8,
+				screen:       draftScreenWeekdays,
+			},
+		},
+		{
+			name: "selected weekday callback removes weekday from mask",
+			draft: reminderDraft{
+				repeat:       reminderRepeatCustomWeekdays,
+				weekdaysMask: 1 | 8,
+				screen:       draftScreenWeekdays,
+			},
+			data: "weekday:8",
+			expected: struct {
+				applied      bool
+				repeat       reminderRepeat
+				weekdaysMask int
+				screen       draftScreen
+			}{
+				applied:      true,
+				repeat:       reminderRepeatCustomWeekdays,
+				weekdaysMask: 1,
+				screen:       draftScreenWeekdays,
+			},
+		},
+		{
+			name: "sunday callback preserves existing weekend mask",
+			draft: reminderDraft{
+				repeat:       reminderRepeatCustomWeekdays,
+				weekdaysMask: 32,
+				screen:       draftScreenWeekdays,
+			},
+			data: "weekday:64",
+			expected: struct {
+				applied      bool
+				repeat       reminderRepeat
+				weekdaysMask int
+				screen       draftScreen
+			}{
+				applied:      true,
+				repeat:       reminderRepeatCustomWeekdays,
+				weekdaysMask: 32 | 64,
+				screen:       draftScreenWeekdays,
+			},
+		},
+		{
+			name:  "invalid weekday callback is rejected",
+			draft: reminderDraft{},
+			data:  "weekday:not-a-number",
+			expected: struct {
+				applied      bool
+				repeat       reminderRepeat
+				weekdaysMask int
+				screen       draftScreen
+			}{applied: false},
+		},
+		{
+			name:  "unknown callback is rejected",
+			draft: reminderDraft{},
+			data:  "weekday-unknown:1",
+			expected: struct {
+				applied      bool
+				repeat       reminderRepeat
+				weekdaysMask int
+				screen       draftScreen
+			}{applied: false},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			bot := &ReminderBot{draftByChat: map[int64]reminderDraft{chatID: test.draft}}
+
+			applied := bot.applyDraftDateCallback(chatID, test.data)
+			draft := bot.draft(chatID)
+
+			require.Equal(t, test.expected.applied, applied)
+			require.Equal(t, test.expected.repeat, draft.repeat)
+			require.Equal(t, test.expected.weekdaysMask, draft.weekdaysMask)
+			require.Equal(t, test.expected.screen, draft.screen)
+		})
+	}
+}
 func TestReminderUITextsAndKeyboards(t *testing.T) {
 	t.Parallel()
 
@@ -315,10 +442,13 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 			action: mainMenuText,
 			expected: struct {
 				expectedText string
-			}{expectedText: "Главное меню\n\nВыберите действие на клавиатуре ниже."},
+			}{
+				expectedText: "Главное меню\n\n" +
+					"Выберите действие на клавиатуре ниже.",
+			},
 		},
 		{
-			name: "draft text shows selected date and time",
+			name: "draft text shows selected date time and empty repeat",
 			action: func() string {
 				return draftText(reminderDraft{
 					title:       "Pay rent",
@@ -331,8 +461,36 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 			expected: struct {
 				expectedText string
 			}{
-				expectedText: "Создание напоминания\n\nДата и время: 02.06.2026 09:30\n" +
-					"Название: Pay rent\nОписание: Before lunch\n\nВыберите дату и время кнопкой ниже.",
+				expectedText: "Создание напоминания\n\n" +
+					"Дата и время: 02.06.2026 09:30\n" +
+					"Название: Pay rent\n" +
+					"Описание: Before lunch\n" +
+					"Повторяемость: не задана\n\n" +
+					"Выберите дату и время кнопкой ниже.",
+			},
+		},
+		{
+			name: "draft text shows selected custom date count",
+			action: func() string {
+				return draftText(reminderDraft{
+					title:       "Pay rent",
+					description: "Before lunch",
+					repeat:      reminderRepeatCustomDates,
+					customDates: []time.Time{
+						time.Date(2026, 6, 2, 0, 0, 0, 0, location),
+						time.Date(2026, 6, 4, 0, 0, 0, 0, location),
+					},
+				}, location)
+			},
+			expected: struct {
+				expectedText string
+			}{
+				expectedText: "Создание напоминания\n\n" +
+					"Дата и время: не задано\n" +
+					"Название: Pay rent\n" +
+					"Описание: Before lunch\n" +
+					"Повторяемость: выбрано дат: 2\n\n" +
+					"Выберите дату и время кнопкой ниже.",
 			},
 		},
 		{
@@ -345,34 +503,32 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 			}{expectedText: "#10: 02.06.2026 09:30\nPay rent\nBefore lunch"},
 		},
 		{
-			name: "reminder list text asks to choose a button",
-			action: func() string {
-				return reminderListText([]database.ReminderView{reminder}, location)
-			},
-			expected: struct {
-				expectedText string
-			}{expectedText: "Активные напоминания\n\nВыберите напоминание кнопкой ниже."},
-		},
-		{
-			name: "empty draft text shows missing fields",
+			name: "empty draft text shows missing fields and empty repeat",
 			action: func() string {
 				return draftText(reminderDraft{}, location)
 			},
 			expected: struct {
 				expectedText string
 			}{
-				expectedText: "Создание напоминания\n\nДата и время: не задано\n" +
-					"Название: не задано\nОписание: не задано\n\nВыберите дату и время кнопкой ниже.",
+				expectedText: "Создание напоминания\n\n" +
+					"Дата и время: не задано\n" +
+					"Название: не задано\n" +
+					"Описание: не задано\n" +
+					"Повторяемость: не задана\n\n" +
+					"Выберите дату и время кнопкой ниже.",
 			},
 		},
 		{
 			name: "empty reminder list explains next action",
 			action: func() string {
-				return reminderListText(nil, location)
+				return reminderListText(nil)
 			},
 			expected: struct {
 				expectedText string
-			}{expectedText: "Активных напоминаний пока нет.\n\nСоздайте первое напоминание на основной клавиатуре."},
+			}{
+				expectedText: "Активных напоминаний пока нет.\n\n" +
+					"Создайте первое напоминание на основной клавиатуре.",
+			},
 		},
 	}
 
@@ -384,7 +540,6 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 		})
 	}
 }
-
 func TestReminderUIBuildsExpectedKeyboards(t *testing.T) {
 	t.Parallel()
 
@@ -405,7 +560,7 @@ func TestReminderUIBuildsExpectedKeyboards(t *testing.T) {
 			expected: struct {
 				rowCount        int
 				firstButtonText string
-			}{rowCount: 3},
+			}{rowCount: 4},
 		},
 		{
 			name: "date choice keyboard is compact",
@@ -703,7 +858,8 @@ func TestReminderBotHandlesMessages(t *testing.T) {
 			message: telego.Message{MessageID: messageID, Chat: telego.Chat{ID: chatID}, Text: "/start"},
 			before: func(caller *telegoapimock.MockCaller, _ *telegrammocks.MockReminderService) {
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(testTelegramResponse(t, telego.Message{MessageID: 1}), nil)
+					Return(testTelegramResponse(t, telego.Message{MessageID: 1}), nil).
+					Times(2)
 			},
 		},
 		{
@@ -711,7 +867,8 @@ func TestReminderBotHandlesMessages(t *testing.T) {
 			message: telego.Message{MessageID: messageID, Chat: telego.Chat{ID: chatID}, Text: buttonCreateReminder},
 			before: func(caller *telegoapimock.MockCaller, _ *telegrammocks.MockReminderService) {
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(testTelegramResponse(t, telego.Message{MessageID: 2}), nil)
+					Return(testTelegramResponse(t, telego.Message{MessageID: 2}), nil).
+					Times(2)
 			},
 		},
 		{
@@ -724,7 +881,8 @@ func TestReminderBotHandlesMessages(t *testing.T) {
 					RemindAt: time.Date(2026, 6, 2, 9, 30, 0, 0, time.Local),
 				}}, nil)
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(testTelegramResponse(t, telego.Message{MessageID: 3}), nil)
+					Return(testTelegramResponse(t, telego.Message{MessageID: 3}), nil).
+					Times(2)
 			},
 		},
 		{
@@ -746,7 +904,8 @@ func TestReminderBotHandlesMessages(t *testing.T) {
 			message: telego.Message{MessageID: messageID, Chat: telego.Chat{ID: chatID}, Text: "unknown"},
 			before: func(caller *telegoapimock.MockCaller, _ *telegrammocks.MockReminderService) {
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(testTelegramResponse(t, telego.Message{MessageID: 5}), nil)
+					Return(testTelegramResponse(t, telego.Message{MessageID: 5}), nil).
+					Times(2)
 			},
 		},
 		{
@@ -929,6 +1088,7 @@ func TestReminderBotCommandCallbacks(t *testing.T) {
 	}
 }
 
+//nolint:lll
 func TestReminderBotSavesDraft(t *testing.T) {
 	t.Parallel()
 
@@ -1006,6 +1166,27 @@ func TestReminderBotSavesDraft(t *testing.T) {
 			},
 		},
 		{
+			name: "valid custom weekdays draft is created with selected weekdays mask",
+			draft: reminderDraft{
+				title:        "Training",
+				date:         futureDate,
+				hour:         7,
+				repeat:       reminderRepeatCustomWeekdays,
+				weekdaysMask: 2 | 8,
+			},
+			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService) {
+				service.EXPECT().
+					CreateWeekdaysReminder(gomock.Any(), chatID, "Training", "", gomock.Any(), 2|8).
+					Return(database.ReminderView{
+						ID:       15,
+						Title:    "Training",
+						RemindAt: futureDate.Add(7 * time.Hour),
+					}, nil)
+				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(testTelegramResponse(t, telego.Message{MessageID: messageID}), nil)
+			},
+		},
+		{
 			name:  "draft without title stays open with validation notice",
 			draft: reminderDraft{date: futureDate, hour: 9},
 			before: func(caller *telegoapimock.MockCaller, _ *telegrammocks.MockReminderService) {
@@ -1020,7 +1201,7 @@ func TestReminderBotSavesDraft(t *testing.T) {
 			}{
 				draftExists: true,
 				screen:      draftScreenMain,
-				notice:      "Чтобы сохранить напоминание, добавьте название и дату с временем.",
+				notice:      "\u0427\u0442\u043e\u0431\u044b \u0441\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u043d\u0430\u043f\u043e\u043c\u0438\u043d\u0430\u043d\u0438\u0435, \u0434\u043e\u0431\u0430\u0432\u044c\u0442\u0435 \u043d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 \u0438 \u0434\u0430\u0442\u0443 \u0441 \u0432\u0440\u0435\u043c\u0435\u043d\u0435\u043c.",
 			},
 		},
 		{
@@ -1038,7 +1219,30 @@ func TestReminderBotSavesDraft(t *testing.T) {
 			}{
 				draftExists: true,
 				screen:      draftScreenTime,
-				notice:      "Это время уже прошло. Выберите будущую дату и время.",
+				notice:      "\u042d\u0442\u043e \u0432\u0440\u0435\u043c\u044f \u0443\u0436\u0435 \u043f\u0440\u043e\u0448\u043b\u043e. \u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0431\u0443\u0434\u0443\u0449\u0443\u044e \u0434\u0430\u0442\u0443 \u0438 \u0432\u0440\u0435\u043c\u044f.",
+			},
+		},
+		{
+			name: "custom weekdays draft without selected weekdays stays open",
+			draft: reminderDraft{
+				title:  "Training",
+				date:   futureDate,
+				hour:   7,
+				repeat: reminderRepeatCustomWeekdays,
+			},
+			before: func(caller *telegoapimock.MockCaller, _ *telegrammocks.MockReminderService) {
+				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(testTelegramResponse(t, telego.Message{MessageID: messageID}), nil)
+			},
+			expected: struct {
+				expectedErr error
+				draftExists bool
+				screen      draftScreen
+				notice      string
+			}{
+				draftExists: true,
+				screen:      draftScreenWeekdays,
+				notice:      "Выберите хотя бы один день недели.",
 			},
 		},
 	}
