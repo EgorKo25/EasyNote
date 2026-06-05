@@ -9,7 +9,10 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/EgorKo25/EasyNote/src/database"
+	"github.com/EgorKo25/EasyNote/src/planner"
 )
+
+type TransactionStorager = planner.TransactionStorage
 
 var (
 	errMarkReminderStatus      = errors.New("reminder status was not updated")
@@ -17,7 +20,7 @@ var (
 	errUpdateRuleStatus        = errors.New("reminder rule status was not updated")
 )
 
-func newTransactionStorage(tx pgx.Tx) transactionStorage {
+func newTransactionStorage(tx pgx.Tx) TransactionStorager {
 	return transactionStorage{tx}
 }
 

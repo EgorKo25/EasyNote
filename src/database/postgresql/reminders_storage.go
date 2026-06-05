@@ -160,34 +160,10 @@ func (d *Database) CancelReminder(ctx context.Context, telegramChatID int64, rem
 	return nil
 }
 
-func (d *Database) ActualReminders(
-	ctx context.Context,
-	from time.Time,
-	until time.Time,
-) ([]*database.ScheduledReminder, error) {
-	query := `
-		SELECT r.id, r.note_id, r.rule_id, n.telegram_chat_id, n.title, n.description, r.remind_at
-		FROM reminders r
-		JOIN notes n ON n.id = r.note_id
-		WHERE r.remind_at >= $1
-			AND r.remind_at <= $2
-			AND r.status = 'new'
-		ORDER BY r.remind_at, r.id
-	`
-
-	rows, err := d.pool.Query(ctx, query, from, until)
-	if err != nil {
-		return nil, fmt.Errorf("load actual reminders: %w", err)
-	}
-	defer rows.Close()
-
-	return scanScheduledReminders(rows)
-}
-
 func (d *Database) FindRemindersReadyToSend(
 	ctx context.Context,
 	now time.Time,
-	limit, maxAttempts int,
+	limit int,
 ) ([]*database.ScheduledReminder, error) {
 	transaction, err := d.pool.Begin(ctx)
 	if err != nil {
@@ -202,9 +178,8 @@ func (d *Database) FindRemindersReadyToSend(
 			FROM reminders r
 			WHERE r.remind_at <= $1
 				AND r.status = 'new'
-				AND r.attempts < $2
 			ORDER BY r.remind_at, r.id
-			LIMIT $3
+			LIMIT $2
 			FOR UPDATE SKIP LOCKED
 		)
 		SELECT r.id, r.note_id, r.rule_id, n.telegram_chat_id, n.title, n.description, r.remind_at
@@ -214,7 +189,7 @@ func (d *Database) FindRemindersReadyToSend(
 		ORDER BY r.remind_at, r.id
 	`
 
-	rows, err := transaction.Query(ctx, query, now, maxAttempts, limit)
+	rows, err := transaction.Query(ctx, query, now, limit)
 	if err != nil {
 		return nil, fmt.Errorf("query reminders ready to send: %w", err)
 	}
