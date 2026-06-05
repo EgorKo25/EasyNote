@@ -206,7 +206,8 @@ jobs:
           test -n "${POSTGRES_DB}" || (echo "POSTGRES_DB secret is required" >&2; exit 1)
           test -n "${POSTGRES_USER}" || (echo "POSTGRES_USER secret is required" >&2; exit 1)
           test -n "${POSTGRES_PASSWORD}" || (echo "POSTGRES_PASSWORD secret is required" >&2; exit 1)
-
+          test -n "${PROXY}" || (echo "PROXY secret is required" >&2; exit 1)
+          
       - name: Ensure deployment directory exists
         uses: appleboy/ssh-action@v1.2.2
         with:
@@ -244,15 +245,23 @@ jobs:
             {
               printf 'TELEGRAM_BOT_TOKEN=%s\n' "${TELEGRAM_BOT_TOKEN}"
               printf 'TZ=%s\n' "${TZ:-Europe/Moscow}"
-              printf 'HTTP_PROXY=%s\n' "${HTTP_PROXY}"
-              printf 'HTTPS_PROXY=%s\n' "${HTTPS_PROXY}"
+              
+              printf 'HTTP_PROXY=%s\n' "${PROXY}"
+              printf 'HTTPS_PROXY=%s\n' "${PROXY}"
+              printf 'http_proxy=%s\n' "${PROXY}"
+              printf 'https_proxy=%s\n' "${PROXY}"
               printf 'NO_PROXY=%s\n' "${NO_PROXY}"
+              
               printf 'POSTGRES_DB=%s\n' "${POSTGRES_DB}"
               printf 'POSTGRES_USER=%s\n' "${POSTGRES_USER}"
               printf 'POSTGRES_PASSWORD=%s\n' "${POSTGRES_PASSWORD}"
               printf 'POSTGRES_HOST_PORT=%s\n' "${POSTGRES_HOST_PORT:-5432}"
-            } > .env
-            chmod 600 .env
+            } > .env.production
+            
+            chmod 600 .env.production
+
+            cp .env.production .env
+            
             echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USERNAME}" --password-stdin
             APP_IMAGE="${APP_IMAGE}" docker compose pull app
             APP_IMAGE="${APP_IMAGE}" docker compose up -d --no-deps app
