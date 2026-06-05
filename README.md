@@ -35,6 +35,7 @@ Runtime behavior:
 - It asks storage for `new` reminder occurrences whose `remind_at` is due.
 - It sends each reminder through the configured sender.
 - Sender failures are retried in scheduler with `scheduler.send_retry_count` and `scheduler.send_retry_interval`.
+- Retry intervals are produced by the scheduler backoff adapter; `send_retry_backoff` supports `constant` and `exponential`.
 - Successful delivery is completed through the existing `Planner` as `sent`.
 - Exhausted send retries are completed through the existing `Planner` as `failed`.
 - The runner logs send failures and continues with the next reminder when failed completion succeeds.
@@ -104,9 +105,11 @@ scheduler:
   batch_limit: 50
   send_retry_count: 3
   send_retry_interval: 5s
+  send_retry_max_interval: 30s
+  send_retry_backoff: constant
 ```
 
-`send_retry_count` is the total number of send attempts for one ready reminder. `send_retry_interval` is the delay between failed send attempts.
+`send_retry_count` is the total number of send attempts for one ready reminder. `send_retry_interval` is the constant delay or exponential initial delay. `send_retry_max_interval` caps exponential backoff. `send_retry_backoff` selects `constant` or `exponential`.
 
 ### Telegram UI
 
@@ -202,7 +205,7 @@ PostgreSQL is not restarted by the beta CD job.
 <ul>
   <li>The reminder runtime worker moved from service to scheduler.</li>
   <li>The old heap/cache scheduler and database cache package were removed.</li>
-  <li>Scheduler send retries are configured with send_retry_count and send_retry_interval.</li>
+  <li>Scheduler send retries are configured with send_retry_count, send_retry_interval, send_retry_max_interval, and send_retry_backoff.</li>
   <li>Reminder draft buttons and main-menu message cleanup were improved.</li>
 </ul>
 

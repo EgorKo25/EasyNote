@@ -8,7 +8,7 @@ The reminder runtime worker was moved from `service` to `scheduler` as `schedule
 
 The old heap/cache scheduler model was removed, including queue/`Next(ctx)` abstractions, cache-window loading, old scheduler tests, generated mocks for that model, and the obsolete `src/database/cache` package.
 
-Scheduler now owns send retries in the runtime layer. `send_retry_count` configures the total send attempts for one ready reminder, and `send_retry_interval` configures the delay between failed attempts.
+Scheduler now owns send retries in the runtime layer. `send_retry_count` configures the total send attempts for one ready reminder, `send_retry_interval` configures the constant or initial backoff delay, `send_retry_max_interval` caps exponential backoff, and `send_retry_backoff` selects the retry strategy.
 
 The runner uses the existing `Planner` to complete sent or failed occurrences. Recurring reminders continue to use the existing planner completion flow; scheduler does not calculate recurrence and PostgreSQL remains storage.
 
@@ -24,6 +24,8 @@ Scheduler configuration changed:
 - removed `max_attempts`;
 - added `send_retry_count`;
 - added `send_retry_interval`.
+- added `send_retry_max_interval`;
+- added `send_retry_backoff`.
 
 ### Affected files
 

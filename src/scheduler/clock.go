@@ -12,6 +12,12 @@ func WithClock(clock Clock) Option {
 	}
 }
 
+func WithRetrier(retrier Retrier) Option {
+	return func(r *Runner) {
+		r.retrier = retrier
+	}
+}
+
 func newSystemClock() Clock {
 	return clock.New()
 }
