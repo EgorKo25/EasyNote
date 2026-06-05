@@ -379,8 +379,7 @@ func reminderViewText(reminder database.ReminderView, location *time.Location) s
 	}
 
 	return fmt.Sprintf(
-		"#%d: %s\n%s\n%s",
-		reminder.ID,
+		"%s\n%s\n%s",
 		reminder.RemindAt.In(location).Format("02.01.2006 15:04"),
 		reminder.Title,
 		description,

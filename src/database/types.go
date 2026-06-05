@@ -85,7 +85,17 @@ const (
 	ReminderRuleStatusCompleted ReminderRuleStatus = "completed"
 )
 
-const WeekdaysMaskWorkdays = 31
+const (
+	WeekdayMaskMonday    = 1
+	WeekdayMaskTuesday   = 2
+	WeekdayMaskWednesday = 4
+	WeekdayMaskThursday  = 8
+	WeekdayMaskFriday    = 16
+	WeekdayMaskSaturday  = 32
+	WeekdayMaskSunday    = 64
+	WeekdaysMaskWorkdays = WeekdayMaskMonday | WeekdayMaskTuesday | WeekdayMaskWednesday |
+		WeekdayMaskThursday | WeekdayMaskFriday
+)
 
 type ReminderRule struct {
 	ID           int64
@@ -112,31 +122,3 @@ type RecurringReminderRequest struct {
 	Rule           ReminderRule
 	CustomDates    []time.Time
 }
-
-type ReminderCompletionStatus string
-
-const (
-	ReminderCompletionStatusSent   ReminderCompletionStatus = "sent"
-	ReminderCompletionStatusFailed ReminderCompletionStatus = "failed"
-)
-
-type ReminderCompletionRequest struct {
-	ReminderID  int64
-	Status      ReminderCompletionStatus
-	SentAt      *time.Time
-	MaxAttempts int
-	Next        ReminderCompletionCalculator
-}
-
-type ReminderCompletionInput struct {
-	Reminder    ScheduledReminder
-	Rule        *ReminderRule
-	CustomDates []CustomReminderDate
-}
-
-type ReminderCompletionNext struct {
-	RemindAt     *time.Time
-	CompleteRule bool
-}
-
-type ReminderCompletionCalculator func(ReminderCompletionInput) (ReminderCompletionNext, error)

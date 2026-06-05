@@ -14,27 +14,32 @@ var ErrReminderTitleEmpty = errors.New("reminder title is empty")
 var ErrCustomReminderDatesEmpty = errors.New("custom reminder dates are empty")
 var ErrWeekdaysMaskEmpty = errors.New("weekdays mask is empty")
 
-func NewReminderService(repository ReminderCommandRepository) *ReminderService {
-	return &ReminderService{repository: repository}
+func NewReminderService(repository ReminderCommandRepository, planner ReminderCreationPlanner) *ReminderService {
+	return &ReminderService{repository: repository, ReminderCreationPlanner: planner}
 }
 
 type ReminderService struct {
+	ReminderCreationPlanner
+
 	repository ReminderCommandRepository
 }
 
 //go:generate go run go.uber.org/mock/mockgen -source=reminders.go -destination=mocks/reminders_mock.go -package=mocks
-type ReminderCommandRepository interface {
-	CreateReminder(
+type ReminderCreationPlanner interface {
+	CreateSingleOccurrence(
 		ctx context.Context,
 		telegramChatID int64,
 		title string,
 		description string,
 		remindAt time.Time,
 	) (database.ReminderView, error)
-	CreateRecurringReminder(
+	CreateInitialOccurrenceForRule(
 		ctx context.Context,
 		request database.RecurringReminderRequest,
 	) (database.ReminderView, error)
+}
+
+type ReminderCommandRepository interface {
 	FindRemindersByChat(ctx context.Context, telegramChatID int64) ([]database.ReminderView, error)
 	CancelReminder(ctx context.Context, telegramChatID int64, reminderID int64) error
 }
@@ -51,7 +56,13 @@ func (s *ReminderService) CreateReminder(
 		return database.ReminderView{}, fmt.Errorf("create reminder: %w", ErrReminderTitleEmpty)
 	}
 
-	reminder, err := s.repository.CreateReminder(ctx, telegramChatID, title, strings.TrimSpace(description), remindAt)
+	reminder, err := s.CreateSingleOccurrence(
+		ctx,
+		telegramChatID,
+		title,
+		strings.TrimSpace(description),
+		remindAt,
+	)
 	if err != nil {
 		return database.ReminderView{}, fmt.Errorf("create reminder: %w", err)
 	}
@@ -152,7 +163,7 @@ func (s *ReminderService) createRecurringReminder(
 		return database.ReminderView{}, fmt.Errorf("create recurring reminder: %w", ErrReminderTitleEmpty)
 	}
 
-	reminder, err := s.repository.CreateRecurringReminder(ctx, database.RecurringReminderRequest{
+	reminder, err := s.CreateInitialOccurrenceForRule(ctx, database.RecurringReminderRequest{
 		TelegramChatID: telegramChatID,
 		Title:          title,
 		Description:    strings.TrimSpace(description),

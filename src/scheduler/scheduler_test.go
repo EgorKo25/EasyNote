@@ -90,7 +90,8 @@ func TestSchedulerRunQueuesReminders(t *testing.T) {
 							cancel()
 
 							return []*database.ScheduledReminder{}, nil
-						})
+						}).
+						Times(1)
 				},
 			},
 			expected: expected{
@@ -112,7 +113,8 @@ func TestSchedulerRunQueuesReminders(t *testing.T) {
 
 					reminderDatabase.EXPECT().
 						ActualReminders(gomock.Any(), baseTime, baseTime.Add(pollInterval)).
-						Return([]*database.ScheduledReminder{firstReminder}, nil)
+						Return([]*database.ScheduledReminder{firstReminder}, nil).
+						Times(1)
 				},
 			},
 			expected: expected{
@@ -134,7 +136,8 @@ func TestSchedulerRunQueuesReminders(t *testing.T) {
 
 					reminderDatabase.EXPECT().
 						ActualReminders(gomock.Any(), baseTime, baseTime.Add(pollInterval)).
-						Return([]*database.ScheduledReminder{firstReminder, thirdReminder, secondReminder}, nil)
+						Return([]*database.ScheduledReminder{firstReminder, thirdReminder, secondReminder}, nil).
+						Times(1)
 				},
 			},
 			expected: expected{
@@ -162,14 +165,16 @@ func TestSchedulerRunQueuesReminders(t *testing.T) {
 								firstPollLoaded.Store(true)
 
 								return []*database.ScheduledReminder{}, nil
-							}),
+							}).
+							Times(1),
 						reminderDatabase.EXPECT().
 							ActualReminders(
 								gomock.Any(),
 								baseTime.Add(pollInterval),
 								baseTime.Add(2*pollInterval),
 							).
-							Return([]*database.ScheduledReminder{secondReminder}, nil),
+							Return([]*database.ScheduledReminder{secondReminder}, nil).
+							Times(1),
 					)
 				},
 			},
@@ -196,7 +201,8 @@ func TestSchedulerRunQueuesReminders(t *testing.T) {
 								firstPollLoaded.Store(true)
 
 								return []*database.ScheduledReminder{firstReminder}, nil
-							}),
+							}).
+							Times(1),
 						reminderDatabase.EXPECT().
 							ActualReminders(
 								gomock.Any(),
@@ -207,7 +213,8 @@ func TestSchedulerRunQueuesReminders(t *testing.T) {
 								cancel()
 
 								return []*database.ScheduledReminder{secondReminder}, nil
-							}),
+							}).
+							Times(1),
 					)
 				},
 			},
@@ -228,7 +235,8 @@ func TestSchedulerRunQueuesReminders(t *testing.T) {
 
 					reminderDatabase.EXPECT().
 						ActualReminders(gomock.Any(), baseTime, baseTime.Add(pollInterval)).
-						Return(nil, errActualRemindersFailed)
+						Return(nil, errActualRemindersFailed).
+						Times(1)
 				},
 			},
 			expected: expected{

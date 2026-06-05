@@ -7,6 +7,7 @@ import (
 	"github.com/EgorKo25/EasyNote/src/config"
 	"github.com/EgorKo25/EasyNote/src/database/postgresql"
 	"github.com/EgorKo25/EasyNote/src/logger"
+	"github.com/EgorKo25/EasyNote/src/planner"
 	"github.com/EgorKo25/EasyNote/src/service"
 	"github.com/EgorKo25/EasyNote/src/telegram"
 )
@@ -22,6 +23,8 @@ func main() {
 	}
 
 	log := logger.Get("main")
+
+	defer func() { _ = log.Sync() }()
 
 	log.With(logger.Any("config", cfg)).Info("the application configuration is initialized")
 
@@ -44,8 +47,9 @@ func main() {
 		panic(err)
 	}
 
-	reminderService := service.NewReminderService(database)
-	reminderWorker := service.NewReminderWorker(database, telegramSender, cfg.Scheduler)
+	reminderPlanner := planner.New(database)
+	reminderService := service.NewReminderService(database, reminderPlanner)
+	reminderWorker := service.NewReminderWorker(database, telegramSender, reminderPlanner, cfg.Scheduler)
 	reminderBot := telegram.NewReminderBot(telegramSender, reminderService, cfg.Telegram)
 
 	runner := background.NewRunner()
@@ -58,10 +62,6 @@ func main() {
 
 	if err = runner.Wait(); err != nil {
 		log.Error("background process failed", err)
-		panic(err)
-	}
-
-	if err := log.Sync(); err != nil {
 		panic(err)
 	}
 }
