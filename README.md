@@ -98,8 +98,9 @@ These packages are included in the focused command because scheduler and cache d
 
 EasyNote follows a thin clean-architecture style around the reminder flow:
 
-- `service` owns reminder creation, validation, completion, and recurring-date calculation.
-- `database` is the source of truth for notes, concrete reminder firings, recurring rules, and custom dates.
+- `service` owns Telegram-facing reminder validation and user workflows.
+- `planner` owns reminder lifecycle orchestration, recurring-date calculation, and completion idempotency.
+- `database/postgresql` is the storage/repository layer for notes, concrete reminder firings, recurring rules, custom dates, and transactions.
 - `telegram` owns the user flow and delegates reminder persistence to the service layer.
 - `main` wires PostgreSQL, the Telegram sender, the reminder worker, and the Telegram bot.
 
@@ -108,10 +109,10 @@ Data flow:
 1. `service` receives a user action from the Telegram bot.
 2. PostgreSQL stores the note and one concrete row in `reminders`.
 3. `ReminderWorker` polls `reminders` rows with status `new` and due `remind_at`.
-4. After delivery, worker calls the service/repository completion path instead of updating rows directly.
-5. Completion marks the current row as `sent` or `failed` and, for active recurring rules, creates the next concrete reminder in the same transaction.
+4. After delivery, worker calls `Planner.CompleteOccurrenceAsSent` or `Planner.CompleteOccurrenceAsFailed`.
+5. Planner marks the current row as `sent` or `failed` and, for active recurring rules, creates the next concrete reminder in the same transaction.
 
-The design keeps recurrence calculation in Go code and uses PostgreSQL for storage and transactionality.
+The design keeps recurrence calculation in the planner layer and uses PostgreSQL for storage and transactionality.
 
 ### Recurring Reminders
 
@@ -123,7 +124,7 @@ Supported recurrence types:
 - Weekday rules: workdays or a custom selected weekday mask.
 - Custom date rules: several selected calendar dates stored in `reminder_custom_dates`.
 
-The worker never recalculates recurrence itself. It sends due reminders and calls completion logic. Completion is transactional: current reminder status is updated, the rule is checked, and the next reminder is inserted or the rule is completed.
+The worker never recalculates recurrence itself. It sends due reminders and calls planner completion logic. Completion is transactional: current reminder status is updated, the rule is checked, and the next reminder is inserted or the rule is completed. PostgreSQL also has a partial unique index that allows only one active `new` reminder for a non-null `rule_id`.
 
 ## Deployment
 
@@ -240,6 +241,7 @@ This is why the heap can be very small while the database can keep the full remi
   <li>Recurring reminders are backed by rule rows and concrete reminder firings.</li>
   <li>Supported modes include intervals, workdays, custom weekdays, and selected dates.</li>
   <li>Reminder completion creates the next firing transactionally in PostgreSQL.</li>
+  <li>The recurrence lifecycle is now orchestrated by a planner layer above PostgreSQL storage.</li>
 </ul>
 
 <h2>v1.0.0 - beta deployment ready</h2>

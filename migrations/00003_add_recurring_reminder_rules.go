@@ -32,6 +32,10 @@ func upAddRecurringReminderRules(ctx context.Context, tx *sql.Tx) error {
 			ON reminders (rule_id)
 			WHERE rule_id IS NOT NULL;
 
+		CREATE UNIQUE INDEX reminders_one_new_per_rule_idx
+			ON reminders (rule_id)
+			WHERE rule_id IS NOT NULL AND status = 'new';
+
 		CREATE TABLE reminder_custom_dates (
 			rule_id BIGINT NOT NULL REFERENCES reminder_rules(id) ON DELETE CASCADE,
 			remind_date DATE NOT NULL,
@@ -50,6 +54,7 @@ func upAddRecurringReminderRules(ctx context.Context, tx *sql.Tx) error {
 func downAddRecurringReminderRules(ctx context.Context, tx *sql.Tx) error {
 	_, err := tx.ExecContext(ctx, `
 		DROP TABLE IF EXISTS reminder_custom_dates;
+		DROP INDEX IF EXISTS reminders_one_new_per_rule_idx;
 		DROP INDEX IF EXISTS reminders_rule_id_idx;
 		ALTER TABLE reminders DROP COLUMN IF EXISTS rule_id;
 		DROP TABLE IF EXISTS reminder_rules;

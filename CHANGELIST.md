@@ -17,7 +17,9 @@ Supported recurrence modes:
 - custom selected weekdays;
 - custom selected calendar dates.
 
-Reminder completion now runs through one transactional business path. It marks the current reminder as `sent` or `failed`, loads the active rule, calculates the next firing in Go, and inserts the next `reminders` row or completes the rule.
+Reminder completion now runs through the `planner` layer. It marks the current reminder as `sent` or `failed`, loads the active rule, calculates the next firing in Go, and inserts the next `reminders` row or completes the rule in one transaction.
+
+PostgreSQL remains the storage/repository layer: it reads and writes notes, reminders, rules, custom dates, and transactional locks, but it no longer owns recurring reminder formulas or lifecycle orchestration.
 
 Telegram reminder creation now includes recurring reminder controls, custom weekday selection, multi-date custom selection, and cleanup of user command/input messages after they are handled.
 
@@ -29,10 +31,14 @@ No public HTTP API was introduced.
 
 - `migrations/00003_add_recurring_reminder_rules.go`
 - `src/database/postgresql/postgresql.go`
+- `src/database/postgresql/reminders_storage.go`
+- `src/database/postgresql/recurring_storage.go`
+- `src/database/postgresql/transaction_storage.go`
 - `src/database/types.go`
+- `src/planner/planner.go`
+- `src/planner/occurrences.go`
 - `src/service/reminders.go`
 - `src/service/reminder_worker.go`
-- `src/service/recurring_reminders.go`
 - `src/telegram/reminder_bot.go`
 - `src/telegram/ui.go`
 

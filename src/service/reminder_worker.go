@@ -10,10 +10,16 @@ import (
 	"github.com/EgorKo25/EasyNote/src/logger"
 )
 
-func NewReminderWorker(repository ReminderRepository, sender ReminderSender, cfg config.Scheduler) *ReminderWorker {
+func NewReminderWorker(
+	repository ReminderRepository,
+	sender ReminderSender,
+	planner ReminderCompletionPlanner,
+	cfg config.Scheduler,
+) *ReminderWorker {
 	return &ReminderWorker{
 		repository: repository,
 		sender:     sender,
+		planner:    planner,
 		cfg:        cfg,
 		now:        time.Now,
 	}
@@ -22,18 +28,27 @@ func NewReminderWorker(repository ReminderRepository, sender ReminderSender, cfg
 type ReminderWorker struct {
 	repository ReminderRepository
 	sender     ReminderSender
+	planner    ReminderCompletionPlanner
 	cfg        config.Scheduler
 	now        func() time.Time
 }
 
 //go:generate go run go.uber.org/mock/mockgen -source=reminder_worker.go -destination=mocks/reminder_worker_mock.go -package=mocks
+type ReminderCompletionPlanner interface {
+	CompleteOccurrence(
+		ctx context.Context,
+		reminderID int64,
+		status database.ReminderStatus,
+		sentAt *time.Time,
+	) error
+}
+
 type ReminderRepository interface {
 	FindRemindersReadyToSend(
 		ctx context.Context,
 		now time.Time,
 		limit, maxAttempts int,
 	) ([]*database.ScheduledReminder, error)
-	CompleteReminder(ctx context.Context, request database.ReminderCompletionRequest) error
 }
 
 type ReminderSender interface {
@@ -82,12 +97,12 @@ func (w *ReminderWorker) sendReadyReminders(ctx context.Context) error {
 		}
 
 		if err = w.sender.SendReminder(ctx, *reminder); err != nil {
-			if markErr := w.repository.CompleteReminder(ctx, database.ReminderCompletionRequest{
-				ReminderID:  reminder.ID,
-				Status:      database.ReminderCompletionStatusFailed,
-				MaxAttempts: w.cfg.MaxAttempts,
-				Next:        CalculateNextReminder,
-			}); markErr != nil {
+			if markErr := w.planner.CompleteOccurrence(
+				ctx,
+				reminder.ID,
+				database.ReminderStatusFailed,
+				nil,
+			); markErr != nil {
 				return fmt.Errorf("mark reminder %d failed after send error %q: %w", reminder.ID, err.Error(), markErr)
 			}
 
@@ -97,12 +112,7 @@ func (w *ReminderWorker) sendReadyReminders(ctx context.Context) error {
 		}
 
 		sentAt := w.now()
-		if err = w.repository.CompleteReminder(ctx, database.ReminderCompletionRequest{
-			ReminderID: reminder.ID,
-			Status:     database.ReminderCompletionStatusSent,
-			SentAt:     &sentAt,
-			Next:       CalculateNextReminder,
-		}); err != nil {
+		if err = w.planner.CompleteOccurrence(ctx, reminder.ID, database.ReminderStatusSent, &sentAt); err != nil {
 			return fmt.Errorf("mark reminder %d sent: %w", reminder.ID, err)
 		}
 	}
