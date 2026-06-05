@@ -10,6 +10,7 @@
 - If tests or lint fail, do not change production code and do not adapt tests to hide the problem. Describe what failed and why, then wait for the user's decision.
 - Ask for the user's permission before changing any system applications, utilities, or files outside the repository.
 - Do not change the linter configuration.
+- Do not add `nolint` directives to production files. `nolint` is allowed only in test files.
 
 ## Test Structure
 - Use the table-driven approach in every test.
