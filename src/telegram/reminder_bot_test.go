@@ -561,7 +561,42 @@ func TestReminderUIBuildsExpectedKeyboards(t *testing.T) {
 			expected: struct {
 				rowCount        int
 				firstButtonText string
-			}{rowCount: 4},
+			}{rowCount: 4, firstButtonText: "Дата"},
+		},
+		{
+			name: "filled one time draft keyboard offers changing date",
+			action: func() *telego.InlineKeyboardMarkup {
+				return draftKeyboard(reminderDraft{
+					date: time.Date(2026, 6, 2, 0, 0, 0, 0, time.Local),
+				}, now)
+			},
+			expected: struct {
+				rowCount        int
+				firstButtonText string
+			}{rowCount: 4, firstButtonText: "Изменить дату"},
+		},
+		{
+			name: "empty recurring draft keyboard explains start date time",
+			action: func() *telego.InlineKeyboardMarkup {
+				return draftKeyboard(reminderDraft{repeat: reminderRepeatEveryDay}, now)
+			},
+			expected: struct {
+				rowCount        int
+				firstButtonText string
+			}{rowCount: 4, firstButtonText: "Дата и время начала"},
+		},
+		{
+			name: "filled recurring draft keyboard offers changing start date time",
+			action: func() *telego.InlineKeyboardMarkup {
+				return draftKeyboard(reminderDraft{
+					date:   time.Date(2026, 6, 2, 0, 0, 0, 0, time.Local),
+					repeat: reminderRepeatEveryDay,
+				}, now)
+			},
+			expected: struct {
+				rowCount        int
+				firstButtonText string
+			}{rowCount: 4, firstButtonText: "Изменить дату и время начала"},
 		},
 		{
 			name: "date choice keyboard is compact",
@@ -844,6 +879,212 @@ func TestNewSenderValidatesToken(t *testing.T) {
 	}
 }
 
+func TestReminderUIBuildsDraftModel(t *testing.T) {
+	t.Parallel()
+
+	location := time.Local
+	customDate := time.Date(2026, 6, 4, 0, 0, 0, 0, location)
+
+	tests := []struct {
+		name     string
+		draft    reminderDraft
+		expected struct {
+			title         string
+			description   string
+			notice        string
+			date          time.Time
+			hour          int
+			minute        int
+			repeat        reminderRepeat
+			customDates   []time.Time
+			weekdaysMask  int
+			screen        draftScreen
+			calendarMonth time.Time
+			waitingFor    draftField
+		}
+	}{
+		{
+			name:  "empty draft maps zero values",
+			draft: reminderDraft{},
+			expected: struct {
+				title         string
+				description   string
+				notice        string
+				date          time.Time
+				hour          int
+				minute        int
+				repeat        reminderRepeat
+				customDates   []time.Time
+				weekdaysMask  int
+				screen        draftScreen
+				calendarMonth time.Time
+				waitingFor    draftField
+			}{},
+		},
+		{
+			name: "one-time draft maps text and date",
+			draft: reminderDraft{
+				title:       "Pay rent",
+				description: "Before lunch",
+				date:        time.Date(2026, 6, 2, 0, 0, 0, 0, location),
+				hour:        9,
+				minute:      30,
+				screen:      draftScreenMain,
+			},
+			expected: struct {
+				title         string
+				description   string
+				notice        string
+				date          time.Time
+				hour          int
+				minute        int
+				repeat        reminderRepeat
+				customDates   []time.Time
+				weekdaysMask  int
+				screen        draftScreen
+				calendarMonth time.Time
+				waitingFor    draftField
+			}{
+				title:       "Pay rent",
+				description: "Before lunch",
+				date:        time.Date(2026, 6, 2, 0, 0, 0, 0, location),
+				hour:        9,
+				minute:      30,
+				screen:      draftScreenMain,
+			},
+		},
+		{
+			name: "recurring draft maps repeat and weekdays",
+			draft: reminderDraft{
+				title:        "Training",
+				repeat:       reminderRepeatCustomWeekdays,
+				weekdaysMask: 1 | 8,
+				screen:       draftScreenWeekdays,
+			},
+			expected: struct {
+				title         string
+				description   string
+				notice        string
+				date          time.Time
+				hour          int
+				minute        int
+				repeat        reminderRepeat
+				customDates   []time.Time
+				weekdaysMask  int
+				screen        draftScreen
+				calendarMonth time.Time
+				waitingFor    draftField
+			}{
+				title:        "Training",
+				repeat:       reminderRepeatCustomWeekdays,
+				weekdaysMask: 1 | 8,
+				screen:       draftScreenWeekdays,
+			},
+		},
+		{
+			name: "custom dates draft maps calendar state",
+			draft: reminderDraft{
+				repeat:        reminderRepeatCustomDates,
+				customDates:   []time.Time{customDate},
+				calendarMonth: time.Date(2026, 6, 1, 0, 0, 0, 0, location),
+				screen:        draftScreenCalendar,
+			},
+			expected: struct {
+				title         string
+				description   string
+				notice        string
+				date          time.Time
+				hour          int
+				minute        int
+				repeat        reminderRepeat
+				customDates   []time.Time
+				weekdaysMask  int
+				screen        draftScreen
+				calendarMonth time.Time
+				waitingFor    draftField
+			}{
+				repeat:        reminderRepeatCustomDates,
+				customDates:   []time.Time{customDate},
+				calendarMonth: time.Date(2026, 6, 1, 0, 0, 0, 0, location),
+				screen:        draftScreenCalendar,
+			},
+		},
+		{
+			name: "title input draft maps waiting field",
+			draft: reminderDraft{
+				waitingFor: fieldTitle,
+				notice:     "Введите название",
+				screen:     draftScreenMain,
+			},
+			expected: struct {
+				title         string
+				description   string
+				notice        string
+				date          time.Time
+				hour          int
+				minute        int
+				repeat        reminderRepeat
+				customDates   []time.Time
+				weekdaysMask  int
+				screen        draftScreen
+				calendarMonth time.Time
+				waitingFor    draftField
+			}{
+				waitingFor: fieldTitle,
+				notice:     "Введите название",
+				screen:     draftScreenMain,
+			},
+		},
+		{
+			name: "description input draft maps waiting field",
+			draft: reminderDraft{
+				waitingFor: fieldDescription,
+				notice:     "Введите описание",
+				screen:     draftScreenMain,
+			},
+			expected: struct {
+				title         string
+				description   string
+				notice        string
+				date          time.Time
+				hour          int
+				minute        int
+				repeat        reminderRepeat
+				customDates   []time.Time
+				weekdaysMask  int
+				screen        draftScreen
+				calendarMonth time.Time
+				waitingFor    draftField
+			}{
+				waitingFor: fieldDescription,
+				notice:     "Введите описание",
+				screen:     draftScreenMain,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			draft := uiDraft(test.draft)
+
+			require.Equal(t, test.expected.title, draft.Title)
+			require.Equal(t, test.expected.description, draft.Description)
+			require.Equal(t, test.expected.notice, draft.Notice)
+			require.Equal(t, test.expected.date, draft.Date)
+			require.Equal(t, test.expected.hour, draft.Hour)
+			require.Equal(t, test.expected.minute, draft.Minute)
+			require.Equal(t, test.expected.repeat, draft.Repeat)
+			require.Equal(t, test.expected.customDates, draft.CustomDates)
+			require.Equal(t, test.expected.weekdaysMask, draft.WeekdaysMask)
+			require.Equal(t, test.expected.screen, draft.Screen)
+			require.Equal(t, test.expected.calendarMonth, draft.CalendarMonth)
+			require.Equal(t, test.expected.waitingFor, draft.WaitingFor)
+		})
+	}
+}
+
 func TestReminderBotHandlesMessages(t *testing.T) {
 	t.Parallel()
 
@@ -866,7 +1107,7 @@ func TestReminderBotHandlesMessages(t *testing.T) {
 			before: func(caller *telegoapimock.MockCaller, _ *telegrammocks.MockReminderService) {
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(testTelegramResponse(t, telego.Message{MessageID: 1}), nil).
-					Times(2)
+					Times(1)
 			},
 		},
 		{

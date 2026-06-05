@@ -1,51 +1,46 @@
 package scheduler
 
 import (
-	"context"
 	"fmt"
-	"time"
 
-	"github.com/EgorKo25/EasyNote/src/database"
+	"github.com/EgorKo25/EasyNote/src/config"
 )
 
-func (s *Scheduler) Run(ctx context.Context) error {
-	for {
-		if err := ctx.Err(); err != nil {
-			return fmt.Errorf("check scheduler context: %w", err)
-		}
-
-		now := s.clock.Now()
-
-		reminders, err := s.database.ActualReminders(ctx, now, now.Add(s.pollInterval))
-		if err != nil {
-			return fmt.Errorf("load scheduled reminders: %w", err)
-		}
-
-		s.enqueue(reminders)
-
-		if err = s.sleep(ctx, s.pollInterval); err != nil {
-			return err
-		}
+func NewRunner(
+	storage Storage,
+	sender Sender,
+	planner Planner,
+	cfg config.Scheduler,
+	opts ...Option,
+) *Runner {
+	runner := &Runner{
+		storage: storage,
+		sender:  sender,
+		planner: planner,
+		cfg:     cfg,
+		clock:   newSystemClock(),
 	}
+
+	for _, opt := range opts {
+		opt(runner)
+	}
+
+	if runner.retrier == nil {
+		runner.retrier = NewBackoffRetrier(cfg, runner.clock)
+	}
+
+	return runner
 }
 
-func (s *Scheduler) enqueue(reminders []*database.ScheduledReminder) {
-	if len(reminders) == 0 {
-		return
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.queue = append(s.queue, reminders...)
-	s.queueReady.Broadcast()
+type Runner struct {
+	storage Storage
+	sender  Sender
+	planner Planner
+	retrier Retrier
+	cfg     config.Scheduler
+	clock   Clock
 }
 
-func (s *Scheduler) sleep(ctx context.Context, delay time.Duration) error {
-	select {
-	case <-ctx.Done():
-		return fmt.Errorf("wait polling interval: %w", ctx.Err())
-	case <-s.clock.After(delay):
-		return nil
-	}
+func (r *Runner) Info() string {
+	return fmt.Sprintf("run scheduler reminder runner, with poll interval: %s", r.cfg.PollInterval)
 }

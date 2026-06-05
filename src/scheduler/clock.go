@@ -4,11 +4,17 @@ import "github.com/benbjohnson/clock"
 
 type Clock = clock.Clock
 
-type Option func(*Scheduler)
+type Option func(*Runner)
 
 func WithClock(clock Clock) Option {
-	return func(s *Scheduler) {
-		s.clock = clock
+	return func(r *Runner) {
+		r.clock = clock
+	}
+}
+
+func WithRetrier(retrier Retrier) Option {
+	return func(r *Runner) {
+		r.retrier = retrier
 	}
 }
 
