@@ -29,6 +29,11 @@
 - Do not create more than one helper function.
 - If a fixture is required, place it in `fixture_test.go` next to the test file unless explicitly asked to keep it in the same test file.
 - If setup logic is needed, prefer adding it to the test case as a function such as `beforeScript func(t *testing.T, ...)` and call it inside the test body.
+- Every package dependency interface must have a nearby `go:generate` directive for mock generation.
+- Interfaces that only document a local implementation detail and do not split package dependencies or participate in tests may omit `go:generate`.
+- Do not replace functional dependencies with handwritten stubs in tests. Close the dependency with an interface, generate a mock for it, and use that mock in tests.
+- Every generated mock expectation must end with `Times(...)` with an explicit expected call count.
+- When a test expects more than one mock call in a specific order, wrap those expectations in `gomock.InOrder`.
 
 ## Coverage
 - Coverage for the target package must not be below 75%.

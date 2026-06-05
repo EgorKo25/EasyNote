@@ -26,7 +26,8 @@ func TestReminderWorkerSendsReadyReminders(t *testing.T) {
 	secondReminder := database.ScheduledReminder{ID: 2, NoteID: 20, TelegramChatID: 200, Title: "second"}
 	repository := mocks.NewMockReminderRepository(ctrl)
 	sender := mocks.NewMockReminderSender(ctrl)
-	worker := service.NewReminderWorker(repository, sender, config.Scheduler{
+	planner := mocks.NewMockReminderCompletionPlanner(ctrl)
+	worker := service.NewReminderWorker(repository, sender, planner, config.Scheduler{
 		PollInterval: time.Nanosecond,
 		BatchLimit:   50,
 		MaxAttempts:  5,
@@ -35,17 +36,25 @@ func TestReminderWorkerSendsReadyReminders(t *testing.T) {
 	gomock.InOrder(
 		repository.EXPECT().
 			FindRemindersReadyToSend(gomock.Any(), gomock.Any(), 50, 5).
-			Return([]*database.ScheduledReminder{&firstReminder, &secondReminder}, nil),
-		sender.EXPECT().SendReminder(gomock.Any(), firstReminder).Return(nil),
-		repository.EXPECT().MarkReminderSent(gomock.Any(), firstReminder.ID, gomock.Any()).Return(nil),
-		sender.EXPECT().SendReminder(gomock.Any(), secondReminder).Return(nil),
-		repository.EXPECT().
-			MarkReminderSent(gomock.Any(), secondReminder.ID, gomock.Any()).
-			DoAndReturn(func(context.Context, int64, time.Time) error {
+			Return([]*database.ScheduledReminder{&firstReminder, &secondReminder}, nil).
+			Times(1),
+		sender.EXPECT().SendReminder(gomock.Any(), firstReminder).Return(nil).Times(1),
+		planner.EXPECT().
+			CompleteOccurrence(gomock.Any(), firstReminder.ID, database.ReminderStatusSent, gomock.Any()).
+			Return(nil).
+			Times(1),
+		sender.EXPECT().
+			SendReminder(gomock.Any(), secondReminder).
+			DoAndReturn(func(context.Context, database.ScheduledReminder) error {
 				cancel()
 
 				return nil
-			}),
+			}).
+			Times(1),
+		planner.EXPECT().
+			CompleteOccurrence(gomock.Any(), secondReminder.ID, database.ReminderStatusSent, gomock.Any()).
+			Return(nil).
+			Times(1),
 	)
 
 	err := worker.Run(ctx)
@@ -60,7 +69,8 @@ func TestReminderWorkerDoesNothingWhenNoRemindersAreReady(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	repository := mocks.NewMockReminderRepository(ctrl)
 	sender := mocks.NewMockReminderSender(ctrl)
-	worker := service.NewReminderWorker(repository, sender, config.Scheduler{
+	planner := mocks.NewMockReminderCompletionPlanner(ctrl)
+	worker := service.NewReminderWorker(repository, sender, planner, config.Scheduler{
 		PollInterval: time.Nanosecond,
 		BatchLimit:   50,
 		MaxAttempts:  5,
@@ -72,7 +82,8 @@ func TestReminderWorkerDoesNothingWhenNoRemindersAreReady(t *testing.T) {
 			cancel()
 
 			return []*database.ScheduledReminder{}, nil
-		})
+		}).
+		Times(1)
 
 	err := worker.Run(ctx)
 
@@ -87,7 +98,8 @@ func TestReminderWorkerMarksFailedReminderAfterSendError(t *testing.T) {
 	reminder := database.ScheduledReminder{ID: 7, NoteID: 70, TelegramChatID: 700, Title: "fail"}
 	repository := mocks.NewMockReminderRepository(ctrl)
 	sender := mocks.NewMockReminderSender(ctrl)
-	worker := service.NewReminderWorker(repository, sender, config.Scheduler{
+	planner := mocks.NewMockReminderCompletionPlanner(ctrl)
+	worker := service.NewReminderWorker(repository, sender, planner, config.Scheduler{
 		PollInterval: time.Nanosecond,
 		BatchLimit:   50,
 		MaxAttempts:  5,
@@ -96,15 +108,20 @@ func TestReminderWorkerMarksFailedReminderAfterSendError(t *testing.T) {
 	gomock.InOrder(
 		repository.EXPECT().
 			FindRemindersReadyToSend(gomock.Any(), gomock.Any(), 50, 5).
-			Return([]*database.ScheduledReminder{&reminder}, nil),
-		sender.EXPECT().SendReminder(gomock.Any(), reminder).Return(errSendReminder),
-		repository.EXPECT().
-			MarkReminderFailed(gomock.Any(), reminder.ID, 5).
-			DoAndReturn(func(context.Context, int64, int) error {
+			Return([]*database.ScheduledReminder{&reminder}, nil).
+			Times(1),
+		sender.EXPECT().
+			SendReminder(gomock.Any(), reminder).
+			DoAndReturn(func(context.Context, database.ScheduledReminder) error {
 				cancel()
 
-				return nil
-			}),
+				return errSendReminder
+			}).
+			Times(1),
+		planner.EXPECT().
+			CompleteOccurrence(gomock.Any(), reminder.ID, database.ReminderStatusFailed, nil).
+			Return(nil).
+			Times(1),
 	)
 
 	err := worker.Run(ctx)
@@ -122,6 +139,7 @@ func TestReminderWorkerStopsOnContextCancellation(t *testing.T) {
 	worker := service.NewReminderWorker(
 		mocks.NewMockReminderRepository(ctrl),
 		mocks.NewMockReminderSender(ctrl),
+		mocks.NewMockReminderCompletionPlanner(ctrl),
 		config.Scheduler{
 			PollInterval: time.Hour,
 			BatchLimit:   50,

@@ -18,6 +18,44 @@ import (
 	gomock "go.uber.org/mock/gomock"
 )
 
+// MockReminderCompletionPlanner is a mock of ReminderCompletionPlanner interface.
+type MockReminderCompletionPlanner struct {
+	ctrl     *gomock.Controller
+	recorder *MockReminderCompletionPlannerMockRecorder
+	isgomock struct{}
+}
+
+// MockReminderCompletionPlannerMockRecorder is the mock recorder for MockReminderCompletionPlanner.
+type MockReminderCompletionPlannerMockRecorder struct {
+	mock *MockReminderCompletionPlanner
+}
+
+// NewMockReminderCompletionPlanner creates a new mock instance.
+func NewMockReminderCompletionPlanner(ctrl *gomock.Controller) *MockReminderCompletionPlanner {
+	mock := &MockReminderCompletionPlanner{ctrl: ctrl}
+	mock.recorder = &MockReminderCompletionPlannerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockReminderCompletionPlanner) EXPECT() *MockReminderCompletionPlannerMockRecorder {
+	return m.recorder
+}
+
+// CompleteOccurrence mocks base method.
+func (m *MockReminderCompletionPlanner) CompleteOccurrence(ctx context.Context, reminderID int64, status database.ReminderStatus, sentAt *time.Time) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CompleteOccurrence", ctx, reminderID, status, sentAt)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CompleteOccurrence indicates an expected call of CompleteOccurrence.
+func (mr *MockReminderCompletionPlannerMockRecorder) CompleteOccurrence(ctx, reminderID, status, sentAt any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CompleteOccurrence", reflect.TypeOf((*MockReminderCompletionPlanner)(nil).CompleteOccurrence), ctx, reminderID, status, sentAt)
+}
+
 // MockReminderRepository is a mock of ReminderRepository interface.
 type MockReminderRepository struct {
 	ctrl     *gomock.Controller
@@ -55,34 +93,6 @@ func (m *MockReminderRepository) FindRemindersReadyToSend(ctx context.Context, n
 func (mr *MockReminderRepositoryMockRecorder) FindRemindersReadyToSend(ctx, now, limit, maxAttempts any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindRemindersReadyToSend", reflect.TypeOf((*MockReminderRepository)(nil).FindRemindersReadyToSend), ctx, now, limit, maxAttempts)
-}
-
-// MarkReminderFailed mocks base method.
-func (m *MockReminderRepository) MarkReminderFailed(ctx context.Context, reminderID int64, maxAttempts int) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "MarkReminderFailed", ctx, reminderID, maxAttempts)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// MarkReminderFailed indicates an expected call of MarkReminderFailed.
-func (mr *MockReminderRepositoryMockRecorder) MarkReminderFailed(ctx, reminderID, maxAttempts any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkReminderFailed", reflect.TypeOf((*MockReminderRepository)(nil).MarkReminderFailed), ctx, reminderID, maxAttempts)
-}
-
-// MarkReminderSent mocks base method.
-func (m *MockReminderRepository) MarkReminderSent(ctx context.Context, reminderID int64, sentAt time.Time) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "MarkReminderSent", ctx, reminderID, sentAt)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// MarkReminderSent indicates an expected call of MarkReminderSent.
-func (mr *MockReminderRepositoryMockRecorder) MarkReminderSent(ctx, reminderID, sentAt any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkReminderSent", reflect.TypeOf((*MockReminderRepository)(nil).MarkReminderSent), ctx, reminderID, sentAt)
 }
 
 // MockReminderSender is a mock of ReminderSender interface.

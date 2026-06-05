@@ -15,39 +15,61 @@ const (
 	buttonCreateReminder = "Создать напоминание"
 	buttonReminderList   = "Список напоминаний"
 )
+
 const (
-	callbackDraftTitle       = "draft:title"
-	callbackDraftDescription = "draft:description"
-	callbackDraftDate        = "draft:date"
-	callbackDraftCalendar    = "draft:calendar"
-	callbackDraftBack        = "draft:back"
-	callbackDraftSave        = "draft:save"
-	callbackDraftCancel      = "draft:cancel"
-	callbackDraftTimeDone    = "draft:time_done"
-	callbackNoop             = "noop"
-	callbackMainMenu         = "menu:main"
-	callbackCreateReminder   = "reminder:create"
-	callbackReminderList     = "reminder:list"
-	callbackReminderBackList = "reminder:back_list"
-	callbackDatePrefix       = "date:"
-	callbackMonthPrefix      = "month:"
-	callbackTimeSetPrefix    = "time:set:"
-	callbackTimeShiftPrefix  = "time:shift:"
-	callbackViewPrefix       = "reminder:view:"
-	callbackDeletePrefix     = "reminder:delete:"
+	callbackDraftTitle        = "draft:title"
+	callbackDraftDescription  = "draft:description"
+	callbackDraftDate         = "draft:date"
+	callbackDraftCalendar     = "draft:calendar"
+	callbackDraftRepeat       = "draft:repeat"
+	callbackDraftBack         = "draft:back"
+	callbackDraftSave         = "draft:save"
+	callbackDraftCancel       = "draft:cancel"
+	callbackDraftTimeDone     = "draft:time_done"
+	callbackDraftCustomDone   = "draft:custom_dates_done"
+	callbackDraftWeekdaysDone = "draft:weekdays_done"
+	callbackNoop              = "noop"
+	callbackMainMenu          = "menu:main"
+	callbackCreateReminder    = "reminder:create"
+	callbackReminderList      = "reminder:list"
+	callbackReminderBackList  = "reminder:back_list"
+	callbackDatePrefix        = "date:"
+	callbackMonthPrefix       = "month:"
+	callbackTimeSetPrefix     = "time:set:"
+	callbackTimeShiftPrefix   = "time:shift:"
+	callbackRepeatPrefix      = "repeat:"
+	callbackWeekdayPrefix     = "weekday:"
+	callbackViewPrefix        = "reminder:view:"
+	callbackDeletePrefix      = "reminder:delete:"
 )
+
 const (
 	fieldTitle       draftField = "title"
 	fieldDescription draftField = "description"
 )
+
 const (
 	draftScreenMain     draftScreen = "main"
 	draftScreenDate     draftScreen = "date"
 	draftScreenCalendar draftScreen = "calendar"
 	draftScreenTime     draftScreen = "time"
+	draftScreenRepeat   draftScreen = "repeat"
+	draftScreenWeekdays draftScreen = "weekdays"
 )
 
 const emptyFieldText = "не задано"
+
+type reminderRepeat string
+
+const (
+	reminderRepeatNone           reminderRepeat = ""
+	reminderRepeatEveryDay       reminderRepeat = "every_day"
+	reminderRepeatEveryWeek      reminderRepeat = "every_week"
+	reminderRepeatEveryTwoDays   reminderRepeat = "every_two_days"
+	reminderRepeatWeekdays       reminderRepeat = "weekdays"
+	reminderRepeatCustomWeekdays reminderRepeat = "custom_weekdays"
+	reminderRepeatCustomDates    reminderRepeat = "custom_dates"
+)
 
 func mainKeyboard() *telego.ReplyKeyboardMarkup {
 	return tu.Keyboard(
@@ -64,19 +86,26 @@ func draftKeyboard(draft reminderDraft, now time.Time) *telego.InlineKeyboardMar
 		return dateKeyboard(draft, now)
 	case draftScreenTime:
 		return timeKeyboard(draft, now)
+	case draftScreenRepeat:
+		return repeatKeyboard()
+	case draftScreenWeekdays:
+		return weekdaysKeyboard(draft)
 	default:
 		return draftMainKeyboard(draft)
 	}
 }
 
 func draftMainKeyboard(draft reminderDraft) *telego.InlineKeyboardMarkup {
-	timeButtonText := "Выбрать дату и время"
+	timeButtonText := "Задать дату и время"
 	if !draft.date.IsZero() {
 		timeButtonText = "Изменить дату и время"
 	}
 
 	return tu.InlineKeyboard(
 		tu.InlineKeyboardRow(tu.InlineKeyboardButton(timeButtonText).WithCallbackData(callbackDraftDate)),
+		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton("Регулярное напоминание").WithCallbackData(callbackDraftRepeat),
+		),
 		tu.InlineKeyboardRow(
 			tu.InlineKeyboardButton("Название").WithCallbackData(callbackDraftTitle),
 			tu.InlineKeyboardButton("Описание").WithCallbackData(callbackDraftDescription),
@@ -86,6 +115,63 @@ func draftMainKeyboard(draft reminderDraft) *telego.InlineKeyboardMarkup {
 			tu.InlineKeyboardButton("Отменить").WithCallbackData(callbackDraftCancel),
 		),
 	)
+}
+
+func repeatKeyboard() *telego.InlineKeyboardMarkup {
+	return tu.InlineKeyboard(
+		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton("Каждый день").WithCallbackData(repeatCallback(reminderRepeatEveryDay)),
+		),
+		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton("Каждую неделю").WithCallbackData(repeatCallback(reminderRepeatEveryWeek)),
+		),
+		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton("Каждые 2 дня").WithCallbackData(repeatCallback(reminderRepeatEveryTwoDays)),
+		),
+		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton("По будням").WithCallbackData(repeatCallback(reminderRepeatWeekdays)),
+		),
+		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton("Свои дни недели").WithCallbackData(
+				repeatCallback(reminderRepeatCustomWeekdays),
+			),
+		),
+		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton("Выбрать даты").WithCallbackData(repeatCallback(reminderRepeatCustomDates)),
+		),
+		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton("Без повторения").WithCallbackData(repeatCallback(reminderRepeatNone)),
+		),
+		tu.InlineKeyboardRow(tu.InlineKeyboardButton("Назад").WithCallbackData(callbackDraftBack)),
+	)
+}
+
+func weekdaysKeyboard(draft reminderDraft) *telego.InlineKeyboardMarkup {
+	return tu.InlineKeyboard(
+		tu.InlineKeyboardRow(
+			weekdayButton("Пн", 1, draft.weekdaysMask),
+			weekdayButton("Вт", 2, draft.weekdaysMask),
+			weekdayButton("Ср", 4, draft.weekdaysMask),
+			weekdayButton("Чт", 8, draft.weekdaysMask),
+		),
+		tu.InlineKeyboardRow(
+			weekdayButton("Пт", 16, draft.weekdaysMask),
+			weekdayButton("Сб", 32, draft.weekdaysMask),
+			weekdayButton("Вс", 64, draft.weekdaysMask),
+		),
+		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton("Готово").WithCallbackData(callbackDraftWeekdaysDone),
+		),
+		tu.InlineKeyboardRow(tu.InlineKeyboardButton("Назад").WithCallbackData(callbackDraftRepeat)),
+	)
+}
+
+func weekdayButton(text string, mask int, selectedMask int) telego.InlineKeyboardButton {
+	if selectedMask&mask != 0 {
+		text = "✓ " + text
+	}
+
+	return tu.InlineKeyboardButton(text).WithCallbackData(weekdayCallback(mask))
 }
 
 func dateChoiceKeyboard(now time.Time) *telego.InlineKeyboardMarkup {
@@ -122,8 +208,16 @@ func dateKeyboard(draft reminderDraft, now time.Time) *telego.InlineKeyboardMark
 		},
 	}
 
-	rows = append(rows, monthDayRows(month, now)...)
-	rows = append(rows, tu.InlineKeyboardRow(tu.InlineKeyboardButton("Назад").WithCallbackData(callbackDraftDate)))
+	rows = append(rows, monthDayRows(month, now, draft.customDates)...)
+	if draft.repeat == reminderRepeatCustomDates {
+		rows = append(rows, tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton("Готово").WithCallbackData(callbackDraftCustomDone),
+		))
+	} else {
+		rows = append(rows, tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton("Назад к выбору даты").WithCallbackData(callbackDraftDate),
+		))
+	}
 
 	return tu.InlineKeyboard(rows...)
 }
@@ -149,7 +243,9 @@ func timeKeyboard(draft reminderDraft, now time.Time) *telego.InlineKeyboardMark
 	}
 
 	if len(presetButtons) == 0 {
-		presetButtons = append(presetButtons, tu.InlineKeyboardButton("Ближайшее время").WithCallbackData(callbackNoop))
+		presetButtons = append(presetButtons,
+			tu.InlineKeyboardButton("Нет доступного времени").WithCallbackData(callbackNoop),
+		)
 	}
 
 	return tu.InlineKeyboard(
@@ -164,7 +260,7 @@ func timeKeyboard(draft reminderDraft, now time.Time) *telego.InlineKeyboardMark
 			tu.InlineKeyboardButton("+5м").WithCallbackData(timeShiftCallback(5)),
 		),
 		tu.InlineKeyboardRow(
-			tu.InlineKeyboardButton("Назад к дате").WithCallbackData(callbackDraftDate),
+			tu.InlineKeyboardButton("День").WithCallbackData(callbackDraftDate),
 			tu.InlineKeyboardButton("Готово").WithCallbackData(callbackDraftTimeDone),
 		),
 	)
@@ -200,9 +296,9 @@ func reminderCreatedKeyboard() *telego.InlineKeyboardMarkup {
 	return tu.InlineKeyboard(
 		tu.InlineKeyboardRow(
 			tu.InlineKeyboardButton("Главное меню").WithCallbackData(callbackMainMenu),
-			tu.InlineKeyboardButton("Активные").WithCallbackData(callbackReminderList),
+			tu.InlineKeyboardButton("Список").WithCallbackData(callbackReminderList),
 		),
-		tu.InlineKeyboardRow(tu.InlineKeyboardButton("Создать новое").WithCallbackData(callbackCreateReminder)),
+		tu.InlineKeyboardRow(tu.InlineKeyboardButton("Создать еще").WithCallbackData(callbackCreateReminder)),
 	)
 }
 
@@ -212,6 +308,7 @@ func mainMenuText() string {
 
 func draftText(draft reminderDraft, location *time.Location) string {
 	remindAt, title, description := emptyFieldText, emptyFieldText, emptyFieldText
+	repeat := repeatText(draft)
 
 	if !draft.remindAt(location).IsZero() {
 		remindAt = draft.remindAt(location).In(location).Format("02.01.2006 15:04")
@@ -233,10 +330,11 @@ func draftText(draft reminderDraft, location *time.Location) string {
 	}
 
 	return fmt.Sprintf(
-		"Создание напоминания\n\nДата и время: %s\nНазвание: %s\nОписание: %s\n\n%s%s",
+		"Создание напоминания\n\nДата и время: %s\nНазвание: %s\nОписание: %s\n%s\n%s%s",
 		remindAt,
 		title,
 		description,
+		repeat,
 		nextStep,
 		notice,
 	)
@@ -244,15 +342,15 @@ func draftText(draft reminderDraft, location *time.Location) string {
 
 func draftNextStep(draft reminderDraft) string {
 	if draft.waitingFor == fieldTitle {
-		return "Отправьте название одним сообщением."
+		return "Введите название напоминания сообщением."
 	}
 
 	if draft.waitingFor == fieldDescription {
-		return "Отправьте описание одним сообщением."
+		return "Введите описание напоминания сообщением."
 	}
 
 	if draft.screen == draftScreenDate {
-		return "Выберите быстрый вариант или откройте календарь."
+		return "Выберите быстрый вариант даты или откройте календарь."
 	}
 
 	if draft.screen == draftScreenCalendar {
@@ -260,36 +358,43 @@ func draftNextStep(draft reminderDraft) string {
 	}
 
 	if draft.screen == draftScreenTime {
-		return "Выберите готовое время или настройте его кнопками."
+		return "Выберите время напоминания."
+	}
+
+	if draft.screen == draftScreenRepeat {
+		return "Выберите периодичность напоминания."
+	}
+
+	if draft.screen == draftScreenWeekdays {
+		return "Выберите дни недели для повторения."
 	}
 
 	return "Выберите дату и время кнопкой ниже."
 }
 
 func reminderViewText(reminder database.ReminderView, location *time.Location) string {
-	description := "не задано"
+	description := "Без описания"
 	if reminder.Description != "" {
 		description = reminder.Description
 	}
 
 	return fmt.Sprintf(
-		"#%d: %s\n%s\n%s",
-		reminder.ID,
+		"%s\n%s\n%s",
 		reminder.RemindAt.In(location).Format("02.01.2006 15:04"),
 		reminder.Title,
 		description,
 	)
 }
 
-func reminderListText(reminders []database.ReminderView, location *time.Location) string {
+func reminderListText(reminders []database.ReminderView) string {
 	if len(reminders) == 0 {
 		return "Активных напоминаний пока нет.\n\nСоздайте первое напоминание на основной клавиатуре."
 	}
 
-	return "Активные напоминания\n\nВыберите напоминание кнопкой ниже."
+	return "Список напоминаний\n\nВыберите напоминание из списка."
 }
 
-func monthDayRows(month time.Time, now time.Time) [][]telego.InlineKeyboardButton {
+func monthDayRows(month time.Time, now time.Time, selectedDates []time.Time) [][]telego.InlineKeyboardButton {
 	firstDay := firstDayOfMonth(month)
 	lastDay := firstDay.AddDate(0, 1, -1).Day()
 	weekdayOffset := int(firstDay.Weekday()+6) % 7
@@ -310,7 +415,12 @@ func monthDayRows(month time.Time, now time.Time) [][]telego.InlineKeyboardButto
 			callback = callbackNoop
 		}
 
-		row = append(row, tu.InlineKeyboardButton(strconv.Itoa(day)).WithCallbackData(callback))
+		text := strconv.Itoa(day)
+		if isDraftCustomDateSelected(date, selectedDates) {
+			text = "✓ " + text
+		}
+
+		row = append(row, tu.InlineKeyboardButton(text).WithCallbackData(callback))
 
 		if len(row) == 7 {
 			rows = append(rows, row)
@@ -347,6 +457,55 @@ func timeSetCallback(hour, minute int) string {
 
 func timeShiftCallback(minutes int) string {
 	return callbackTimeShiftPrefix + strconv.Itoa(minutes)
+}
+
+func repeatCallback(value reminderRepeat) string {
+	return callbackRepeatPrefix + string(value)
+}
+
+func weekdayCallback(mask int) string {
+	return callbackWeekdayPrefix + strconv.Itoa(mask)
+}
+
+func repeatText(draft reminderDraft) string {
+	switch draft.repeat {
+	case reminderRepeatEveryDay:
+		return "Повторяемость: каждый день\n"
+	case reminderRepeatEveryWeek:
+		return "Повторяемость: каждую неделю\n"
+	case reminderRepeatEveryTwoDays:
+		return "Повторяемость: каждые 2 дня\n"
+	case reminderRepeatWeekdays:
+		return "Повторяемость: по будням\n"
+	case reminderRepeatCustomWeekdays:
+		return fmt.Sprintf("Повторяемость: выбрано дней недели: %d\n", selectedWeekdayCount(draft.weekdaysMask))
+	case reminderRepeatCustomDates:
+		return fmt.Sprintf("Повторяемость: выбрано дат: %d\n", len(draft.customDates))
+	default:
+		return "Повторяемость: не задана\n"
+	}
+}
+
+func selectedWeekdayCount(mask int) int {
+	count := 0
+
+	for _, dayMask := range []int{1, 2, 4, 8, 16, 32, 64} {
+		if mask&dayMask != 0 {
+			count++
+		}
+	}
+
+	return count
+}
+
+func isDraftCustomDateSelected(date time.Time, selectedDates []time.Time) bool {
+	for _, selected := range selectedDates {
+		if selected.Year() == date.Year() && selected.Month() == date.Month() && selected.Day() == date.Day() {
+			return true
+		}
+	}
+
+	return false
 }
 
 func isFutureDraftTime(draft reminderDraft, hour int, minute int, now time.Time) bool {
