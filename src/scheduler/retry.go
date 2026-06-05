@@ -11,23 +11,15 @@ import (
 	"github.com/EgorKo25/EasyNote/src/config"
 )
 
-const (
-	RetryBackoffConstant    = "constant"
-	RetryBackoffExponential = "exponential"
-)
+const RetryBackoffExponential = "exponential"
 
 var errRetryAttemptsExhausted = errors.New("retry attempts exhausted")
 
 func NewBackoffRetrier(cfg config.Scheduler, clock Clock) *BackoffRetrier {
-	maxInterval := cfg.SendRetryMaxInterval
-	if maxInterval == 0 {
-		maxInterval = cfg.SendRetryInterval
-	}
-
 	return &BackoffRetrier{
 		attempts:    cfg.SendRetryCount,
 		interval:    cfg.SendRetryInterval,
-		maxInterval: maxInterval,
+		maxInterval: cfg.SendRetryMaxInterval,
 		strategy:    cfg.SendRetryBackoff,
 		clock:       clock,
 	}

@@ -94,9 +94,6 @@ type reminderDraft struct {
 	waitingFor    draftField
 }
 
-type draftField string
-type draftScreen string
-
 func (b *ReminderBot) Info() string {
 	return "run telegram reminder bot"
 }
@@ -1074,8 +1071,4 @@ func (d reminderDraft) remindAt(location *time.Location) time.Time {
 	}
 
 	return time.Date(d.date.Year(), d.date.Month(), d.date.Day(), d.hour, d.minute, 0, 0, location)
-}
-
-func (d reminderDraft) selectedTimeText() string {
-	return fmt.Sprintf("%02d:%02d", d.hour, d.minute)
 }
