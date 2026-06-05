@@ -22,6 +22,8 @@ scheduler:
   batch_limit: 50
   send_retry_count: 3
   send_retry_interval: 5s
+  send_retry_max_interval: 30s
+  send_retry_backoff: constant
 
 telegram:
   token_env: TELEGRAM_BOT_TOKEN

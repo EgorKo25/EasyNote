@@ -1,6 +1,6 @@
 // Package config is a configurator for  all app's services and modules
 //
-//nolint:lll,tagalign // The linter was disabled because it had a conflict with the tagalign linter. Tagalign linter is more important in this file.
+//nolint:lll,golines,tagalign // The linter was disabled because it had a conflict with the tagalign linter. Tagalign linter is more important in this file.
 package config
 
 import (
@@ -64,10 +64,12 @@ type Config struct {
 }
 
 type Scheduler struct {
-	PollInterval      time.Duration `default:"1m" validate:"required,gt=0"  yaml:"poll_interval"`
-	SendRetryInterval time.Duration `default:"5s" validate:"required,gt=0"  yaml:"send_retry_interval"`
-	BatchLimit        int           `default:"50" validate:"required,min=1" yaml:"batch_limit"`
-	SendRetryCount    int           `default:"3"  validate:"required,min=1" yaml:"send_retry_count"`
+	PollInterval         time.Duration `default:"1m" validate:"required,gt=0"  yaml:"poll_interval"`
+	SendRetryInterval    time.Duration `default:"5s" validate:"required,gt=0"  yaml:"send_retry_interval"`
+	SendRetryMaxInterval time.Duration `default:"30s" validate:"required,gt=0" yaml:"send_retry_max_interval"`
+	BatchLimit           int           `default:"50" validate:"required,min=1" yaml:"batch_limit"`
+	SendRetryCount       int           `default:"3"  validate:"required,min=1" yaml:"send_retry_count"`
+	SendRetryBackoff     string        `default:"constant" validate:"required,oneof=constant exponential" yaml:"send_retry_backoff"`
 }
 
 type AppConfig struct {

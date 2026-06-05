@@ -1,4 +1,4 @@
-//nolint:testpackage,maintidx,cyclop // Tests exercise unexported one-tick processing without adding production hooks.
+//nolint:testpackage,maintidx // Tests exercise unexported one-tick processing without adding production hooks.
 package scheduler
 
 import (
@@ -32,7 +32,6 @@ func TestRunnerProcessesReadyReminders(t *testing.T) {
 	secondReminder := database.ScheduledReminder{ID: 2, NoteID: 20, TelegramChatID: 200, Title: "second"}
 
 	type expected struct {
-		expectedErrIs   error
 		expectedErrText string
 	}
 
@@ -152,18 +151,22 @@ func TestRunnerProcessesReadyReminders(t *testing.T) {
 
 				<-readyForTimers
 
-				for range 10 {
+				var actualErr error
+
+				require.Eventually(t, func() bool {
 					select {
 					case err := <-errCh:
-						return err
+						actualErr = err
+
+						return true
 					default:
 						testClock.Add(retryInterval)
+
+						return false
 					}
-				}
+				}, time.Second, time.Millisecond)
 
-				cancel()
-
-				return <-errCh
+				return actualErr
 			},
 		},
 		{
@@ -219,18 +222,22 @@ func TestRunnerProcessesReadyReminders(t *testing.T) {
 
 				<-readyForTimers
 
-				for range 10 {
+				var actualErr error
+
+				require.Eventually(t, func() bool {
 					select {
 					case err := <-errCh:
-						return err
+						actualErr = err
+
+						return true
 					default:
 						testClock.Add(retryInterval)
+
+						return false
 					}
-				}
+				}, time.Second, time.Millisecond)
 
-				cancel()
-
-				return <-errCh
+				return actualErr
 			},
 		},
 		{
@@ -266,22 +273,26 @@ func TestRunnerProcessesReadyReminders(t *testing.T) {
 					errCh <- runner.Run(runCtx)
 				}()
 
-				for range 10 {
+				var actualErr error
+
+				require.Eventually(t, func() bool {
 					select {
 					case <-readyForTimers:
 						cancel()
 
-						return <-errCh
+						actualErr = <-errCh
+
+						return true
 					default:
 						testClock.Add(pollInterval)
+
+						return false
 					}
-				}
+				}, time.Second, time.Millisecond)
 
-				cancel()
-
-				return <-errCh
+				return actualErr
 			},
-			expected: expected{expectedErrIs: context.Canceled},
+			expected: expected{expectedErrText: "wait scheduler interval: context canceled"},
 		},
 		{
 			name: "storage loading error is returned",
@@ -306,7 +317,7 @@ func TestRunnerProcessesReadyReminders(t *testing.T) {
 			run: func(ctx context.Context, runner *Runner, _ *clock.Mock, _ chan struct{}) error {
 				return runner.processReadyReminders(ctx)
 			},
-			expected: expected{expectedErrIs: errFindReadyReminders},
+			expected: expected{expectedErrText: "find reminders ready to send: find ready reminders"},
 		},
 		{
 			name: "planner sent completion error is returned",
@@ -338,7 +349,7 @@ func TestRunnerProcessesReadyReminders(t *testing.T) {
 			run: func(ctx context.Context, runner *Runner, _ *clock.Mock, _ chan struct{}) error {
 				return runner.processReadyReminders(ctx)
 			},
-			expected: expected{expectedErrIs: errCompleteReminder},
+			expected: expected{expectedErrText: `complete reminder 1 with status "sent": complete reminder`},
 		},
 		{
 			name: "planner failed completion error is returned after exhausted retries",
@@ -370,7 +381,7 @@ func TestRunnerProcessesReadyReminders(t *testing.T) {
 			run: func(ctx context.Context, runner *Runner, _ *clock.Mock, _ chan struct{}) error {
 				return runner.processReadyReminders(ctx)
 			},
-			expected: expected{expectedErrIs: errCompleteReminder},
+			expected: expected{expectedErrText: `complete reminder 1 with status "failed": complete reminder`},
 		},
 		{
 			name: "context cancellation before run is returned without loading reminders",
@@ -394,7 +405,7 @@ func TestRunnerProcessesReadyReminders(t *testing.T) {
 
 				return runner.Run(runCtx)
 			},
-			expected: expected{expectedErrIs: context.Canceled},
+			expected: expected{expectedErrText: "wait scheduler interval: context canceled"},
 		},
 	}
 
@@ -423,19 +434,19 @@ func TestRunnerProcessesReadyReminders(t *testing.T) {
 
 			err := testCase.run(t.Context(), runner, testClock, testCase.readyForTimers)
 
-			if testCase.expected.expectedErrIs != nil {
-				require.ErrorIs(t, err, testCase.expected.expectedErrIs)
-
-				return
-			}
-
 			if testCase.expected.expectedErrText != "" {
-				require.EqualError(t, err, testCase.expected.expectedErrText)
+				require.EqualErrorf(
+					t,
+					err,
+					testCase.expected.expectedErrText,
+					"case %q returned unexpected error",
+					testCase.name,
+				)
 
 				return
 			}
 
-			require.NoError(t, err)
+			require.NoErrorf(t, err, "case %q returned unexpected error", testCase.name)
 		})
 	}
 }

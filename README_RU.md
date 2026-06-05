@@ -47,10 +47,13 @@ scheduler:
   batch_limit: 50
   send_retry_count: 3
   send_retry_interval: 5s
+  send_retry_max_interval: 30s
+  send_retry_backoff: constant
 ```
 
 `send_retry_count` задает общее количество попыток отправки одного готового напоминания.
-`send_retry_interval` задает интервал между неуспешными попытками.
+`send_retry_interval` задает постоянный интервал или начальный интервал exponential backoff.
+`send_retry_max_interval` ограничивает exponential backoff, а `send_retry_backoff` выбирает стратегию `constant` или `exponential`.
 Если отправка успешна, occurrence завершается как `sent`. Если все попытки исчерпаны, occurrence завершается как `failed`.
 
 ## Периодичные напоминания

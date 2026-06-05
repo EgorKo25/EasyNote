@@ -21,7 +21,9 @@
 
 ## Assertions
 - Do not use `wantErr` or similar boolean flags for error checks.
-- If error verification is needed, define an `expected` structure with an `expectedErr error` field and compare errors with `require.Error`, `require.EqualError`, and similar assertion helpers.
+- If error verification is needed, define an `expected` structure with a single `expectedErrText string` field and compare errors with `require.EqualErrorf`.
+- In new table-driven tests, do not put two or more error fields into `expected`. Prefer a single `expectedErrText string` field; use an empty string when no error is expected.
+- Prefer `require.EqualErrorf` or `require.NoError` over branching on sentinel error fields in table assertions.
 - Prefer assertion helpers from `require` when they simplify the test without weakening it.
 - Do not use fallback branches like checking `nil` versus empty slices when an explicit expected slice can be provided. Put the expected slice directly into the test case.
 
@@ -40,7 +42,8 @@
 
 ## Scheduler Architecture
 - Scheduler processing must stay inside the scheduler package logic unless there is a real implemented dependency boundary.
-- Do not introduce a separate processor entity or builder option for scheduler reminder processing.
-- Scheduler must keep due reminders in its own internal queue.
-- Expose due reminders through `Next(ctx)`, not through a public reminders channel.
+- In Go files, put every interface declared in the file near the top of that file, before constructors, structs, and function bodies.
+- Scheduler runtime must be split by responsibility: runner/tick-loop, ready-reminder sending, retry/backoff policy, clock abstraction, and dependency interfaces.
+- Scheduler must not reintroduce the old heap/cache queue model or public `Next(ctx)` due-reminder API.
+- Retry/backoff must be hidden behind an internal project interface; external backoff library APIs must not leak into runner orchestration.
 - Do not add the global logger to structs. Get named loggers at the call site where logging is performed.
