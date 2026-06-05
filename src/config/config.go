@@ -64,10 +64,12 @@ type Config struct {
 }
 
 type Scheduler struct {
-	CacheWindow  time.Duration `default:"24h" validate:"required,gt=0"  yaml:"cache_window"`
-	PollInterval time.Duration `default:"1m"  validate:"required,gt=0"  yaml:"poll_interval"`
-	BatchLimit   int           `default:"50"  validate:"required,min=1" yaml:"batch_limit"`
-	MaxAttempts  int           `default:"5"   validate:"required,min=1" yaml:"max_attempts"`
+	PollInterval         time.Duration `default:"1m"       validate:"required,gt=0"                       yaml:"poll_interval"`
+	SendRetryInterval    time.Duration `default:"5s"       validate:"required,gt=0"                       yaml:"send_retry_interval"`
+	SendRetryMaxInterval time.Duration `default:"30s"      validate:"required,gt=0"                       yaml:"send_retry_max_interval"`
+	BatchLimit           int           `default:"50"       validate:"required,min=1"                      yaml:"batch_limit"`
+	SendRetryCount       int           `default:"3"        validate:"required,min=1"                      yaml:"send_retry_count"`
+	SendRetryBackoff     string        `default:"constant" validate:"required,oneof=constant exponential" yaml:"send_retry_backoff"`
 }
 
 type AppConfig struct {

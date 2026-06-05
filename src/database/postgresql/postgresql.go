@@ -13,7 +13,6 @@ import (
 	_ "github.com/EgorKo25/EasyNote/migrations"
 	"github.com/EgorKo25/EasyNote/src/config"
 	"github.com/EgorKo25/EasyNote/src/logger"
-	"github.com/EgorKo25/EasyNote/src/planner"
 )
 
 func NewDatabase(ctx context.Context, cfg config.Database) (*Database, error) {
@@ -78,7 +77,7 @@ func (d *Database) Migrate(ctx context.Context) error {
 
 func (d *Database) WithinTransaction(
 	ctx context.Context,
-	action func(ctx context.Context, storage planner.TransactionStorage) error,
+	action func(ctx context.Context, storage TransactionStorager) error,
 ) error {
 	transaction, err := d.pool.Begin(ctx)
 	if err != nil {

@@ -6,7 +6,7 @@ Telegram-бот для напоминаний о рутинных задачах
 
 Источник версии приложения - `CHANGELIST.md`.
 
-Текущая версия: `1.1.0`.
+Текущая версия: `1.2.0`.
 
 ## Проверки
 
@@ -23,17 +23,38 @@ docker build --check -f deploy/docker/EasyNote.Dockerfile .
 - `telegram` отвечает за пользовательский сценарий;
 - `service` валидирует входные данные и вызывает доменную логику;
 - `planner` управляет жизненным циклом напоминаний, рассчитывает следующее срабатывание и обеспечивает идемпотентное завершение;
+- `scheduler` выполняет runtime-loop отправки готовых напоминаний;
 - `database/postgresql` хранит данные, выполняет storage/repository операции и транзакции;
 - PostgreSQL является источником истины.
 
 Для фоновой отправки поток выглядит так:
 
 ```text
-ReminderWorker -> TelegramSender -> planner -> postgresql -> DB
+scheduler.Runner -> TelegramSender -> planner -> postgresql -> DB
 ```
 
-`ReminderWorker` выбирает готовые к отправке строки из `reminders`, отправляет сообщение и затем вызывает
-`Planner.CompleteOccurrenceAsSent` или `Planner.CompleteOccurrenceAsFailed`. Worker не рассчитывает регулярность.
+`scheduler.Runner` выбирает готовые к отправке строки из `reminders`, отправляет сообщение и затем вызывает
+`Planner.CompleteOccurrence`. Scheduler не рассчитывает регулярность и не работает напрямую с SQL.
+
+Старый heap/cache scheduler, публичный `Next(ctx)`, window-загрузка `ActualReminders` и пакет `src/database/cache`
+удалены. Runtime-планировщик теперь один: `scheduler.Runner`.
+
+Настройки retry отправки:
+
+```yaml
+scheduler:
+  poll_interval: 1m
+  batch_limit: 50
+  send_retry_count: 3
+  send_retry_interval: 5s
+  send_retry_max_interval: 30s
+  send_retry_backoff: constant
+```
+
+`send_retry_count` задает общее количество попыток отправки одного готового напоминания.
+`send_retry_interval` задает постоянный интервал или начальный интервал exponential backoff.
+`send_retry_max_interval` ограничивает exponential backoff, а `send_retry_backoff` выбирает стратегию `constant` или `exponential`.
+Если отправка успешна, occurrence завершается как `sent`. Если все попытки исчерпаны, occurrence завершается как `failed`.
 
 ## Периодичные напоминания
 
@@ -61,3 +82,10 @@ Planner считает следующую дату в Go-коде. PostgreSQL pa
 
 При создании напоминания доступен сценарий периодичного напоминания. Для custom dates используется календарная клавиатура
 с выбором нескольких дат. Для выбранных дней недели используется отдельная клавиатура с днями `Пн`-`Вс`.
+
+Кнопки draft отражают заполненность полей: `Название`, `Описание`, `Дата` меняются на `Изменить ...` после ввода.
+Для периодичных напоминаний дата подписана как `Дата и время начала` или `Изменить дату и время начала`, чтобы было
+понятно, что это старт регулярных оповещений.
+
+После обработки команд главного меню `Создать напоминание` и `Список напоминаний` бот удаляет пользовательское сообщение
+с текстом кнопки из диалога. Ошибка удаления логируется и не прерывает обработку команды.

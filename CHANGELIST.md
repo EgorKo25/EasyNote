@@ -1,4 +1,55 @@
-version: 1.1.0
+version: 1.2.0
+
+## v1.2.0 - Scheduler runtime runner
+
+### What was done
+
+The reminder runtime worker was moved from `service` to `scheduler` as `scheduler.Runner`.
+
+The old heap/cache scheduler model was removed, including queue/`Next(ctx)` abstractions, cache-window loading, old scheduler tests, generated mocks for that model, and the obsolete `src/database/cache` package.
+
+Scheduler now owns send retries in the runtime layer. `send_retry_count` configures the total send attempts for one ready reminder, `send_retry_interval` configures the constant or initial backoff delay, `send_retry_max_interval` caps exponential backoff, and `send_retry_backoff` selects the retry strategy.
+
+The runner uses the existing `Planner` to complete sent or failed occurrences. Recurring reminders continue to use the existing planner completion flow; scheduler does not calculate recurrence and PostgreSQL remains storage.
+
+Telegram reminder draft buttons now reflect field state. Recurring drafts show `Дата и время начала` before the start value is set and `Изменить дату и время начала` after it is set. Title, description, and date buttons also switch to `Изменить ...` when filled.
+
+The Telegram bot deletes user messages produced by the main reply-keyboard commands `Создать напоминание` and `Список напоминаний` after handling them. Deletion failures are logged without breaking command handling.
+
+### API changes
+
+Scheduler configuration changed:
+
+- removed `cache_window`;
+- removed `max_attempts`;
+- added `send_retry_count`;
+- added `send_retry_interval`.
+- added `send_retry_max_interval`;
+- added `send_retry_backoff`.
+
+### Affected files
+
+- `config/config.yaml`
+- `main.go`
+- `README.md`
+- `README_RU.md`
+- `src/config/config.go`
+- `src/database/postgresql/reminders_storage.go`
+- `src/database/cache/heap.go`
+- `src/database/cache/reminder_cache.go`
+- `src/database/cache/reminder_cache_test.go`
+- `src/scheduler/clock.go`
+- `src/scheduler/runner.go`
+- `src/scheduler/runner_test.go`
+- `src/scheduler/mocks/scheduler_mock.go`
+- `src/scheduler/scheduler.go`
+- `src/scheduler/scheduler_test.go`
+- `src/scheduler/storage.go`
+- `src/service/reminder_worker.go`
+- `src/service/reminder_worker_test.go`
+- `src/telegram/reminder_bot.go`
+- `src/telegram/reminder_bot_test.go`
+- `src/telegram/ui.go`
 
 ## v1.1.0 - Recurring reminders
 
