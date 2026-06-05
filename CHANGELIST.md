@@ -1,4 +1,46 @@
-version: 1.0.3
+version: 1.1.0
+
+## v1.1.0 - Recurring reminders
+
+### What was done
+
+Recurring reminders are now supported through separate rule storage instead of rewriting old reminder rows.
+
+The `reminders` table remains the table of concrete firings: one row is one reminder at one `remind_at`. Recurring rules are stored in `reminder_rules`, custom selected dates are stored in `reminder_custom_dates`, and recurring reminder rows reference rules through nullable `reminders.rule_id`.
+
+Supported recurrence modes:
+
+- every day;
+- every 2 days;
+- every week;
+- workdays;
+- custom selected weekdays;
+- custom selected calendar dates.
+
+Reminder completion now runs through the `planner` layer. It marks the current reminder as `sent` or `failed`, loads the active rule, calculates the next firing in Go, and inserts the next `reminders` row or completes the rule in one transaction.
+
+PostgreSQL remains the storage/repository layer: it reads and writes notes, reminders, rules, custom dates, and transactional locks, but it no longer owns recurring reminder formulas or lifecycle orchestration.
+
+Telegram reminder creation now includes recurring reminder controls, custom weekday selection, multi-date custom selection, and cleanup of user command/input messages after they are handled.
+
+### API changes
+
+No public HTTP API was introduced.
+
+### Affected files
+
+- `migrations/00003_add_recurring_reminder_rules.go`
+- `src/database/postgresql/postgresql.go`
+- `src/database/postgresql/reminders_storage.go`
+- `src/database/postgresql/recurring_storage.go`
+- `src/database/postgresql/transaction_storage.go`
+- `src/database/types.go`
+- `src/planner/planner.go`
+- `src/planner/occurrences.go`
+- `src/service/reminders.go`
+- `src/service/reminder_worker.go`
+- `src/telegram/reminder_bot.go`
+- `src/telegram/ui.go`
 
 ## v1.0.3 - Telegram reminder UI and delivery fixes
 

@@ -2,6 +2,7 @@ package telegram
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -14,6 +15,8 @@ import (
 	"github.com/mymmrac/telego"
 	tu "github.com/mymmrac/telego/telegoutil"
 )
+
+var ErrUnsupportedReminderRepeat = errors.New("unsupported reminder repeat")
 
 func NewReminderBot(sender *Sender, service ReminderService, cfg config.Telegram) *ReminderBot {
 	return &ReminderBot{
@@ -46,6 +49,32 @@ type ReminderService interface {
 		description string,
 		remindAt time.Time,
 	) (database.ReminderView, error)
+	CreateIntervalReminder(
+		ctx context.Context,
+		telegramChatID int64,
+		title string,
+		description string,
+		remindAt time.Time,
+		intervalDays int,
+	) (database.ReminderView, error)
+	CreateWeekdaysReminder(
+		ctx context.Context,
+		telegramChatID int64,
+		title string,
+		description string,
+		remindAt time.Time,
+		weekdaysMask int,
+	) (database.ReminderView, error)
+	CreateCustomDatesReminder(
+		ctx context.Context,
+		telegramChatID int64,
+		title string,
+		description string,
+		selectedDates []time.Time,
+		hour int,
+		minute int,
+		location *time.Location,
+	) (database.ReminderView, error)
 	Reminders(ctx context.Context, telegramChatID int64) ([]database.ReminderView, error)
 	DeleteReminder(ctx context.Context, telegramChatID int64, reminderID int64) error
 }
@@ -57,6 +86,9 @@ type reminderDraft struct {
 	date          time.Time
 	hour          int
 	minute        int
+	repeat        reminderRepeat
+	customDates   []time.Time
+	weekdaysMask  int
 	screen        draftScreen
 	calendarMonth time.Time
 	waitingFor    draftField
@@ -115,16 +147,12 @@ func (b *ReminderBot) handleMessage(ctx context.Context, message telego.Message)
 	chatID := message.Chat.ID
 	text := strings.TrimSpace(message.Text)
 
-	if text == "/start" || text == buttonStart {
-		return b.sendStart(ctx, chatID)
-	}
+	if handled, err := b.handleKnownMessage(ctx, chatID, message.MessageID, text); handled || err != nil {
+		if err != nil {
+			return err
+		}
 
-	if text == buttonCreateReminder {
-		return b.startReminderDraft(ctx, chatID)
-	}
-
-	if text == buttonReminderList {
-		return b.sendReminderList(ctx, chatID)
+		return nil
 	}
 
 	if b.applyDraftText(chatID, text) {
@@ -137,7 +165,46 @@ func (b *ReminderBot) handleMessage(ctx context.Context, message telego.Message)
 		return nil
 	}
 
-	return b.replaceUI(ctx, chatID, "Выберите действие на клавиатуре ниже.", mainKeyboard())
+	if err := b.replaceUI(
+		ctx,
+		chatID,
+		"Не понял команду. Используйте основную клавиатуру.",
+		mainKeyboard(),
+	); err != nil {
+		return err
+	}
+
+	b.deleteMessage(ctx, chatID, message.MessageID)
+
+	return nil
+}
+
+func (b *ReminderBot) handleKnownMessage(
+	ctx context.Context,
+	chatID int64,
+	messageID int,
+	text string,
+) (bool, error) {
+	var err error
+
+	switch text {
+	case "/start", buttonStart:
+		err = b.sendStart(ctx, chatID)
+	case buttonCreateReminder:
+		err = b.startReminderDraft(ctx, chatID)
+	case buttonReminderList:
+		err = b.sendReminderList(ctx, chatID)
+	default:
+		return false, nil
+	}
+
+	if err != nil {
+		return true, err
+	}
+
+	b.deleteMessage(ctx, chatID, messageID)
+
+	return true, nil
 }
 
 func (b *ReminderBot) handleCallback(ctx context.Context, query telego.CallbackQuery) error {
@@ -208,6 +275,18 @@ func (b *ReminderBot) handleDraftCommandCallback(
 		b.setDraftScreen(chatID, draftScreenCalendar)
 
 		return true, b.editDraft(ctx, chatID, messageID)
+	case callbackDraftCustomDone:
+		b.setDraftScreen(chatID, draftScreenTime)
+
+		return true, b.editDraft(ctx, chatID, messageID)
+	case callbackDraftWeekdaysDone:
+		b.setDraftScreen(chatID, draftScreenMain)
+
+		return true, b.editDraft(ctx, chatID, messageID)
+	case callbackDraftRepeat:
+		b.setDraftScreen(chatID, draftScreenRepeat)
+
+		return true, b.editDraft(ctx, chatID, messageID)
 	case callbackDraftBack:
 		b.setDraftScreen(chatID, draftScreenMain)
 
@@ -233,7 +312,12 @@ func (b *ReminderBot) handleDraftFinalCommandCallback(
 	case callbackDraftCancel:
 		b.deleteDraft(chatID)
 
-		return true, b.replaceUI(ctx, chatID, "Создание напоминания отменено.\n\n"+mainMenuText(), mainKeyboard())
+		return true, b.replaceUI(
+			ctx,
+			chatID,
+			"Создание напоминания отменено.\n\n"+mainMenuText(),
+			mainKeyboard(),
+		)
 	default:
 		return false, nil
 	}
@@ -277,7 +361,7 @@ func (b *ReminderBot) sendReminderList(ctx context.Context, chatID int64) error 
 		return fmt.Errorf("load reminders: %w", err)
 	}
 
-	return b.replaceUI(ctx, chatID, reminderListText(reminders, b.location()), reminderListKeyboard(reminders))
+	return b.replaceUI(ctx, chatID, reminderListText(reminders), reminderListKeyboard(reminders))
 }
 
 func (b *ReminderBot) editReminderList(ctx context.Context, chatID int64, messageID int) error {
@@ -286,26 +370,18 @@ func (b *ReminderBot) editReminderList(ctx context.Context, chatID int64, messag
 		return fmt.Errorf("load reminders: %w", err)
 	}
 
-	return b.editUI(ctx, chatID, messageID, reminderListText(reminders, b.location()), reminderListKeyboard(reminders))
+	return b.editUI(ctx, chatID, messageID, reminderListText(reminders), reminderListKeyboard(reminders))
 }
 
 func (b *ReminderBot) saveDraft(ctx context.Context, chatID int64, messageID int) error {
 	draft := b.draft(chatID)
+	remindAt := b.draftReminderTime(draft)
 
-	remindAt := draft.remindAt(b.location())
-	if draft.title == "" || remindAt.IsZero() {
-		b.setDraftNotice(chatID, "Чтобы сохранить напоминание, добавьте название и дату с временем.")
-
+	if b.setDraftValidationNotice(chatID, draft, remindAt) {
 		return b.editDraft(ctx, chatID, messageID)
 	}
 
-	if !remindAt.After(b.now()) {
-		b.setDraftTimeNotice(chatID, "Это время уже прошло. Выберите будущую дату и время.")
-
-		return b.editDraft(ctx, chatID, messageID)
-	}
-
-	reminder, err := b.service.CreateReminder(ctx, chatID, draft.title, draft.description, remindAt)
+	reminder, err := b.createDraftReminder(ctx, chatID, draft, remindAt)
 	if err != nil {
 		return fmt.Errorf("create reminder: %w", err)
 	}
@@ -316,9 +392,55 @@ func (b *ReminderBot) saveDraft(ctx context.Context, chatID int64, messageID int
 		ctx,
 		chatID,
 		messageID,
-		"Напоминание создано.\n\n"+reminderViewText(reminder, b.location()),
+		"Напоминание сохранено.\n\n"+reminderViewText(reminder, b.location()),
 		reminderCreatedKeyboard(),
 	)
+}
+
+func (b *ReminderBot) draftReminderTime(draft reminderDraft) time.Time {
+	if draft.repeat != reminderRepeatCustomDates || len(draft.customDates) == 0 {
+		return draft.remindAt(b.location())
+	}
+
+	firstDate := draft.customDates[0]
+	for _, date := range draft.customDates[1:] {
+		if date.Before(firstDate) {
+			firstDate = date
+		}
+	}
+
+	return time.Date(
+		firstDate.Year(),
+		firstDate.Month(),
+		firstDate.Day(),
+		draft.hour,
+		draft.minute,
+		0,
+		0,
+		b.location(),
+	)
+}
+
+func (b *ReminderBot) setDraftValidationNotice(chatID int64, draft reminderDraft, remindAt time.Time) bool {
+	if draft.title == "" || remindAt.IsZero() {
+		b.setDraftNotice(chatID, "Чтобы сохранить напоминание, добавьте название и дату с временем.")
+
+		return true
+	}
+
+	if draft.repeat == reminderRepeatCustomWeekdays && draft.weekdaysMask == 0 {
+		b.setDraftScreenNotice(chatID, draftScreenWeekdays, "Выберите хотя бы один день недели.")
+
+		return true
+	}
+
+	if !remindAt.After(b.now()) {
+		b.setDraftTimeNotice(chatID, "Это время уже прошло. Выберите будущую дату и время.")
+
+		return true
+	}
+
+	return false
 }
 
 func (b *ReminderBot) viewReminder(ctx context.Context, chatID int64, messageID int, data string) error {
@@ -348,7 +470,7 @@ func (b *ReminderBot) viewReminder(ctx context.Context, chatID int64, messageID 
 		ctx,
 		chatID,
 		messageID,
-		"Напоминание не найдено.\n\n"+reminderListText(reminders, b.location()),
+		"Напоминание не найдено.\n\n"+reminderListText(reminders),
 		reminderListKeyboard(reminders),
 	)
 }
@@ -372,7 +494,7 @@ func (b *ReminderBot) deleteReminder(ctx context.Context, chatID int64, messageI
 		ctx,
 		chatID,
 		messageID,
-		"Напоминание удалено.\n\n"+reminderListText(reminders, b.location()),
+		"Напоминание удалено.\n\n"+reminderListText(reminders),
 		reminderListKeyboard(reminders),
 	)
 }
@@ -467,7 +589,133 @@ func (b *ReminderBot) applyDraftDateCallback(chatID int64, data string) bool {
 		return b.applyDraftTimeShift(chatID, value)
 	}
 
+	if value, ok := strings.CutPrefix(data, callbackRepeatPrefix); ok {
+		return b.applyDraftRepeat(chatID, value)
+	}
+
+	if value, ok := strings.CutPrefix(data, callbackWeekdayPrefix); ok {
+		return b.applyDraftWeekday(chatID, value)
+	}
+
 	return false
+}
+
+func (b *ReminderBot) createDraftReminder(
+	ctx context.Context,
+	chatID int64,
+	draft reminderDraft,
+	remindAt time.Time,
+) (database.ReminderView, error) {
+	switch draft.repeat {
+	case reminderRepeatNone:
+		return b.createDraftOneTimeReminder(ctx, chatID, draft, remindAt)
+	case reminderRepeatWeekdays:
+		return b.createDraftWeekdaysReminder(ctx, chatID, draft, remindAt, database.WeekdaysMaskWorkdays)
+	case reminderRepeatCustomWeekdays:
+		return b.createDraftWeekdaysReminder(ctx, chatID, draft, remindAt, draft.weekdaysMask)
+	case reminderRepeatCustomDates:
+		return b.createDraftCustomDatesReminder(ctx, chatID, draft)
+	default:
+		intervalDays, ok := intervalDaysForRepeat(draft.repeat)
+		if !ok {
+			return database.ReminderView{}, fmt.Errorf("%w: %s", ErrUnsupportedReminderRepeat, draft.repeat)
+		}
+
+		return b.createDraftIntervalReminder(ctx, chatID, draft, remindAt, intervalDays)
+	}
+}
+
+func (b *ReminderBot) createDraftOneTimeReminder(
+	ctx context.Context,
+	chatID int64,
+	draft reminderDraft,
+	remindAt time.Time,
+) (database.ReminderView, error) {
+	reminder, err := b.service.CreateReminder(ctx, chatID, draft.title, draft.description, remindAt)
+	if err != nil {
+		return database.ReminderView{}, fmt.Errorf("create one-time reminder: %w", err)
+	}
+
+	return reminder, nil
+}
+
+func (b *ReminderBot) createDraftWeekdaysReminder(
+	ctx context.Context,
+	chatID int64,
+	draft reminderDraft,
+	remindAt time.Time,
+	weekdaysMask int,
+) (database.ReminderView, error) {
+	reminder, err := b.service.CreateWeekdaysReminder(
+		ctx,
+		chatID,
+		draft.title,
+		draft.description,
+		remindAt,
+		weekdaysMask,
+	)
+	if err != nil {
+		return database.ReminderView{}, fmt.Errorf("create weekdays reminder: %w", err)
+	}
+
+	return reminder, nil
+}
+
+func (b *ReminderBot) createDraftCustomDatesReminder(
+	ctx context.Context,
+	chatID int64,
+	draft reminderDraft,
+) (database.ReminderView, error) {
+	reminder, err := b.service.CreateCustomDatesReminder(
+		ctx,
+		chatID,
+		draft.title,
+		draft.description,
+		draft.customDates,
+		draft.hour,
+		draft.minute,
+		b.location(),
+	)
+	if err != nil {
+		return database.ReminderView{}, fmt.Errorf("create custom dates reminder: %w", err)
+	}
+
+	return reminder, nil
+}
+
+func intervalDaysForRepeat(repeat reminderRepeat) (int, bool) {
+	switch repeat {
+	case reminderRepeatEveryDay:
+		return 1, true
+	case reminderRepeatEveryTwoDays:
+		return 2, true
+	case reminderRepeatEveryWeek:
+		return 7, true
+	default:
+		return 0, false
+	}
+}
+
+func (b *ReminderBot) createDraftIntervalReminder(
+	ctx context.Context,
+	chatID int64,
+	draft reminderDraft,
+	remindAt time.Time,
+	intervalDays int,
+) (database.ReminderView, error) {
+	reminder, err := b.service.CreateIntervalReminder(
+		ctx,
+		chatID,
+		draft.title,
+		draft.description,
+		remindAt,
+		intervalDays,
+	)
+	if err != nil {
+		return database.ReminderView{}, fmt.Errorf("create interval reminder: %w", err)
+	}
+
+	return reminder, nil
 }
 
 func (b *ReminderBot) applyDraftMonth(chatID int64, value string) bool {
@@ -488,7 +736,7 @@ func (b *ReminderBot) applyDraftMonth(chatID int64, value string) bool {
 
 	nowMonth := firstDayOfMonth(b.now())
 	if firstDayOfMonth(month).Before(nowMonth) {
-		draft.notice = "Эта дата уже прошла. Выберите будущую дату."
+		draft.notice = "Нельзя выбрать месяц в прошлом. Выберите текущий или будущий месяц."
 		draft.screen = draftScreenCalendar
 		b.draftByChat[chatID] = draft
 
@@ -498,6 +746,55 @@ func (b *ReminderBot) applyDraftMonth(chatID int64, value string) bool {
 	draft.calendarMonth = firstDayOfMonth(month)
 	draft.notice = ""
 	draft.screen = draftScreenCalendar
+	b.draftByChat[chatID] = draft
+
+	return true
+}
+
+func (b *ReminderBot) applyDraftRepeat(chatID int64, value string) bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	draft, exists := b.draftByChat[chatID]
+	if !exists {
+		return false
+	}
+
+	draft.repeat = reminderRepeat(value)
+	draft.notice = ""
+
+	switch draft.repeat {
+	case reminderRepeatCustomDates:
+		draft.screen = draftScreenCalendar
+	case reminderRepeatCustomWeekdays:
+		draft.screen = draftScreenWeekdays
+	default:
+		draft.screen = draftScreenMain
+	}
+
+	b.draftByChat[chatID] = draft
+
+	return true
+}
+
+func (b *ReminderBot) applyDraftWeekday(chatID int64, value string) bool {
+	mask, err := strconv.Atoi(value)
+	if err != nil {
+		return false
+	}
+
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	draft, exists := b.draftByChat[chatID]
+	if !exists {
+		return false
+	}
+
+	draft.weekdaysMask ^= mask
+	draft.repeat = reminderRepeatCustomWeekdays
+	draft.notice = ""
+	draft.screen = draftScreenWeekdays
 	b.draftByChat[chatID] = draft
 
 	return true
@@ -521,7 +818,17 @@ func (b *ReminderBot) applyDraftDate(chatID int64, value string) bool {
 
 	now := b.now()
 	if date.Before(beginningOfDay(now)) {
-		draft.notice = "Эта дата уже прошла. Выберите сегодняшнюю или будущую дату."
+		draft.notice = "Нельзя выбрать дату в прошлом. Выберите сегодняшнюю или будущую дату."
+		draft.screen = draftScreenCalendar
+		b.draftByChat[chatID] = draft
+
+		return true
+	}
+
+	if draft.repeat == reminderRepeatCustomDates {
+		draft.customDates = toggleDraftCustomDate(draft.customDates, date)
+		draft.calendarMonth = firstDayOfMonth(date)
+		draft.notice = ""
 		draft.screen = draftScreenCalendar
 		b.draftByChat[chatID] = draft
 
@@ -544,6 +851,20 @@ func (b *ReminderBot) applyDraftDate(chatID int64, value string) bool {
 	return true
 }
 
+func toggleDraftCustomDate(dates []time.Time, date time.Time) []time.Time {
+	for index, selected := range dates {
+		if sameDraftDate(selected, date) {
+			return append(dates[:index], dates[index+1:]...)
+		}
+	}
+
+	return append(dates, date)
+}
+
+func sameDraftDate(left time.Time, right time.Time) bool {
+	return left.Year() == right.Year() && left.Month() == right.Month() && left.Day() == right.Day()
+}
+
 func (b *ReminderBot) applyDraftTime(chatID int64, value string) bool {
 	parsed, err := time.Parse("15:04", value)
 	if err != nil {
@@ -562,7 +883,7 @@ func (b *ReminderBot) applyDraftTime(chatID int64, value string) bool {
 	draft.minute = parsed.Minute()
 
 	if !draft.remindAt(b.location()).After(b.now()) {
-		draft.notice = "Это время уже прошло. Выберите будущее время."
+		draft.notice = "Выбранное время уже прошло. Выберите будущее время."
 	} else {
 		draft.notice = ""
 	}
@@ -593,7 +914,7 @@ func (b *ReminderBot) applyDraftTimeShift(chatID int64, value string) bool {
 	draft.minute = shiftedTime.Minute()
 
 	if !draft.remindAt(b.location()).After(b.now()) {
-		draft.notice = "Это время уже прошло. Выберите будущее время."
+		draft.notice = "Выбранное время уже прошло. Выберите будущее время."
 	} else {
 		draft.notice = ""
 	}
@@ -634,6 +955,17 @@ func (b *ReminderBot) setDraftTimeNotice(chatID int64, notice string) {
 	draft.notice = notice
 	draft.waitingFor = ""
 	draft.screen = draftScreenTime
+	b.draftByChat[chatID] = draft
+}
+
+func (b *ReminderBot) setDraftScreenNotice(chatID int64, screen draftScreen, notice string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	draft := b.draftByChat[chatID]
+	draft.notice = notice
+	draft.waitingFor = ""
+	draft.screen = screen
 	b.draftByChat[chatID] = draft
 }
 

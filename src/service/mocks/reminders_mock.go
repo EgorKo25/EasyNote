@@ -18,6 +18,60 @@ import (
 	gomock "go.uber.org/mock/gomock"
 )
 
+// MockReminderCreationPlanner is a mock of ReminderCreationPlanner interface.
+type MockReminderCreationPlanner struct {
+	ctrl     *gomock.Controller
+	recorder *MockReminderCreationPlannerMockRecorder
+	isgomock struct{}
+}
+
+// MockReminderCreationPlannerMockRecorder is the mock recorder for MockReminderCreationPlanner.
+type MockReminderCreationPlannerMockRecorder struct {
+	mock *MockReminderCreationPlanner
+}
+
+// NewMockReminderCreationPlanner creates a new mock instance.
+func NewMockReminderCreationPlanner(ctrl *gomock.Controller) *MockReminderCreationPlanner {
+	mock := &MockReminderCreationPlanner{ctrl: ctrl}
+	mock.recorder = &MockReminderCreationPlannerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockReminderCreationPlanner) EXPECT() *MockReminderCreationPlannerMockRecorder {
+	return m.recorder
+}
+
+// CreateInitialOccurrenceForRule mocks base method.
+func (m *MockReminderCreationPlanner) CreateInitialOccurrenceForRule(ctx context.Context, request database.RecurringReminderRequest) (database.ReminderView, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateInitialOccurrenceForRule", ctx, request)
+	ret0, _ := ret[0].(database.ReminderView)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateInitialOccurrenceForRule indicates an expected call of CreateInitialOccurrenceForRule.
+func (mr *MockReminderCreationPlannerMockRecorder) CreateInitialOccurrenceForRule(ctx, request any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateInitialOccurrenceForRule", reflect.TypeOf((*MockReminderCreationPlanner)(nil).CreateInitialOccurrenceForRule), ctx, request)
+}
+
+// CreateSingleOccurrence mocks base method.
+func (m *MockReminderCreationPlanner) CreateSingleOccurrence(ctx context.Context, telegramChatID int64, title, description string, remindAt time.Time) (database.ReminderView, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateSingleOccurrence", ctx, telegramChatID, title, description, remindAt)
+	ret0, _ := ret[0].(database.ReminderView)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateSingleOccurrence indicates an expected call of CreateSingleOccurrence.
+func (mr *MockReminderCreationPlannerMockRecorder) CreateSingleOccurrence(ctx, telegramChatID, title, description, remindAt any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateSingleOccurrence", reflect.TypeOf((*MockReminderCreationPlanner)(nil).CreateSingleOccurrence), ctx, telegramChatID, title, description, remindAt)
+}
+
 // MockReminderCommandRepository is a mock of ReminderCommandRepository interface.
 type MockReminderCommandRepository struct {
 	ctrl     *gomock.Controller
@@ -54,21 +108,6 @@ func (m *MockReminderCommandRepository) CancelReminder(ctx context.Context, tele
 func (mr *MockReminderCommandRepositoryMockRecorder) CancelReminder(ctx, telegramChatID, reminderID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CancelReminder", reflect.TypeOf((*MockReminderCommandRepository)(nil).CancelReminder), ctx, telegramChatID, reminderID)
-}
-
-// CreateReminder mocks base method.
-func (m *MockReminderCommandRepository) CreateReminder(ctx context.Context, telegramChatID int64, title, description string, remindAt time.Time) (database.ReminderView, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateReminder", ctx, telegramChatID, title, description, remindAt)
-	ret0, _ := ret[0].(database.ReminderView)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// CreateReminder indicates an expected call of CreateReminder.
-func (mr *MockReminderCommandRepositoryMockRecorder) CreateReminder(ctx, telegramChatID, title, description, remindAt any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateReminder", reflect.TypeOf((*MockReminderCommandRepository)(nil).CreateReminder), ctx, telegramChatID, title, description, remindAt)
 }
 
 // FindRemindersByChat mocks base method.

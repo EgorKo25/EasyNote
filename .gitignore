@@ -34,3 +34,6 @@ go.work.sum
 *NTS.md
 .gocache
 .golangci-cache
+
+*.ps1
+*.zip
