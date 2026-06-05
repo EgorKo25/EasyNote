@@ -8,6 +8,7 @@ import (
 	"github.com/EgorKo25/EasyNote/src/database/postgresql"
 	"github.com/EgorKo25/EasyNote/src/logger"
 	"github.com/EgorKo25/EasyNote/src/planner"
+	"github.com/EgorKo25/EasyNote/src/scheduler"
 	"github.com/EgorKo25/EasyNote/src/service"
 	"github.com/EgorKo25/EasyNote/src/telegram"
 )
@@ -49,14 +50,14 @@ func main() {
 
 	reminderPlanner := planner.New(database)
 	reminderService := service.NewReminderService(database, reminderPlanner)
-	reminderWorker := service.NewReminderWorker(database, telegramSender, reminderPlanner, cfg.Scheduler)
+	reminderRunner := scheduler.NewRunner(database, telegramSender, reminderPlanner, cfg.Scheduler)
 	reminderBot := telegram.NewReminderBot(telegramSender, reminderService, cfg.Telegram)
 
 	runner := background.NewRunner()
 
 	runner.Run(
 		ctx,
-		reminderWorker,
+		reminderRunner,
 		reminderBot,
 	)
 

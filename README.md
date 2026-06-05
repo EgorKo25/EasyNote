@@ -6,15 +6,15 @@ Telegram reminder bot for routine tasks.
 
 The source of truth for the application version is `CHANGELIST.md`.
 
-Current version: `1.1.0`.
+Current version: `1.2.0`.
 
 ## Tests
 
 Focused verification commands:
 
 ```bash
-go test ./src/scheduler ./src/database/cache ./src/database ./src/config -cover
-golangci-lint run ./src/scheduler ./src/database/cache ./src/database ./src/config
+go test ./src/scheduler ./src/telegram ./src/config -cover
+golangci-lint run --config ./.golangci.yml
 ```
 
 Deployment-focused checks:
@@ -27,67 +27,36 @@ docker build --check -f deploy/docker/EasyNote.Dockerfile .
 
 ### Package `src/scheduler`
 
-The scheduler tests prove the service-facing reminder planning contract. The scheduler is the layer above the database and cache implementations:
+The scheduler package is the runtime layer for sending ready reminders. `scheduler.Runner` replaced the old service reminder worker and the old heap/cache scheduler model.
 
-- `scheduler.Database` is the source of truth.
-- `scheduler.Cache` is an optimization for the active reminder window.
-- `github.com/benbjohnson/clock` is used so time-dependent behavior can be tested deterministically.
+Runtime behavior:
 
-Scheduling behavior:
+- The runner waits for `scheduler.poll_interval`.
+- It asks storage for `new` reminder occurrences whose `remind_at` is due.
+- It sends each reminder through the configured sender.
+- Sender failures are retried in scheduler with `scheduler.send_retry_count` and `scheduler.send_retry_interval`.
+- Successful delivery is completed through the existing `Planner` as `sent`.
+- Exhausted send retries are completed through the existing `Planner` as `failed`.
+- The runner logs send failures and continues with the next reminder when failed completion succeeds.
+- Recurring reminders are still handled by `Planner`; scheduler does not calculate recurrence.
 
-- Every new reminder is saved through `Database.SaveScheduledReminder`.
-- If the reminder belongs to the current cache window, it is also inserted into cache.
-- If the reminder is outside the cache window, it stays only in the database.
-- `Refresh` loads the `[now, now + cacheWindow]` database window and replaces the cache contents.
+The old heap/cache scheduler, `Next(ctx)` queue, `ActualReminders` window loading, and `src/database/cache` package were removed.
 
-The package tests prove that contract with real cache, generated gomock database/cache interfaces, and controlled time from `github.com/benbjohnson/clock`.
-
-| Scenario | What is verified | Test type | Status |
-|---|---|---|---|
-| Schedule inside cache window | Reminder is saved to DB and inserted into real cache | table-driven, real cache, mock DB | PASS |
-| Schedule outside cache window | Reminder is saved to DB but not cached | table-driven, real cache, mock DB | PASS |
-| Schedule at time boundaries | Current-time and exact-window reminders are accepted | table-driven, real cache, mock DB | PASS |
-| Schedule save failure | Database save error is wrapped and cache stays unchanged | table-driven, mock DB | PASS |
-| Due reminders | Due reminders are drained according to controlled clock time | table-driven, real cache | PASS |
-| Refresh database window | `[now, now + cacheWindow]` is requested from DB | table-driven, mock DB, real cache | PASS |
-| Refresh cache replacement | Stale cache entries are removed after refresh | table-driven, mock DB, real cache | PASS |
-| Cache delegation | Scheduler delegates due/cancel/delay/window/len calls to cache | table-driven, mock cache | PASS |
-| Load 1,000 reminders | Scheduler stores and drains 1,000 reminders | table-driven, real cache, mock DB | PASS |
-| Load 10,000 reminders | Scheduler stores and drains 10,000 reminders | table-driven, real cache, mock DB | PASS |
-| Concurrent 800 schedules | Scheduler accepts 800 parallel scheduling calls | table-driven, real cache, mock DB | PASS |
-| Concurrent 900 schedules | Scheduler accepts 900 parallel scheduling calls | table-driven, real cache, mock DB | PASS |
-
-Coverage: `100.0%`.
-
-Scheduler load benchmark:
-
-```bash
-go test ./src/scheduler -run '^$' -bench BenchmarkSchedulerScheduleAndDrainWithRealCache -benchtime=3x -benchmem
-```
-
-| Benchmark | Latest local result |
-|---|---:|
-| `BenchmarkSchedulerScheduleAndDrainWithRealCache` | `~19.2 ms/op`, `~6.9 MB/op`, `~50160 allocs/op` |
-
-### Package `src/database/cache`
-
-The cache tests verify the heap-backed reminder storage that scheduler uses as an optimization layer.
+The package tests use generated gomock interfaces and controlled time from `github.com/benbjohnson/clock`; retry intervals are tested without real sleep.
 
 | Scenario | What is verified | Test type | Status |
 |---|---|---|---|
-| Scheduled reminder conversion | Note and reminder fields are copied into scheduled reminder DTO | table-driven, real types | PASS |
-| Heap operations | Push, pop, swap, ordering, and heap indexes work correctly | table-driven, real heap | PASS |
-| Add within cache window | Only reminders inside the current window are inserted | table-driven, real cache | PASS |
-| Upsert | Existing reminders are updated without duplicates | table-driven, real cache | PASS |
-| Pop due | Due reminders are drained and future reminders stay cached | table-driven, real cache | PASS |
-| Remove | Existing reminders are removed and missing reminders are ignored | table-driven, real cache | PASS |
-| Empty state | Empty cache operations remain stable | table-driven, real cache | PASS |
-
-Coverage: `90.3%`.
+| Ready reminder batch | Ready reminders are loaded, sent, and completed as sent | table-driven, mock storage/sender/planner | PASS |
+| Empty batch | No sender or planner calls are made | table-driven, mock storage | PASS |
+| Retry success | Sender failure waits on fake clock and then completes as sent | table-driven, mock clock | PASS |
+| Retry exhausted | Reminder is completed as failed and later reminders continue | table-driven, mock clock | PASS |
+| Storage failure | Storage error is returned | table-driven, mock storage | PASS |
+| Planner failure | Completion error is returned | table-driven, mock planner | PASS |
+| Context cancellation | Run exits on canceled context | table-driven, mock clock | PASS |
 
 ### Packages `src/database` and `src/config`
 
-These packages are included in the focused command because scheduler and cache depend on their contracts.
+These packages are included in the focused command because scheduler and Telegram depend on their contracts.
 
 | Package | Current focused status |
 |---|---|
@@ -101,15 +70,16 @@ EasyNote follows a thin clean-architecture style around the reminder flow:
 - `service` owns Telegram-facing reminder validation and user workflows.
 - `planner` owns reminder lifecycle orchestration, recurring-date calculation, and completion idempotency.
 - `database/postgresql` is the storage/repository layer for notes, concrete reminder firings, recurring rules, custom dates, and transactions.
+- `scheduler` owns the runtime loop that sends ready reminders.
 - `telegram` owns the user flow and delegates reminder persistence to the service layer.
-- `main` wires PostgreSQL, the Telegram sender, the reminder worker, and the Telegram bot.
+- `main` wires PostgreSQL, the Telegram sender, the scheduler runner, and the Telegram bot.
 
 Data flow:
 
 1. `service` receives a user action from the Telegram bot.
 2. PostgreSQL stores the note and one concrete row in `reminders`.
-3. `ReminderWorker` polls `reminders` rows with status `new` and due `remind_at`.
-4. After delivery, worker calls `Planner.CompleteOccurrenceAsSent` or `Planner.CompleteOccurrenceAsFailed`.
+3. `scheduler.Runner` polls `reminders` rows with status `new` and due `remind_at`.
+4. After delivery, scheduler calls `Planner.CompleteOccurrence`.
 5. Planner marks the current row as `sent` or `failed` and, for active recurring rules, creates the next concrete reminder in the same transaction.
 
 The design keeps recurrence calculation in the planner layer and uses PostgreSQL for storage and transactionality.
@@ -124,7 +94,25 @@ Supported recurrence types:
 - Weekday rules: workdays or a custom selected weekday mask.
 - Custom date rules: several selected calendar dates stored in `reminder_custom_dates`.
 
-The worker never recalculates recurrence itself. It sends due reminders and calls planner completion logic. Completion is transactional: current reminder status is updated, the rule is checked, and the next reminder is inserted or the rule is completed. PostgreSQL also has a partial unique index that allows only one active `new` reminder for a non-null `rule_id`.
+The scheduler never recalculates recurrence itself. It sends due reminders and calls planner completion logic. Completion is transactional: current reminder status is updated, the rule is checked, and the next reminder is inserted or the rule is completed. PostgreSQL also has a partial unique index that allows only one active `new` reminder for a non-null `rule_id`.
+
+### Scheduler Configuration
+
+```yaml
+scheduler:
+  poll_interval: 1m
+  batch_limit: 50
+  send_retry_count: 3
+  send_retry_interval: 5s
+```
+
+`send_retry_count` is the total number of send attempts for one ready reminder. `send_retry_interval` is the delay between failed send attempts.
+
+### Telegram UI
+
+Reminder draft buttons now reflect filled fields: `Название`, `Описание`, and `Дата` become `Изменить ...` after input. Recurring reminder drafts use `Дата и время начала` / `Изменить дату и время начала` so the user sees that the value starts the recurring schedule.
+
+After the main reply-keyboard commands `Создать напоминание` and `Список напоминаний` are handled, the bot deletes those user messages from the dialog and logs deletion failures without interrupting the command.
 
 ## Deployment
 
@@ -205,36 +193,18 @@ docker compose up -d --no-deps app
 
 PostgreSQL is not restarted by the beta CD job.
 
-### Cache in practice
-
-![EasyNote cache and heap flow](./pictures/cache-heap-flow.png)
-
-The cache is not the source of truth. It is a narrow, fast layer that keeps only the reminders that are close enough to matter right now.
-
-What happens in practice:
-
-1. The service asks the scheduler to store a reminder.
-2. The scheduler always writes the reminder to the database first.
-3. The scheduler then checks the active cache window.
-4. If the reminder fits the window, it is added to the heap-backed cache.
-5. If the reminder is outside the window, cache skips it and the database keeps it for later refresh.
-6. When the clock reaches the due time, `Due()` pops the top of the heap and returns ready reminders.
-7. When the service or background loop calls `Refresh()`, the scheduler reloads the current `[now, now + cacheWindow]` range from the database and replaces cache contents.
-
-Heap behavior:
-
-- `Add` inserts a reminder and keeps the earliest item at the top.
-- `Upsert` updates an existing reminder without creating duplicates.
-- `PopDue` removes every reminder whose time is now or earlier.
-- `Remove` deletes one reminder by id.
-- `Replace` throws away stale cache content and rebuilds the active window from the database.
-
-This is why the heap can be very small while the database can keep the full reminder history.
-
 ## Changelist
 
 <div style="max-height: 420px; overflow-y: auto; border: 1px solid #d0d7de; border-radius: 6px; padding: 16px;">
-<p><strong>version: 1.1.0</strong></p>
+<p><strong>version: 1.2.0</strong></p>
+
+<h2>v1.2.0 - scheduler runtime runner</h2>
+<ul>
+  <li>The reminder runtime worker moved from service to scheduler.</li>
+  <li>The old heap/cache scheduler and database cache package were removed.</li>
+  <li>Scheduler send retries are configured with send_retry_count and send_retry_interval.</li>
+  <li>Reminder draft buttons and main-menu message cleanup were improved.</li>
+</ul>
 
 <h2>v1.1.0 - recurring reminders</h2>
 <ul>

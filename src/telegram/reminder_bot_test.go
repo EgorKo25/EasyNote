@@ -561,7 +561,42 @@ func TestReminderUIBuildsExpectedKeyboards(t *testing.T) {
 			expected: struct {
 				rowCount        int
 				firstButtonText string
-			}{rowCount: 4},
+			}{rowCount: 4, firstButtonText: "Дата"},
+		},
+		{
+			name: "filled one time draft keyboard offers changing date",
+			action: func() *telego.InlineKeyboardMarkup {
+				return draftKeyboard(reminderDraft{
+					date: time.Date(2026, 6, 2, 0, 0, 0, 0, time.Local),
+				}, now)
+			},
+			expected: struct {
+				rowCount        int
+				firstButtonText string
+			}{rowCount: 4, firstButtonText: "Изменить дату"},
+		},
+		{
+			name: "empty recurring draft keyboard explains start date time",
+			action: func() *telego.InlineKeyboardMarkup {
+				return draftKeyboard(reminderDraft{repeat: reminderRepeatEveryDay}, now)
+			},
+			expected: struct {
+				rowCount        int
+				firstButtonText string
+			}{rowCount: 4, firstButtonText: "Дата и время начала"},
+		},
+		{
+			name: "filled recurring draft keyboard offers changing start date time",
+			action: func() *telego.InlineKeyboardMarkup {
+				return draftKeyboard(reminderDraft{
+					date:   time.Date(2026, 6, 2, 0, 0, 0, 0, time.Local),
+					repeat: reminderRepeatEveryDay,
+				}, now)
+			},
+			expected: struct {
+				rowCount        int
+				firstButtonText string
+			}{rowCount: 4, firstButtonText: "Изменить дату и время начала"},
 		},
 		{
 			name: "date choice keyboard is compact",
@@ -866,7 +901,7 @@ func TestReminderBotHandlesMessages(t *testing.T) {
 			before: func(caller *telegoapimock.MockCaller, _ *telegrammocks.MockReminderService) {
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(testTelegramResponse(t, telego.Message{MessageID: 1}), nil).
-					Times(2)
+					Times(1)
 			},
 		},
 		{

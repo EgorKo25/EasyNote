@@ -18,10 +18,10 @@ logger:
       time_format: utc
 
 scheduler:
-  cache_window: 24h
   poll_interval: 1m
   batch_limit: 50
-  max_attempts: 5
+  send_retry_count: 3
+  send_retry_interval: 5s
 
 telegram:
   token_env: TELEGRAM_BOT_TOKEN

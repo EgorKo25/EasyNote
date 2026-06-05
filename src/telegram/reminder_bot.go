@@ -202,7 +202,9 @@ func (b *ReminderBot) handleKnownMessage(
 		return true, err
 	}
 
-	b.deleteMessage(ctx, chatID, messageID)
+	if text == buttonCreateReminder || text == buttonReminderList {
+		b.deleteMessage(ctx, chatID, messageID)
+	}
 
 	return true, nil
 }

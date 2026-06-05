@@ -96,25 +96,46 @@ func draftKeyboard(draft reminderDraft, now time.Time) *telego.InlineKeyboardMar
 }
 
 func draftMainKeyboard(draft reminderDraft) *telego.InlineKeyboardMarkup {
-	timeButtonText := "Задать дату и время"
-	if !draft.date.IsZero() {
-		timeButtonText = "Изменить дату и время"
+	titleButtonText := "Название"
+	if draft.title != "" {
+		titleButtonText = "Изменить название"
+	}
+
+	descriptionButtonText := "Описание"
+	if draft.description != "" {
+		descriptionButtonText = "Изменить описание"
+	}
+
+	dateButtonText := "Дата"
+	if draft.repeat != reminderRepeatNone {
+		dateButtonText = "Дата и время начала"
+	}
+
+	if draftDateIsSet(draft) {
+		dateButtonText = "Изменить дату"
+		if draft.repeat != reminderRepeatNone {
+			dateButtonText = "Изменить дату и время начала"
+		}
 	}
 
 	return tu.InlineKeyboard(
-		tu.InlineKeyboardRow(tu.InlineKeyboardButton(timeButtonText).WithCallbackData(callbackDraftDate)),
+		tu.InlineKeyboardRow(tu.InlineKeyboardButton(dateButtonText).WithCallbackData(callbackDraftDate)),
 		tu.InlineKeyboardRow(
 			tu.InlineKeyboardButton("Регулярное напоминание").WithCallbackData(callbackDraftRepeat),
 		),
 		tu.InlineKeyboardRow(
-			tu.InlineKeyboardButton("Название").WithCallbackData(callbackDraftTitle),
-			tu.InlineKeyboardButton("Описание").WithCallbackData(callbackDraftDescription),
+			tu.InlineKeyboardButton(titleButtonText).WithCallbackData(callbackDraftTitle),
+			tu.InlineKeyboardButton(descriptionButtonText).WithCallbackData(callbackDraftDescription),
 		),
 		tu.InlineKeyboardRow(
 			tu.InlineKeyboardButton("Сохранить").WithCallbackData(callbackDraftSave),
 			tu.InlineKeyboardButton("Отменить").WithCallbackData(callbackDraftCancel),
 		),
 	)
+}
+
+func draftDateIsSet(draft reminderDraft) bool {
+	return !draft.date.IsZero() || len(draft.customDates) > 0
 }
 
 func repeatKeyboard() *telego.InlineKeyboardMarkup {
