@@ -84,8 +84,12 @@ type ReminderService interface {
 	Reminders(ctx context.Context, telegramChatID int64) ([]database.ReminderView, error)
 	ReminderHistory(ctx context.Context, telegramChatID int64) ([]database.ReminderView, error)
 	DeleteReminder(ctx context.Context, telegramChatID int64, reminderID int64) error
-	CompleteReminder(ctx context.Context, reminderID int64) error
-	CancelDeliveredReminder(ctx context.Context, reminderID int64) error
+	CompleteOccurrence(
+		ctx context.Context,
+		reminderID int64,
+		status database.ReminderStatus,
+		sentAt *time.Time,
+	) error
 	UserSettings(ctx context.Context, telegramChatID int64) (database.UserSettings, error)
 	SetUserTimezoneByCity(ctx context.Context, telegramChatID int64, city string) error
 	SetIntrusiveSettings(ctx context.Context, telegramChatID int64, enabled bool, interval time.Duration) error
@@ -705,13 +709,17 @@ func (b *ReminderBot) acknowledgeReminder(
 		return fmt.Errorf("parse delivered reminder id: %w", err)
 	}
 
+	completedAt := time.Now()
+
 	switch status {
 	case database.ReminderStatusCompleted:
-		err = b.service.CompleteReminder(ctx, reminderID)
 	case database.ReminderStatusCanceled:
-		err = b.service.CancelDeliveredReminder(ctx, reminderID)
 	default:
 		err = fmt.Errorf("%w: %s", errUnsupportedDeliveredReminderStatus, status)
+	}
+
+	if err == nil {
+		err = b.service.CompleteOccurrence(ctx, reminderID, status, &completedAt)
 	}
 
 	if err != nil {

@@ -1880,7 +1880,12 @@ func TestReminderBotAcknowledgesDeliveredReminders(t *testing.T) {
 			status: database.ReminderStatusCompleted,
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService) {
 				gomock.InOrder(
-					service.EXPECT().CompleteReminder(gomock.Any(), int64(10)).Return(nil).Times(1),
+					service.EXPECT().CompleteOccurrence(
+						gomock.Any(),
+						int64(10),
+						database.ReminderStatusCompleted,
+						gomock.Any(),
+					).Return(nil).Times(1),
 					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 						Return(testTelegramResponse(t, telego.Message{MessageID: messageID}), nil).
 						Times(1),
@@ -1894,7 +1899,12 @@ func TestReminderBotAcknowledgesDeliveredReminders(t *testing.T) {
 			status: database.ReminderStatusCanceled,
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService) {
 				gomock.InOrder(
-					service.EXPECT().CancelDeliveredReminder(gomock.Any(), int64(11)).Return(nil).Times(1),
+					service.EXPECT().CompleteOccurrence(
+						gomock.Any(),
+						int64(11),
+						database.ReminderStatusCanceled,
+						gomock.Any(),
+					).Return(nil).Times(1),
 					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 						Return(testTelegramResponse(t, telego.Message{MessageID: messageID}), nil).
 						Times(1),
@@ -1908,7 +1918,12 @@ func TestReminderBotAcknowledgesDeliveredReminders(t *testing.T) {
 			status: database.ReminderStatusCompleted,
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService) {
 				gomock.InOrder(
-					service.EXPECT().CompleteReminder(gomock.Any(), int64(12)).Return(nil).Times(1),
+					service.EXPECT().CompleteOccurrence(
+						gomock.Any(),
+						int64(12),
+						database.ReminderStatusCompleted,
+						gomock.Any(),
+					).Return(nil).Times(1),
 					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 						Return(testTelegramResponse(t, telego.Message{MessageID: messageID}), nil).
 						Times(1),
@@ -1922,7 +1937,12 @@ func TestReminderBotAcknowledgesDeliveredReminders(t *testing.T) {
 			status: database.ReminderStatusCanceled,
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService) {
 				gomock.InOrder(
-					service.EXPECT().CancelDeliveredReminder(gomock.Any(), int64(13)).Return(nil).Times(1),
+					service.EXPECT().CompleteOccurrence(
+						gomock.Any(),
+						int64(13),
+						database.ReminderStatusCanceled,
+						gomock.Any(),
+					).Return(nil).Times(1),
 					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 						Return(testTelegramResponse(t, telego.Message{MessageID: messageID}), nil).
 						Times(1),
@@ -1946,7 +1966,12 @@ func TestReminderBotAcknowledgesDeliveredReminders(t *testing.T) {
 			prefix: callbackReminderDone,
 			status: database.ReminderStatusCompleted,
 			before: func(_ *telegoapimock.MockCaller, service *telegrammocks.MockReminderService) {
-				service.EXPECT().CompleteReminder(gomock.Any(), int64(14)).
+				service.EXPECT().CompleteOccurrence(
+					gomock.Any(),
+					int64(14),
+					database.ReminderStatusCompleted,
+					gomock.Any(),
+				).
 					Return(errCompleteDelivered).
 					Times(1)
 			},

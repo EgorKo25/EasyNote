@@ -42,32 +42,18 @@ func (m *MockReminderService) EXPECT() *MockReminderServiceMockRecorder {
 	return m.recorder
 }
 
-// CancelDeliveredReminder mocks base method.
-func (m *MockReminderService) CancelDeliveredReminder(ctx context.Context, reminderID int64) error {
+// CompleteOccurrence mocks base method.
+func (m *MockReminderService) CompleteOccurrence(ctx context.Context, reminderID int64, status database.ReminderStatus, sentAt *time.Time) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CancelDeliveredReminder", ctx, reminderID)
+	ret := m.ctrl.Call(m, "CompleteOccurrence", ctx, reminderID, status, sentAt)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// CancelDeliveredReminder indicates an expected call of CancelDeliveredReminder.
-func (mr *MockReminderServiceMockRecorder) CancelDeliveredReminder(ctx, reminderID any) *gomock.Call {
+// CompleteOccurrence indicates an expected call of CompleteOccurrence.
+func (mr *MockReminderServiceMockRecorder) CompleteOccurrence(ctx, reminderID, status, sentAt any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CancelDeliveredReminder", reflect.TypeOf((*MockReminderService)(nil).CancelDeliveredReminder), ctx, reminderID)
-}
-
-// CompleteReminder mocks base method.
-func (m *MockReminderService) CompleteReminder(ctx context.Context, reminderID int64) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CompleteReminder", ctx, reminderID)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// CompleteReminder indicates an expected call of CompleteReminder.
-func (mr *MockReminderServiceMockRecorder) CompleteReminder(ctx, reminderID any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CompleteReminder", reflect.TypeOf((*MockReminderService)(nil).CompleteReminder), ctx, reminderID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CompleteOccurrence", reflect.TypeOf((*MockReminderService)(nil).CompleteOccurrence), ctx, reminderID, status, sentAt)
 }
 
 // CreateCustomDatesReminder mocks base method.
