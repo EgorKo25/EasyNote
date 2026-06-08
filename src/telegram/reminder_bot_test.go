@@ -1,4 +1,4 @@
-//nolint:lll,testpackage,gosec,cyclop // These tests cover internal Telegram UI state transitions without adding production hooks.
+//nolint:lll,testpackage,gosec // These tests cover internal Telegram UI state transitions without adding production hooks.
 package telegram
 
 import (
