@@ -92,7 +92,7 @@ type ReminderService interface {
 		sentAt *time.Time,
 	) error
 	UserSettings(ctx context.Context, telegramChatID int64) (database.UserSettings, error)
-	SetUserTimezoneByCity(ctx context.Context, telegramChatID int64, city string) error
+	SetUserTimezone(ctx context.Context, telegramChatID int64, timezone string) error
 	SetIntrusiveSettings(ctx context.Context, telegramChatID int64, enabled bool, interval time.Duration) error
 }
 
@@ -316,15 +316,15 @@ func (b *ReminderBot) handleSettingsCallback(
 	messageID int,
 	data string,
 ) (bool, error) {
+	if handled, err := b.handleTimezoneSettingsCallback(ctx, chatID, messageID, data); handled {
+		return true, err
+	}
+
 	switch data {
 	case telegramui.CallbackSettings:
 		return true, b.editSettings(ctx, chatID, messageID)
 	case telegramui.CallbackSettingsLanguage:
 		return true, b.editUI(ctx, chatID, messageID, "Язык приложения: русский", telegramui.SettingsKeyboard())
-	case telegramui.CallbackSettingsTimezone:
-		b.setDraftWaitingFor(chatID, telegramui.FieldTimezoneCity)
-
-		return true, b.editUI(ctx, chatID, messageID, "Введите город, чтобы определить часовой пояс.", nil)
 	case telegramui.CallbackSettingsIntrusive:
 		b.setDraftWaitingFor(chatID, telegramui.FieldIntrusiveInterval)
 
@@ -341,6 +341,25 @@ func (b *ReminderBot) handleSettingsCallback(
 		}
 
 		return true, b.editIntrusiveSettings(ctx, chatID, messageID)
+	default:
+		return false, nil
+	}
+}
+
+func (b *ReminderBot) handleTimezoneSettingsCallback(
+	ctx context.Context,
+	chatID int64,
+	messageID int,
+	data string,
+) (bool, error) {
+	switch {
+	case data == telegramui.CallbackSettingsTimezone:
+		return true, b.editTimezoneSettings(ctx, chatID, messageID, data)
+	case strings.HasPrefix(data, telegramui.CallbackSettingsTimezonePrev),
+		strings.HasPrefix(data, telegramui.CallbackSettingsTimezoneNext):
+		return true, b.editTimezoneSettings(ctx, chatID, messageID, data)
+	case strings.HasPrefix(data, telegramui.CallbackSettingsTimezoneSelect):
+		return true, b.setTimezoneByCallback(ctx, chatID, messageID, data)
 	default:
 		return false, nil
 	}
@@ -598,6 +617,70 @@ func (b *ReminderBot) editIntrusiveSettings(ctx context.Context, chatID int64, m
 	)
 }
 
+func (b *ReminderBot) editTimezoneSettings(ctx context.Context, chatID int64, messageID int, data string) error {
+	var index int
+
+	if data == telegramui.CallbackSettingsTimezone {
+		settings, err := b.service.UserSettings(ctx, chatID)
+		if err != nil {
+			return fmt.Errorf("load user settings: %w", err)
+		}
+
+		index = telegramui.TimezoneIndex(settings.Timezone)
+	} else {
+		parsedIndex, err := timezoneCallbackIndex(data)
+		if err != nil {
+			return err
+		}
+
+		index = parsedIndex
+	}
+
+	return b.editUI(
+		ctx,
+		chatID,
+		messageID,
+		"Выберите часовой пояс.",
+		telegramui.TimezoneKeyboard(index, b.now(chatID)),
+	)
+}
+
+func (b *ReminderBot) setTimezoneByCallback(ctx context.Context, chatID int64, messageID int, data string) error {
+	index, err := timezoneCallbackIndex(data)
+	if err != nil {
+		return err
+	}
+
+	option := telegramui.TimezoneByIndex(index)
+	if err = b.service.SetUserTimezone(ctx, chatID, option.Timezone); err != nil {
+		return fmt.Errorf("set user timezone: %w", err)
+	}
+
+	return b.editSettings(ctx, chatID, messageID)
+}
+
+func timezoneCallbackIndex(data string) (int, error) {
+	value := data
+	for _, prefix := range []string{
+		telegramui.CallbackSettingsTimezonePrev,
+		telegramui.CallbackSettingsTimezoneNext,
+		telegramui.CallbackSettingsTimezoneSelect,
+	} {
+		if suffix, ok := strings.CutPrefix(data, prefix); ok {
+			value = suffix
+
+			break
+		}
+	}
+
+	index, err := strconv.Atoi(value)
+	if err != nil {
+		return 0, fmt.Errorf("parse timezone index: %w", err)
+	}
+
+	return index, nil
+}
+
 func (b *ReminderBot) saveDraft(ctx context.Context, chatID int64, messageID int) error {
 	draft := b.draft(chatID)
 	remindAt := b.draftReminderTime(chatID, draft)
@@ -834,10 +917,6 @@ func (b *ReminderBot) applyDraftText(ctx context.Context, chatID int64, text str
 		draft.title = text
 	case telegramui.FieldDescription:
 		draft.description = text
-	case telegramui.FieldTimezoneCity:
-		b.mu.Unlock()
-
-		return b.applyTimezoneCity(ctx, chatID, text)
 	case telegramui.FieldIntrusiveInterval:
 		b.mu.Unlock()
 
@@ -865,24 +944,6 @@ func (b *ReminderBot) applyDraftText(ctx context.Context, chatID int64, text str
 	draft.screen = telegramui.ScreenMain
 	b.draftByChat[chatID] = draft
 	b.mu.Unlock()
-
-	return true
-}
-
-func (b *ReminderBot) applyTimezoneCity(ctx context.Context, chatID int64, text string) bool {
-	if err := b.service.SetUserTimezoneByCity(ctx, chatID, text); err != nil {
-		b.setDraftNotice(chatID, "Не удалось определить часовой пояс по этому городу.")
-
-		return true
-	}
-
-	if err := b.loadChatLocation(ctx, chatID); err != nil {
-		b.setDraftNotice(chatID, "Не удалось загрузить часовой пояс.")
-
-		return true
-	}
-
-	b.deleteDraft(chatID)
 
 	return true
 }

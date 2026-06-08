@@ -515,6 +515,103 @@ func TestSettingsHistoryAndStatusTexts(t *testing.T) {
 	}
 }
 
+func TestTimezoneControls(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name     string
+		action   func() string
+		expected struct {
+			text string
+		}
+	}{
+		{
+			name: "moscow button text shows positive utc offset",
+			action: func() string {
+				return telegramui.TimezoneButtonText(telegramui.TimezoneByIndex(0), now)
+			},
+			expected: struct {
+				text string
+			}{text: "Москва (+3)"},
+		},
+		{
+			name: "next callback advances timezone index",
+			action: func() string {
+				return telegramui.TimezoneNextCallback(0)
+			},
+			expected: struct {
+				text string
+			}{text: "settings:timezone:next:1"},
+		},
+		{
+			name: "previous callback decrements timezone index",
+			action: func() string {
+				return telegramui.TimezonePrevCallback(1)
+			},
+			expected: struct {
+				text string
+			}{text: "settings:timezone:prev:0"},
+		},
+		{
+			name: "select callback stores timezone index",
+			action: func() string {
+				return telegramui.TimezoneSelectCallback(2)
+			},
+			expected: struct {
+				text string
+			}{text: "settings:timezone:select:2"},
+		},
+		{
+			name: "negative timezone index wraps to last option",
+			action: func() string {
+				return telegramui.TimezonePrevCallback(0)
+			},
+			expected: struct {
+				text string
+			}{text: "settings:timezone:prev:11"},
+		},
+		{
+			name: "large timezone index wraps through options",
+			action: func() string {
+				return telegramui.TimezoneButtonText(telegramui.TimezoneByIndex(99), now)
+			},
+			expected: struct {
+				text string
+			}{text: "Екатеринбург (+5)"},
+		},
+		{
+			name: "timezone lookup finds configured city index",
+			action: func() string {
+				return telegramui.TimezoneSelectCallback(telegramui.TimezoneIndex("Asia/Novosibirsk"))
+			},
+			expected: struct {
+				text string
+			}{text: "settings:timezone:select:5"},
+		},
+		{
+			name: "timezone keyboard exposes arrows and selected city",
+			action: func() string {
+				rows := keyboardTexts(telegramui.TimezoneKeyboard(0, now).InlineKeyboard)
+
+				return rows[0][0] + rows[0][1] + rows[0][2]
+			},
+			expected: struct {
+				text string
+			}{text: "<Москва (+3)>"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			require.Equal(t, test.expected.text, test.action())
+		})
+	}
+}
+
 func keyboardTexts(rows any) [][]string {
 	switch typedRows := rows.(type) {
 	case [][]telego.KeyboardButton:

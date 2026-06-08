@@ -25,6 +25,9 @@ const (
 	CallbackSettings                = "settings:open"
 	CallbackSettingsLanguage        = "settings:language"
 	CallbackSettingsTimezone        = "settings:timezone"
+	CallbackSettingsTimezonePrev    = "settings:timezone:prev:"
+	CallbackSettingsTimezoneNext    = "settings:timezone:next:"
+	CallbackSettingsTimezoneSelect  = "settings:timezone:select:"
 	CallbackSettingsIntrusive       = "settings:intrusive"
 	CallbackSettingsIntrusiveOn     = "settings:intrusive:on"
 	CallbackSettingsIntrusiveOff    = "settings:intrusive:off"
@@ -49,7 +52,6 @@ const (
 const (
 	FieldTitle             Field = "title"
 	FieldDescription       Field = "description"
-	FieldTimezoneCity      Field = "timezone_city"
 	FieldIntrusiveInterval Field = "intrusive_interval"
 	FieldRepeatInterval    Field = "repeat_interval"
 )
