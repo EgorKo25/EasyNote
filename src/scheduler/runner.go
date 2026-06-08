@@ -14,31 +14,32 @@ func NewRunner(
 	opts ...Option,
 ) *Runner {
 	runner := &Runner{
-		storage: storage,
-		sender:  sender,
-		planner: planner,
+		Storage: storage,
+		Sender:  sender,
+		Planner: planner,
 		cfg:     cfg,
-		clock:   newSystemClock(),
+		Clock:   newSystemClock(),
 	}
 
 	for _, opt := range opts {
 		opt(runner)
 	}
 
-	if runner.retrier == nil {
-		runner.retrier = NewBackoffRetrier(cfg, runner.clock)
+	if runner.Retrier == nil {
+		runner.Retrier = NewBackoffRetrier(cfg, runner.Clock)
 	}
 
 	return runner
 }
 
 type Runner struct {
-	storage Storage
-	sender  Sender
-	planner Planner
-	retrier Retrier
-	cfg     config.Scheduler
-	clock   Clock
+	Storage
+	Sender
+	Planner
+	Retrier
+	Clock
+
+	cfg config.Scheduler
 }
 
 func (r *Runner) Info() string {

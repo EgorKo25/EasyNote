@@ -221,10 +221,8 @@ func (b *ReminderBot) runKnownMessageCommand(ctx context.Context, chatID int64, 
 		return b.sendStart(ctx, chatID), true
 	case buttonCreateReminder:
 		return b.startReminderDraft(ctx, chatID), true
-	case buttonReminderList:
-		return b.sendReminderList(ctx, chatID), true
-	case buttonReminderHistory:
-		return b.sendReminderHistory(ctx, chatID), true
+	case buttonReminders:
+		return b.sendReminders(ctx, chatID), true
 	case buttonSettings:
 		return b.sendSettings(ctx, chatID), true
 	default:
@@ -234,8 +232,7 @@ func (b *ReminderBot) runKnownMessageCommand(ctx context.Context, chatID int64, 
 
 func shouldDeleteKnownMessage(text string) bool {
 	return text == buttonCreateReminder ||
-		text == buttonReminderList ||
-		text == buttonReminderHistory ||
+		text == buttonReminders ||
 		text == buttonSettings
 }
 
@@ -446,6 +443,10 @@ func (b *ReminderBot) handleDraftFinalCommandCallback(
 
 func (b *ReminderBot) sendStart(ctx context.Context, chatID int64) error {
 	return b.replaceUI(ctx, chatID, mainMenuText(), mainKeyboard())
+}
+
+func (b *ReminderBot) sendReminders(ctx context.Context, chatID int64) error {
+	return b.replaceUI(ctx, chatID, remindersText(), remindersKeyboard())
 }
 
 func (b *ReminderBot) startReminderDraft(ctx context.Context, chatID int64) error {

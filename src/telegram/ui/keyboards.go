@@ -12,10 +12,19 @@ import (
 func MainKeyboard() *telego.ReplyKeyboardMarkup {
 	return tu.Keyboard(
 		tu.KeyboardRow(tu.KeyboardButton(ButtonCreateReminder)),
-		tu.KeyboardRow(tu.KeyboardButton(ButtonReminderList)),
-		tu.KeyboardRow(tu.KeyboardButton(ButtonReminderHistory)),
+		tu.KeyboardRow(tu.KeyboardButton(ButtonReminders)),
 		tu.KeyboardRow(tu.KeyboardButton(ButtonSettings)),
 	).WithResizeKeyboard()
+}
+
+func RemindersKeyboard() *telego.InlineKeyboardMarkup {
+	return tu.InlineKeyboard(
+		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton(ButtonReminderList).WithCallbackData(CallbackReminderList),
+			tu.InlineKeyboardButton(ButtonReminderHistory).WithCallbackData(CallbackReminderHistory),
+		),
+		tu.InlineKeyboardRow(tu.InlineKeyboardButton("Главное меню").WithCallbackData(CallbackMainMenu)),
+	)
 }
 
 func DraftKeyboard(draft Draft, now time.Time) *telego.InlineKeyboardMarkup {

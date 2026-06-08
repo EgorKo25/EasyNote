@@ -11,6 +11,7 @@ import (
 const (
 	buttonStart           = telegramui.ButtonStart
 	buttonCreateReminder  = telegramui.ButtonCreateReminder
+	buttonReminders       = telegramui.ButtonReminders
 	buttonReminderList    = telegramui.ButtonReminderList
 	buttonReminderHistory = telegramui.ButtonReminderHistory
 	buttonSettings        = telegramui.ButtonSettings
@@ -90,6 +91,10 @@ func mainKeyboard() *telego.ReplyKeyboardMarkup {
 	return telegramui.MainKeyboard()
 }
 
+func remindersKeyboard() *telego.InlineKeyboardMarkup {
+	return telegramui.RemindersKeyboard()
+}
+
 func draftKeyboard(draft reminderDraft, now time.Time) *telego.InlineKeyboardMarkup {
 	return telegramui.DraftKeyboard(uiDraft(draft), now)
 }
@@ -116,6 +121,10 @@ func intrusiveSettingsKeyboard() *telego.InlineKeyboardMarkup {
 
 func mainMenuText() string {
 	return telegramui.MainMenuText()
+}
+
+func remindersText() string {
+	return telegramui.RemindersText()
 }
 
 func draftText(draft reminderDraft, location *time.Location) string {
