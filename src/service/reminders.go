@@ -14,7 +14,7 @@ var ErrReminderTitleEmpty = errors.New("reminder title is empty")
 var ErrCustomReminderDatesEmpty = errors.New("custom reminder dates are empty")
 var ErrWeekdaysMaskEmpty = errors.New("weekdays mask is empty")
 var ErrIntrusiveIntervalOutOfRange = errors.New("intrusive reminder interval is out of range")
-var ErrUnknownTimezoneCity = errors.New("unknown timezone city")
+var ErrUnknownTimezone = errors.New("unknown timezone")
 
 func NewReminderService(repository ReminderCommandRepository, planner ReminderCreationPlanner) *ReminderService {
 	return &ReminderService{repository: repository, ReminderCreationPlanner: planner}
@@ -184,14 +184,14 @@ func (s *ReminderService) UserSettings(ctx context.Context, telegramChatID int64
 	return settings, nil
 }
 
-func (s *ReminderService) SetUserTimezoneByCity(ctx context.Context, telegramChatID int64, city string) error {
-	timezone := strings.TrimSpace(city)
+func (s *ReminderService) SetUserTimezone(ctx context.Context, telegramChatID int64, timezone string) error {
+	timezone = strings.TrimSpace(timezone)
 	if timezone == "" {
-		return fmt.Errorf("%w: %s", ErrUnknownTimezoneCity, city)
+		return fmt.Errorf("%w: %s", ErrUnknownTimezone, timezone)
 	}
 
 	if _, err := time.LoadLocation(timezone); err != nil {
-		return fmt.Errorf("%w: %s", ErrUnknownTimezoneCity, city)
+		return fmt.Errorf("%w: %s", ErrUnknownTimezone, timezone)
 	}
 
 	if err := s.repository.UpdateUserTimezone(ctx, telegramChatID, timezone); err != nil {

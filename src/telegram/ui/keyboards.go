@@ -293,6 +293,20 @@ func SettingsKeyboard() *telego.InlineKeyboardMarkup {
 	)
 }
 
+func TimezoneKeyboard(index int, now time.Time) *telego.InlineKeyboardMarkup {
+	index = normalizeTimezoneIndex(index)
+	option := timezoneOptions[index]
+
+	return tu.InlineKeyboard(
+		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton("<").WithCallbackData(TimezonePrevCallback(index)),
+			tu.InlineKeyboardButton(TimezoneButtonText(option, now)).WithCallbackData(TimezoneSelectCallback(index)),
+			tu.InlineKeyboardButton(">").WithCallbackData(TimezoneNextCallback(index)),
+		),
+		tu.InlineKeyboardRow(tu.InlineKeyboardButton("Назад").WithCallbackData(CallbackSettings)),
+	)
+}
+
 func IntrusiveSettingsKeyboard() *telego.InlineKeyboardMarkup {
 	return tu.InlineKeyboard(
 		tu.InlineKeyboardRow(
@@ -301,4 +315,70 @@ func IntrusiveSettingsKeyboard() *telego.InlineKeyboardMarkup {
 		),
 		tu.InlineKeyboardRow(tu.InlineKeyboardButton("Назад").WithCallbackData(CallbackSettings)),
 	)
+}
+
+func TimezoneIndex(timezone string) int {
+	for index, option := range timezoneOptions {
+		if option.Timezone == timezone {
+			return index
+		}
+	}
+
+	return 0
+}
+
+func TimezoneByIndex(index int) TimezoneOption {
+	return timezoneOptions[normalizeTimezoneIndex(index)]
+}
+
+func TimezoneButtonText(option TimezoneOption, now time.Time) string {
+	location, err := time.LoadLocation(option.Timezone)
+	if err != nil {
+		return option.City
+	}
+
+	_, offset := now.In(location).Zone()
+
+	return fmt.Sprintf("%s (%+d)", option.City, offset/3600)
+}
+
+func TimezonePrevCallback(index int) string {
+	return fmt.Sprintf("%s%d", CallbackSettingsTimezonePrev, normalizeTimezoneIndex(index-1))
+}
+
+func TimezoneNextCallback(index int) string {
+	return fmt.Sprintf("%s%d", CallbackSettingsTimezoneNext, normalizeTimezoneIndex(index+1))
+}
+
+func TimezoneSelectCallback(index int) string {
+	return fmt.Sprintf("%s%d", CallbackSettingsTimezoneSelect, normalizeTimezoneIndex(index))
+}
+
+func normalizeTimezoneIndex(index int) int {
+	count := len(timezoneOptions)
+	if count == 0 {
+		return 0
+	}
+
+	index %= count
+	if index < 0 {
+		index += count
+	}
+
+	return index
+}
+
+var timezoneOptions = []TimezoneOption{
+	{City: "Москва", Timezone: "Europe/Moscow"},
+	{City: "Калининград", Timezone: "Europe/Kaliningrad"},
+	{City: "Самара", Timezone: "Europe/Samara"},
+	{City: "Екатеринбург", Timezone: "Asia/Yekaterinburg"},
+	{City: "Омск", Timezone: "Asia/Omsk"},
+	{City: "Новосибирск", Timezone: "Asia/Novosibirsk"},
+	{City: "Красноярск", Timezone: "Asia/Krasnoyarsk"},
+	{City: "Иркутск", Timezone: "Asia/Irkutsk"},
+	{City: "Якутск", Timezone: "Asia/Yakutsk"},
+	{City: "Владивосток", Timezone: "Asia/Vladivostok"},
+	{City: "Магадан", Timezone: "Asia/Magadan"},
+	{City: "Камчатка", Timezone: "Asia/Kamchatka"},
 }

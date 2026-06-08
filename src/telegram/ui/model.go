@@ -21,6 +21,11 @@ type Draft struct {
 	WaitingFor    Field
 }
 
+type TimezoneOption struct {
+	City     string
+	Timezone string
+}
+
 func (d Draft) RemindAt(location *time.Location) time.Time {
 	if d.Date.IsZero() {
 		return time.Time{}

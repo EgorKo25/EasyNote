@@ -174,18 +174,18 @@ func (mr *MockReminderServiceMockRecorder) SetIntrusiveSettings(ctx, telegramCha
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetIntrusiveSettings", reflect.TypeOf((*MockReminderService)(nil).SetIntrusiveSettings), ctx, telegramChatID, enabled, interval)
 }
 
-// SetUserTimezoneByCity mocks base method.
-func (m *MockReminderService) SetUserTimezoneByCity(ctx context.Context, telegramChatID int64, city string) error {
+// SetUserTimezone mocks base method.
+func (m *MockReminderService) SetUserTimezone(ctx context.Context, telegramChatID int64, timezone string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetUserTimezoneByCity", ctx, telegramChatID, city)
+	ret := m.ctrl.Call(m, "SetUserTimezone", ctx, telegramChatID, timezone)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// SetUserTimezoneByCity indicates an expected call of SetUserTimezoneByCity.
-func (mr *MockReminderServiceMockRecorder) SetUserTimezoneByCity(ctx, telegramChatID, city any) *gomock.Call {
+// SetUserTimezone indicates an expected call of SetUserTimezone.
+func (mr *MockReminderServiceMockRecorder) SetUserTimezone(ctx, telegramChatID, timezone any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetUserTimezoneByCity", reflect.TypeOf((*MockReminderService)(nil).SetUserTimezoneByCity), ctx, telegramChatID, city)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetUserTimezone", reflect.TypeOf((*MockReminderService)(nil).SetUserTimezone), ctx, telegramChatID, timezone)
 }
 
 // UserSettings mocks base method.
