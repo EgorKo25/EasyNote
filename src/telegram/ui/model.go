@@ -15,9 +15,15 @@ type Draft struct {
 	Repeat        Repeat
 	CustomDates   []time.Time
 	WeekdaysMask  int
+	IntervalDays  int
 	Screen        Screen
 	CalendarMonth time.Time
 	WaitingFor    Field
+}
+
+type TimezoneOption struct {
+	City     string
+	Timezone string
 }
 
 func (d Draft) RemindAt(location *time.Location) time.Time {

@@ -8,11 +8,11 @@ import (
 
 func (r *Runner) Run(ctx context.Context) error {
 	for {
-		if err := wait(ctx, r.clock, r.cfg.PollInterval, "wait scheduler interval"); err != nil {
+		if err := wait(ctx, r.Clock, r.cfg.PollInterval, "wait scheduler interval"); err != nil {
 			return err
 		}
 
-		if err := r.processReadyReminders(ctx); err != nil {
+		if err := r.sendDueReminders(ctx); err != nil {
 			return err
 		}
 	}
