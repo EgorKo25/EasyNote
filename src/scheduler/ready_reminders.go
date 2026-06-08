@@ -10,18 +10,20 @@ import (
 	"github.com/EgorKo25/EasyNote/src/logger"
 )
 
-func (r *Runner) processReadyReminders(ctx context.Context) error {
-	reminders, err := r.FindRemindersReadyToSend(ctx, r.Now(), r.cfg.BatchLimit)
+func (r *Runner) sendDueReminders(ctx context.Context) error {
+	now := r.Now()
+
+	reminders, err := r.FindRemindersReadyToSend(ctx, now, r.cfg.BatchLimit)
 	if err != nil {
 		return fmt.Errorf("find reminders ready to send: %w", err)
 	}
 
 	for _, reminder := range reminders {
 		if err = ctx.Err(); err != nil {
-			return fmt.Errorf("process ready reminders: %w", err)
+			return fmt.Errorf("send due reminders: %w", err)
 		}
 
-		if err = r.processReadyReminder(ctx, *reminder); err != nil {
+		if err = r.sendDueReminder(ctx, *reminder, now); err != nil {
 			return err
 		}
 	}
@@ -29,10 +31,13 @@ func (r *Runner) processReadyReminders(ctx context.Context) error {
 	return nil
 }
 
-func (r *Runner) processReadyReminder(ctx context.Context, reminder database.ScheduledReminder) error {
-	sentTime := r.Now()
-	if shouldSkipIntrusiveReminder(reminder, sentTime) {
-		return r.CompleteOccurrence(ctx, reminder.ID, database.ReminderStatusSkipped, &sentTime)
+func (r *Runner) sendDueReminder(
+	ctx context.Context,
+	reminder database.ScheduledReminder,
+	now time.Time,
+) error {
+	if shouldSkipIntrusiveReminder(reminder, now) {
+		return r.CompleteOccurrence(ctx, reminder.ID, database.ReminderStatusSkipped, &now)
 	}
 
 	status := database.ReminderStatusSent
@@ -52,16 +57,14 @@ func (r *Runner) processReadyReminder(ctx context.Context, reminder database.Sch
 		)
 	}
 
-	sendTime := r.Now()
-
 	var completedAt *time.Time
 	if status == database.ReminderStatusSent {
-		completedAt = &sendTime
+		completedAt = &now
 	}
 
 	if reminder.IntrusiveEnabled {
 		if err = r.MarkReminderDelivered(ctx,
-			deliveryForReminder(reminder, messageID, sendTime)); err != nil {
+			deliveryForReminder(reminder, messageID, now)); err != nil {
 			return fmt.Errorf("mark reminder %d delivered: %w", reminder.ID, err)
 		}
 

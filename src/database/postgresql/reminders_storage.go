@@ -93,7 +93,12 @@ func (d *Database) FindRemindersByChat(ctx context.Context, telegramChatID int64
 		return nil, fmt.Errorf("find reminders by chat: %w", err)
 	}
 
-	return scanReminderViews(rows, "active reminders by chat")
+	reminders, err := pgx.CollectRows(rows, pgx.RowToStructByName[database.ReminderView])
+	if err != nil {
+		return nil, fmt.Errorf("collect reminders by chat: %w", err)
+	}
+
+	return reminders, nil
 }
 
 func (d *Database) FindReminderHistoryByChat(
@@ -114,33 +119,9 @@ func (d *Database) FindReminderHistoryByChat(
 		return nil, fmt.Errorf("find reminder history by chat: %w", err)
 	}
 
-	return scanReminderViews(rows, "reminder history by chat")
-}
-
-func scanReminderViews(rows pgx.Rows, operation string) ([]database.ReminderView, error) {
-	defer rows.Close()
-
-	reminders := make([]database.ReminderView, 0)
-
-	for rows.Next() {
-		var reminder database.ReminderView
-		if err := rows.Scan(
-			&reminder.ID,
-			&reminder.RuleID,
-			&reminder.Title,
-			&reminder.Description,
-			&reminder.RemindAt,
-			&reminder.Status,
-			&reminder.CreatedAt,
-		); err != nil {
-			return nil, fmt.Errorf("scan %s: %w", operation, err)
-		}
-
-		reminders = append(reminders, reminder)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate %s: %w", operation, err)
+	reminders, err := pgx.CollectRows(rows, pgx.RowToStructByName[database.ReminderView])
+	if err != nil {
+		return nil, fmt.Errorf("collect reminder history by chat: %w", err)
 	}
 
 	return reminders, nil

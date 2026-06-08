@@ -175,24 +175,6 @@ func (s *ReminderService) DeleteReminder(ctx context.Context, telegramChatID int
 	return nil
 }
 
-func (s *ReminderService) CompleteReminder(ctx context.Context, reminderID int64) error {
-	now := time.Now()
-	if err := s.CompleteOccurrence(ctx, reminderID, database.ReminderStatusCompleted, &now); err != nil {
-		return fmt.Errorf("complete reminder: %w", err)
-	}
-
-	return nil
-}
-
-func (s *ReminderService) CancelDeliveredReminder(ctx context.Context, reminderID int64) error {
-	now := time.Now()
-	if err := s.CompleteOccurrence(ctx, reminderID, database.ReminderStatusCanceled, &now); err != nil {
-		return fmt.Errorf("cancel delivered reminder: %w", err)
-	}
-
-	return nil
-}
-
 func (s *ReminderService) UserSettings(ctx context.Context, telegramChatID int64) (database.UserSettings, error) {
 	settings, err := s.repository.UserSettings(ctx, telegramChatID)
 	if err != nil {
@@ -203,8 +185,12 @@ func (s *ReminderService) UserSettings(ctx context.Context, telegramChatID int64
 }
 
 func (s *ReminderService) SetUserTimezoneByCity(ctx context.Context, telegramChatID int64, city string) error {
-	timezone, ok := timezoneForCity(city)
-	if !ok {
+	timezone := strings.TrimSpace(city)
+	if timezone == "" {
+		return fmt.Errorf("%w: %s", ErrUnknownTimezoneCity, city)
+	}
+
+	if _, err := time.LoadLocation(timezone); err != nil {
 		return fmt.Errorf("%w: %s", ErrUnknownTimezoneCity, city)
 	}
 
@@ -270,31 +256,4 @@ func earliestDate(dates []time.Time) time.Time {
 	}
 
 	return earliest
-}
-
-func timezoneForCity(city string) (string, bool) {
-	normalized := strings.ToLower(strings.TrimSpace(city))
-	timezones := map[string]string{
-		"москва":           "Europe/Moscow",
-		"moscow":           "Europe/Moscow",
-		"санкт-петербург":  "Europe/Moscow",
-		"saint petersburg": "Europe/Moscow",
-		"екатеринбург":     "Asia/Yekaterinburg",
-		"новосибирск":      "Asia/Novosibirsk",
-		"красноярск":       "Asia/Krasnoyarsk",
-		"иркутск":          "Asia/Irkutsk",
-		"владивосток":      "Asia/Vladivostok",
-		"new york":         "America/New_York",
-		"los angeles":      "America/Los_Angeles",
-		"chicago":          "America/Chicago",
-		"denver":           "America/Denver",
-		"london":           "Europe/London",
-		"berlin":           "Europe/Berlin",
-		"paris":            "Europe/Paris",
-		"tokyo":            "Asia/Tokyo",
-	}
-
-	timezone, ok := timezones[normalized]
-
-	return timezone, ok
 }

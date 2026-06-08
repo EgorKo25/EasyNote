@@ -12,7 +12,7 @@ func (r *Runner) Run(ctx context.Context) error {
 			return err
 		}
 
-		if err := r.processReadyReminders(ctx); err != nil {
+		if err := r.sendDueReminders(ctx); err != nil {
 			return err
 		}
 	}

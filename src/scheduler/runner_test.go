@@ -19,7 +19,7 @@ import (
 var (
 	errFindReadyReminders = errors.New("find ready reminders")
 	errSendReminder       = errors.New("send reminder")
-	errCompleteReminder   = errors.New("complete reminder")
+	errCompleteOccurrence = errors.New("complete reminder")
 )
 
 func TestRunnerProcessesReadyReminders(t *testing.T) {
@@ -76,7 +76,7 @@ func TestRunnerProcessesReadyReminders(t *testing.T) {
 				)
 			},
 			run: func(ctx context.Context, runner *Runner, _ *clock.Mock, _ chan struct{}) error {
-				return runner.processReadyReminders(ctx)
+				return runner.sendDueReminders(ctx)
 			},
 		},
 		{
@@ -100,7 +100,7 @@ func TestRunnerProcessesReadyReminders(t *testing.T) {
 					Times(1)
 			},
 			run: func(ctx context.Context, runner *Runner, _ *clock.Mock, _ chan struct{}) error {
-				return runner.processReadyReminders(ctx)
+				return runner.sendDueReminders(ctx)
 			},
 		},
 		{
@@ -146,7 +146,7 @@ func TestRunnerProcessesReadyReminders(t *testing.T) {
 				errCh := make(chan error, 1)
 
 				go func() {
-					errCh <- runner.processReadyReminders(runCtx)
+					errCh <- runner.sendDueReminders(runCtx)
 				}()
 
 				<-readyForTimers
@@ -217,7 +217,7 @@ func TestRunnerProcessesReadyReminders(t *testing.T) {
 				errCh := make(chan error, 1)
 
 				go func() {
-					errCh <- runner.processReadyReminders(runCtx)
+					errCh <- runner.sendDueReminders(runCtx)
 				}()
 
 				<-readyForTimers
@@ -332,7 +332,7 @@ func TestRunnerProcessesReadyReminders(t *testing.T) {
 				)
 			},
 			run: func(ctx context.Context, runner *Runner, _ *clock.Mock, _ chan struct{}) error {
-				return runner.processReadyReminders(ctx)
+				return runner.sendDueReminders(ctx)
 			},
 		},
 		{
@@ -371,7 +371,7 @@ func TestRunnerProcessesReadyReminders(t *testing.T) {
 				)
 			},
 			run: func(ctx context.Context, runner *Runner, _ *clock.Mock, _ chan struct{}) error {
-				return runner.processReadyReminders(ctx)
+				return runner.sendDueReminders(ctx)
 			},
 		},
 		{
@@ -395,7 +395,7 @@ func TestRunnerProcessesReadyReminders(t *testing.T) {
 					Times(1)
 			},
 			run: func(ctx context.Context, runner *Runner, _ *clock.Mock, _ chan struct{}) error {
-				return runner.processReadyReminders(ctx)
+				return runner.sendDueReminders(ctx)
 			},
 			expected: expected{expectedErrText: "find reminders ready to send: find ready reminders"},
 		},
@@ -422,12 +422,12 @@ func TestRunnerProcessesReadyReminders(t *testing.T) {
 					sender.EXPECT().SendReminder(gomock.Any(), firstReminder).Return(101, nil).Times(1),
 					planner.EXPECT().
 						CompleteOccurrence(gomock.Any(), firstReminder.ID, database.ReminderStatusSent, gomock.Any()).
-						Return(errCompleteReminder).
+						Return(errCompleteOccurrence).
 						Times(1),
 				)
 			},
 			run: func(ctx context.Context, runner *Runner, _ *clock.Mock, _ chan struct{}) error {
-				return runner.processReadyReminders(ctx)
+				return runner.sendDueReminders(ctx)
 			},
 			expected: expected{expectedErrText: `complete reminder 1 with status "sent": complete reminder`},
 		},
@@ -454,12 +454,12 @@ func TestRunnerProcessesReadyReminders(t *testing.T) {
 					sender.EXPECT().SendReminder(gomock.Any(), firstReminder).Return(0, errSendReminder).Times(1),
 					planner.EXPECT().
 						CompleteOccurrence(gomock.Any(), firstReminder.ID, database.ReminderStatusFailed, nil).
-						Return(errCompleteReminder).
+						Return(errCompleteOccurrence).
 						Times(1),
 				)
 			},
 			run: func(ctx context.Context, runner *Runner, _ *clock.Mock, _ chan struct{}) error {
-				return runner.processReadyReminders(ctx)
+				return runner.sendDueReminders(ctx)
 			},
 			expected: expected{expectedErrText: `complete reminder 1 with status "failed": complete reminder`},
 		},
