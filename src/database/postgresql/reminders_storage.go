@@ -11,6 +11,8 @@ import (
 	"github.com/EgorKo25/EasyNote/src/database"
 )
 
+var errUnsupportedReminderAcknowledgmentStatus = errors.New("unsupported reminder acknowledgment status")
+
 func (d *Database) SaveReminder(ctx context.Context, reminder *database.Reminder) error {
 	query := `
 		INSERT INTO reminders (note_id, rule_id, remind_at, status, attempts, sent_at)
@@ -90,13 +92,39 @@ func (d *Database) FindRemindersByChat(ctx context.Context, telegramChatID int64
 	if err != nil {
 		return nil, fmt.Errorf("find reminders by chat: %w", err)
 	}
+
+	return scanReminderViews(rows, "active reminders by chat")
+}
+
+func (d *Database) FindReminderHistoryByChat(
+	ctx context.Context,
+	telegramChatID int64,
+) ([]database.ReminderView, error) {
+	query := `
+		SELECT r.id, r.rule_id, n.title, n.description, r.remind_at, r.status, r.created_at
+		FROM reminders r
+		JOIN notes n ON n.id = r.note_id
+		WHERE n.telegram_chat_id = $1
+			AND r.status <> 'new'
+		ORDER BY r.remind_at DESC, r.id DESC
+	`
+
+	rows, err := d.pool.Query(ctx, query, telegramChatID)
+	if err != nil {
+		return nil, fmt.Errorf("find reminder history by chat: %w", err)
+	}
+
+	return scanReminderViews(rows, "reminder history by chat")
+}
+
+func scanReminderViews(rows pgx.Rows, operation string) ([]database.ReminderView, error) {
 	defer rows.Close()
 
 	reminders := make([]database.ReminderView, 0)
 
 	for rows.Next() {
 		var reminder database.ReminderView
-		if err = rows.Scan(
+		if err := rows.Scan(
 			&reminder.ID,
 			&reminder.RuleID,
 			&reminder.Title,
@@ -105,14 +133,14 @@ func (d *Database) FindRemindersByChat(ctx context.Context, telegramChatID int64
 			&reminder.Status,
 			&reminder.CreatedAt,
 		); err != nil {
-			return nil, fmt.Errorf("scan reminder by chat: %w", err)
+			return nil, fmt.Errorf("scan %s: %w", operation, err)
 		}
 
 		reminders = append(reminders, reminder)
 	}
 
-	if err = rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate reminders by chat: %w", err)
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate %s: %w", operation, err)
 	}
 
 	return reminders, nil
@@ -176,16 +204,34 @@ func (d *Database) FindRemindersReadyToSend(
 		WITH due AS (
 			SELECT r.id
 			FROM reminders r
+			JOIN notes n ON n.id = r.note_id
+			LEFT JOIN user_settings s ON s.telegram_chat_id = n.telegram_chat_id
 			WHERE r.remind_at <= $1
 				AND r.status = 'new'
+				AND (
+					r.next_send_at IS NULL
+					OR r.next_send_at <= $1
+					OR r.intrusive_until <= $1
+				)
 			ORDER BY r.remind_at, r.id
 			LIMIT $2
 			FOR UPDATE SKIP LOCKED
 		)
-		SELECT r.id, r.note_id, r.rule_id, n.telegram_chat_id, n.title, n.description, r.remind_at
+		SELECT
+			r.id,
+			r.note_id,
+			r.rule_id,
+			n.telegram_chat_id,
+			n.title,
+			n.description,
+			r.remind_at,
+			COALESCE(s.intrusive_enabled, false),
+			(COALESCE(s.intrusive_interval_minutes, 30) * INTERVAL '1 minute') AS intrusive_interval,
+			r.telegram_message_id
 		FROM reminders r
 		JOIN due d ON d.id = r.id
 		JOIN notes n ON n.id = r.note_id
+		LEFT JOIN user_settings s ON s.telegram_chat_id = n.telegram_chat_id
 		ORDER BY r.remind_at, r.id
 	`
 
@@ -220,6 +266,9 @@ func scanScheduledReminders(rows pgx.Rows) ([]*database.ScheduledReminder, error
 			&reminder.Title,
 			&reminder.Description,
 			&reminder.RemindAt,
+			&reminder.IntrusiveEnabled,
+			&reminder.IntrusiveInterval,
+			&reminder.TelegramMessageID,
 		); err != nil {
 			return nil, fmt.Errorf("scan scheduled reminder: %w", err)
 		}
@@ -232,4 +281,62 @@ func scanScheduledReminders(rows pgx.Rows) ([]*database.ScheduledReminder, error
 	}
 
 	return reminders, nil
+}
+
+func (d *Database) MarkReminderDelivered(ctx context.Context, delivery database.ReminderDelivery) error {
+	query := `
+		UPDATE reminders
+		SET last_sent_at = now(),
+			next_send_at = $2,
+			intrusive_until = $3,
+			telegram_message_id = $4
+		WHERE id = $1
+			AND status = 'new'
+	`
+
+	if affectedRows, err := d.pool.Exec(
+		ctx,
+		query,
+		delivery.ReminderID,
+		delivery.NextSendAt,
+		delivery.IntrusiveUntil,
+		delivery.MessageID,
+	); err != nil {
+		return fmt.Errorf("mark reminder delivered: %w", err)
+	} else if affectedRows.RowsAffected() == 0 {
+		return fmt.Errorf("mark reminder delivered: %w", database.ErrReminderNotFound)
+	}
+
+	return nil
+}
+
+func (d *Database) AcknowledgeReminder(
+	ctx context.Context,
+	telegramChatID int64,
+	reminderID int64,
+	status database.ReminderStatus,
+) error {
+	if status != database.ReminderStatusCompleted && status != database.ReminderStatusCanceled {
+		return fmt.Errorf("%w: %s", errUnsupportedReminderAcknowledgmentStatus, status)
+	}
+
+	query := `
+		UPDATE reminders r
+		SET status = $3,
+			sent_at = now(),
+			next_send_at = NULL
+		FROM notes n
+		WHERE n.id = r.note_id
+			AND n.telegram_chat_id = $1
+			AND r.id = $2
+			AND r.status = 'new'
+	`
+
+	if affectedRows, err := d.pool.Exec(ctx, query, telegramChatID, reminderID, status); err != nil {
+		return fmt.Errorf("acknowledge reminder: %w", err)
+	} else if affectedRows.RowsAffected() == 0 {
+		return fmt.Errorf("%w: %d", database.ErrReminderNotFound, reminderID)
+	}
+
+	return nil
 }

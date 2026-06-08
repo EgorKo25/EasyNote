@@ -122,6 +122,24 @@ func TestReminderDraftAppliesTextInput(t *testing.T) {
 			}{applied: true, description: "Prepare documents before lunch", screen: draftScreenMain},
 		},
 		{
+			name: "manual time input is saved from HH MM message",
+			draft: reminderDraft{
+				date:   time.Date(2099, 6, 2, 0, 0, 0, 0, time.Local),
+				screen: draftScreenTime,
+			},
+			input: "18:45",
+			expected: struct {
+				applied     bool
+				title       string
+				description string
+				hour        int
+				minute      int
+				waitingFor  draftField
+				screen      draftScreen
+				notice      string
+			}{applied: true, hour: 18, minute: 45, screen: draftScreenMain},
+		},
+		{
 			name:  "message is ignored when draft does not wait for text",
 			draft: reminderDraft{screen: draftScreenMain},
 			input: "ignored",
@@ -135,6 +153,24 @@ func TestReminderDraftAppliesTextInput(t *testing.T) {
 				screen      draftScreen
 				notice      string
 			}{applied: false, screen: draftScreenMain},
+		},
+		{
+			name: "invalid manual time input is ignored on time screen",
+			draft: reminderDraft{
+				date:   time.Date(2099, 6, 2, 0, 0, 0, 0, time.Local),
+				screen: draftScreenTime,
+			},
+			input: "18-45",
+			expected: struct {
+				applied     bool
+				title       string
+				description string
+				hour        int
+				minute      int
+				waitingFor  draftField
+				screen      draftScreen
+				notice      string
+			}{applied: false, screen: draftScreenTime},
 		},
 		{
 			name:  "message is ignored when draft does not exist",
@@ -163,7 +199,7 @@ func TestReminderDraftAppliesTextInput(t *testing.T) {
 
 			bot := &ReminderBot{draftByChat: drafts}
 
-			applied := bot.applyDraftText(chatID, test.input)
+			applied := bot.applyDraftText(t.Context(), chatID, test.input)
 			draft := bot.draft(chatID)
 
 			require.Equal(t, test.expected.applied, applied)
@@ -230,7 +266,7 @@ func TestReminderDraftAppliesDateCallbacks(t *testing.T) {
 				hour    int
 				minute  int
 				screen  draftScreen
-			}{applied: true, date: time.Date(2026, 6, 2, 0, 0, 0, 0, location), hour: 18, screen: draftScreenTime},
+			}{applied: true, date: time.Date(2026, 6, 2, 0, 0, 0, 0, location), hour: 18, screen: draftScreenMain},
 		},
 		{
 			name: "time shift callback moves selected time",
@@ -795,7 +831,7 @@ func TestSenderSendsReminder(t *testing.T) {
 			require.NoError(t, err)
 
 			sender := &Sender{bot: bot, cfg: test.cfg}
-			err = sender.SendReminder(t.Context(), test.reminder)
+			_, err = sender.SendReminder(t.Context(), test.reminder)
 
 			if test.expected.expectedErr != nil {
 				require.EqualError(t, err, test.expected.expectedErr.Error())
@@ -1946,7 +1982,7 @@ func TestReminderBotConfigurationHelpers(t *testing.T) {
 			action: func(t *testing.T) {
 				t.Helper()
 
-				location := (&ReminderBot{}).location()
+				location := (&ReminderBot{}).location(1)
 
 				require.Equal(t, time.Local, location)
 			},

@@ -1,4 +1,39 @@
-version: 1.2.0
+version: 1.3.0
+
+## v1.3.0 - Reminder settings and persistent delivery
+
+### What was done
+
+Telegram reminder creation now accepts manual `HH:MM` input while the time picker is open. The bot updates the draft time and deletes the user's input message after handling it.
+
+Quick time presets now finish time selection immediately and return the user to the reminder draft editor.
+
+The recurring reminder menu now exposes only daily repeat, custom weekdays, no repeat, and a custom day-interval option. Removed options are no longer shown in the Telegram UI.
+
+The main menu now includes settings and reminder history. Settings currently cover Russian language display, timezone selection by city, and intrusive reminder configuration with a 30 minute to 24 hour interval.
+
+Intrusive reminders send `Готово` and `Отменить` actions with delivered reminders. When enabled, due reminders are repeated according to the user's interval, the previous reminder message is removed before the next one is sent, and reminders older than 24 hours are completed as skipped.
+
+Reminder history shows completed, canceled, skipped, sent, and failed reminder statuses separately from active reminders.
+
+### API changes
+
+- added `user_settings`;
+- extended `reminders` with delivery state columns for intrusive reminders;
+- added `completed` and `skipped` reminder statuses;
+- scheduler sender now returns a Telegram message id for persisted delivery state.
+
+### Affected files
+
+- `migrations/00004_add_user_settings_and_intrusive_reminders.go`
+- `src/database/postgresql/reminders_storage.go`
+- `src/database/postgresql/user_settings_storage.go`
+- `src/database/types.go`
+- `src/scheduler/ready_reminders.go`
+- `src/service/reminders.go`
+- `src/telegram/reminder_bot.go`
+- `src/telegram/sender.go`
+- `src/telegram/ui`
 
 ## v1.2.0 - Scheduler runtime runner
 

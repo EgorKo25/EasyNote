@@ -57,6 +57,20 @@ func (mr *MockStorageMockRecorder) FindRemindersReadyToSend(ctx, now, limit any)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindRemindersReadyToSend", reflect.TypeOf((*MockStorage)(nil).FindRemindersReadyToSend), ctx, now, limit)
 }
 
+// MarkReminderDelivered mocks base method.
+func (m *MockStorage) MarkReminderDelivered(ctx context.Context, delivery database.ReminderDelivery) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MarkReminderDelivered", ctx, delivery)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// MarkReminderDelivered indicates an expected call of MarkReminderDelivered.
+func (mr *MockStorageMockRecorder) MarkReminderDelivered(ctx, delivery any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkReminderDelivered", reflect.TypeOf((*MockStorage)(nil).MarkReminderDelivered), ctx, delivery)
+}
+
 // MockSender is a mock of Sender interface.
 type MockSender struct {
 	ctrl     *gomock.Controller
@@ -82,11 +96,12 @@ func (m *MockSender) EXPECT() *MockSenderMockRecorder {
 }
 
 // SendReminder mocks base method.
-func (m *MockSender) SendReminder(ctx context.Context, reminder database.ScheduledReminder) error {
+func (m *MockSender) SendReminder(ctx context.Context, reminder database.ScheduledReminder) (int, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SendReminder", ctx, reminder)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(int)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // SendReminder indicates an expected call of SendReminder.

@@ -42,49 +42,32 @@ func (m *MockReminderService) EXPECT() *MockReminderServiceMockRecorder {
 	return m.recorder
 }
 
-// CreateReminder mocks base method.
-func (m *MockReminderService) CreateReminder(ctx context.Context, telegramChatID int64, title, description string, remindAt time.Time) (database.ReminderView, error) {
+// CancelDeliveredReminder mocks base method.
+func (m *MockReminderService) CancelDeliveredReminder(ctx context.Context, reminderID int64) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateReminder", ctx, telegramChatID, title, description, remindAt)
-	ret0, _ := ret[0].(database.ReminderView)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret := m.ctrl.Call(m, "CancelDeliveredReminder", ctx, reminderID)
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
-// CreateReminder indicates an expected call of CreateReminder.
-func (mr *MockReminderServiceMockRecorder) CreateReminder(ctx, telegramChatID, title, description, remindAt any) *gomock.Call {
+// CancelDeliveredReminder indicates an expected call of CancelDeliveredReminder.
+func (mr *MockReminderServiceMockRecorder) CancelDeliveredReminder(ctx, reminderID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateReminder", reflect.TypeOf((*MockReminderService)(nil).CreateReminder), ctx, telegramChatID, title, description, remindAt)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CancelDeliveredReminder", reflect.TypeOf((*MockReminderService)(nil).CancelDeliveredReminder), ctx, reminderID)
 }
 
-// CreateIntervalReminder mocks base method.
-func (m *MockReminderService) CreateIntervalReminder(ctx context.Context, telegramChatID int64, title, description string, remindAt time.Time, intervalDays int) (database.ReminderView, error) {
+// CompleteReminder mocks base method.
+func (m *MockReminderService) CompleteReminder(ctx context.Context, reminderID int64) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateIntervalReminder", ctx, telegramChatID, title, description, remindAt, intervalDays)
-	ret0, _ := ret[0].(database.ReminderView)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret := m.ctrl.Call(m, "CompleteReminder", ctx, reminderID)
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
-// CreateIntervalReminder indicates an expected call of CreateIntervalReminder.
-func (mr *MockReminderServiceMockRecorder) CreateIntervalReminder(ctx, telegramChatID, title, description, remindAt, intervalDays any) *gomock.Call {
+// CompleteReminder indicates an expected call of CompleteReminder.
+func (mr *MockReminderServiceMockRecorder) CompleteReminder(ctx, reminderID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateIntervalReminder", reflect.TypeOf((*MockReminderService)(nil).CreateIntervalReminder), ctx, telegramChatID, title, description, remindAt, intervalDays)
-}
-
-// CreateWeekdaysReminder mocks base method.
-func (m *MockReminderService) CreateWeekdaysReminder(ctx context.Context, telegramChatID int64, title, description string, remindAt time.Time, weekdaysMask int) (database.ReminderView, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateWeekdaysReminder", ctx, telegramChatID, title, description, remindAt, weekdaysMask)
-	ret0, _ := ret[0].(database.ReminderView)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// CreateWeekdaysReminder indicates an expected call of CreateWeekdaysReminder.
-func (mr *MockReminderServiceMockRecorder) CreateWeekdaysReminder(ctx, telegramChatID, title, description, remindAt, weekdaysMask any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateWeekdaysReminder", reflect.TypeOf((*MockReminderService)(nil).CreateWeekdaysReminder), ctx, telegramChatID, title, description, remindAt, weekdaysMask)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CompleteReminder", reflect.TypeOf((*MockReminderService)(nil).CompleteReminder), ctx, reminderID)
 }
 
 // CreateCustomDatesReminder mocks base method.
@@ -102,6 +85,51 @@ func (mr *MockReminderServiceMockRecorder) CreateCustomDatesReminder(ctx, telegr
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateCustomDatesReminder", reflect.TypeOf((*MockReminderService)(nil).CreateCustomDatesReminder), ctx, telegramChatID, title, description, selectedDates, hour, minute, location)
 }
 
+// CreateIntervalReminder mocks base method.
+func (m *MockReminderService) CreateIntervalReminder(ctx context.Context, telegramChatID int64, title, description string, remindAt time.Time, intervalDays int) (database.ReminderView, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateIntervalReminder", ctx, telegramChatID, title, description, remindAt, intervalDays)
+	ret0, _ := ret[0].(database.ReminderView)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateIntervalReminder indicates an expected call of CreateIntervalReminder.
+func (mr *MockReminderServiceMockRecorder) CreateIntervalReminder(ctx, telegramChatID, title, description, remindAt, intervalDays any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateIntervalReminder", reflect.TypeOf((*MockReminderService)(nil).CreateIntervalReminder), ctx, telegramChatID, title, description, remindAt, intervalDays)
+}
+
+// CreateReminder mocks base method.
+func (m *MockReminderService) CreateReminder(ctx context.Context, telegramChatID int64, title, description string, remindAt time.Time) (database.ReminderView, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateReminder", ctx, telegramChatID, title, description, remindAt)
+	ret0, _ := ret[0].(database.ReminderView)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateReminder indicates an expected call of CreateReminder.
+func (mr *MockReminderServiceMockRecorder) CreateReminder(ctx, telegramChatID, title, description, remindAt any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateReminder", reflect.TypeOf((*MockReminderService)(nil).CreateReminder), ctx, telegramChatID, title, description, remindAt)
+}
+
+// CreateWeekdaysReminder mocks base method.
+func (m *MockReminderService) CreateWeekdaysReminder(ctx context.Context, telegramChatID int64, title, description string, remindAt time.Time, weekdaysMask int) (database.ReminderView, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateWeekdaysReminder", ctx, telegramChatID, title, description, remindAt, weekdaysMask)
+	ret0, _ := ret[0].(database.ReminderView)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateWeekdaysReminder indicates an expected call of CreateWeekdaysReminder.
+func (mr *MockReminderServiceMockRecorder) CreateWeekdaysReminder(ctx, telegramChatID, title, description, remindAt, weekdaysMask any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateWeekdaysReminder", reflect.TypeOf((*MockReminderService)(nil).CreateWeekdaysReminder), ctx, telegramChatID, title, description, remindAt, weekdaysMask)
+}
+
 // DeleteReminder mocks base method.
 func (m *MockReminderService) DeleteReminder(ctx context.Context, telegramChatID, reminderID int64) error {
 	m.ctrl.T.Helper()
@@ -114,6 +142,21 @@ func (m *MockReminderService) DeleteReminder(ctx context.Context, telegramChatID
 func (mr *MockReminderServiceMockRecorder) DeleteReminder(ctx, telegramChatID, reminderID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteReminder", reflect.TypeOf((*MockReminderService)(nil).DeleteReminder), ctx, telegramChatID, reminderID)
+}
+
+// ReminderHistory mocks base method.
+func (m *MockReminderService) ReminderHistory(ctx context.Context, telegramChatID int64) ([]database.ReminderView, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReminderHistory", ctx, telegramChatID)
+	ret0, _ := ret[0].([]database.ReminderView)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReminderHistory indicates an expected call of ReminderHistory.
+func (mr *MockReminderServiceMockRecorder) ReminderHistory(ctx, telegramChatID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReminderHistory", reflect.TypeOf((*MockReminderService)(nil).ReminderHistory), ctx, telegramChatID)
 }
 
 // Reminders mocks base method.
@@ -129,4 +172,47 @@ func (m *MockReminderService) Reminders(ctx context.Context, telegramChatID int6
 func (mr *MockReminderServiceMockRecorder) Reminders(ctx, telegramChatID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Reminders", reflect.TypeOf((*MockReminderService)(nil).Reminders), ctx, telegramChatID)
+}
+
+// SetIntrusiveSettings mocks base method.
+func (m *MockReminderService) SetIntrusiveSettings(ctx context.Context, telegramChatID int64, enabled bool, interval time.Duration) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetIntrusiveSettings", ctx, telegramChatID, enabled, interval)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetIntrusiveSettings indicates an expected call of SetIntrusiveSettings.
+func (mr *MockReminderServiceMockRecorder) SetIntrusiveSettings(ctx, telegramChatID, enabled, interval any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetIntrusiveSettings", reflect.TypeOf((*MockReminderService)(nil).SetIntrusiveSettings), ctx, telegramChatID, enabled, interval)
+}
+
+// SetUserTimezoneByCity mocks base method.
+func (m *MockReminderService) SetUserTimezoneByCity(ctx context.Context, telegramChatID int64, city string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetUserTimezoneByCity", ctx, telegramChatID, city)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetUserTimezoneByCity indicates an expected call of SetUserTimezoneByCity.
+func (mr *MockReminderServiceMockRecorder) SetUserTimezoneByCity(ctx, telegramChatID, city any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetUserTimezoneByCity", reflect.TypeOf((*MockReminderService)(nil).SetUserTimezoneByCity), ctx, telegramChatID, city)
+}
+
+// UserSettings mocks base method.
+func (m *MockReminderService) UserSettings(ctx context.Context, telegramChatID int64) (database.UserSettings, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UserSettings", ctx, telegramChatID)
+	ret0, _ := ret[0].(database.UserSettings)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UserSettings indicates an expected call of UserSettings.
+func (mr *MockReminderServiceMockRecorder) UserSettings(ctx, telegramChatID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UserSettings", reflect.TypeOf((*MockReminderService)(nil).UserSettings), ctx, telegramChatID)
 }
