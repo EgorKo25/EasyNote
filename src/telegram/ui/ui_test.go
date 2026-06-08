@@ -279,3 +279,366 @@ func TestCalendarAndCallbacks(t *testing.T) {
 		})
 	}
 }
+
+func TestMenuAndActionKeyboards(t *testing.T) {
+	t.Parallel()
+
+	reminder := database.ReminderView{ID: 7, Title: "Pay rent"}
+
+	tests := []struct {
+		name     string
+		action   func() [][]string
+		expected struct {
+			rows [][]string
+		}
+	}{
+		{
+			name: "main keyboard exposes create reminders and settings",
+			action: func() [][]string {
+				keyboard := telegramui.MainKeyboard()
+
+				return keyboardTexts(keyboard.Keyboard)
+			},
+			expected: struct {
+				rows [][]string
+			}{rows: [][]string{{"Создать"}, {"Напоминания"}, {"Настройки"}}},
+		},
+		{
+			name: "reminders keyboard exposes active and past lists",
+			action: func() [][]string {
+				return keyboardTexts(telegramui.RemindersKeyboard().InlineKeyboard)
+			},
+			expected: struct {
+				rows [][]string
+			}{rows: [][]string{{"Активные", "Прошедшие"}, {"Главное меню"}}},
+		},
+		{
+			name: "reminder details keyboard exposes back delete and main menu",
+			action: func() [][]string {
+				return keyboardTexts(telegramui.ReminderDetailsKeyboard(reminder).InlineKeyboard)
+			},
+			expected: struct {
+				rows [][]string
+			}{rows: [][]string{{"Назад", "Удалить"}, {"Главное меню"}}},
+		},
+		{
+			name: "created reminder keyboard exposes navigation actions",
+			action: func() [][]string {
+				return keyboardTexts(telegramui.ReminderCreatedKeyboard().InlineKeyboard)
+			},
+			expected: struct {
+				rows [][]string
+			}{rows: [][]string{{"Главное меню", "Список"}, {"Создать еще"}}},
+		},
+		{
+			name: "settings keyboard exposes user setting actions",
+			action: func() [][]string {
+				return keyboardTexts(telegramui.SettingsKeyboard().InlineKeyboard)
+			},
+			expected: struct {
+				rows [][]string
+			}{rows: [][]string{{"Язык: русский"}, {"Часовой пояс"}, {"Настойчивые напоминания"}, {"Главное меню"}}},
+		},
+		{
+			name: "intrusive settings keyboard exposes enable disable and back",
+			action: func() [][]string {
+				return keyboardTexts(telegramui.IntrusiveSettingsKeyboard().InlineKeyboard)
+			},
+			expected: struct {
+				rows [][]string
+			}{rows: [][]string{{"Включить", "Выключить"}, {"Назад"}}},
+		},
+		{
+			name: "repeat draft screen exposes repeat choices",
+			action: func() [][]string {
+				keyboard := telegramui.DraftKeyboard(telegramui.Draft{Screen: telegramui.ScreenRepeat}, time.Now())
+
+				return keyboardTexts(keyboard.InlineKeyboard[:4])
+			},
+			expected: struct {
+				rows [][]string
+			}{rows: [][]string{{"Каждый день"}, {"Свои дни недели"}, {"Интервал в днях"}, {"Без повторения"}}},
+		},
+		{
+			name: "weekdays draft screen marks selected weekdays",
+			action: func() [][]string {
+				keyboard := telegramui.DraftKeyboard(telegramui.Draft{
+					Screen:       telegramui.ScreenWeekdays,
+					WeekdaysMask: 1 | 16,
+				}, time.Now())
+
+				return keyboardTexts(keyboard.InlineKeyboard[:2])
+			},
+			expected: struct {
+				rows [][]string
+			}{rows: [][]string{{"✓ Пн", "Вт", "Ср", "Чт"}, {"✓ Пт", "Сб", "Вс"}}},
+		},
+		{
+			name: "interval draft screen shows selected interval",
+			action: func() [][]string {
+				keyboard := telegramui.DraftKeyboard(telegramui.Draft{
+					Screen:       telegramui.ScreenInterval,
+					IntervalDays: 3,
+				}, time.Now())
+
+				return keyboardTexts(keyboard.InlineKeyboard[:1])
+			},
+			expected: struct {
+				rows [][]string
+			}{rows: [][]string{{"Интервал: 3 дн."}}},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			require.Equal(t, test.expected.rows, test.action())
+		})
+	}
+}
+
+func TestSettingsHistoryAndStatusTexts(t *testing.T) {
+	t.Parallel()
+
+	location := time.FixedZone("MSK", 3*60*60)
+	interval := 45 * time.Minute
+
+	tests := []struct {
+		name     string
+		action   func() string
+		expected struct {
+			text string
+		}
+	}{
+		{
+			name:   "reminders text asks to choose list",
+			action: telegramui.RemindersText,
+			expected: struct {
+				text string
+			}{text: "Напоминания\n\nВыберите список напоминаний."},
+		},
+		{
+			name: "history text renders completed reminder",
+			action: func() string {
+				return telegramui.ReminderHistoryText([]database.ReminderView{{
+					Title:    "Pay rent",
+					RemindAt: time.Date(2026, 6, 2, 6, 30, 0, 0, time.UTC),
+					Status:   database.ReminderStatusCompleted,
+				}}, location)
+			},
+			expected: struct {
+				text string
+			}{text: "Прошедшие напоминания\n\n02.06.2026 09:30\nPay rent\nСтатус: Выполнено"},
+		},
+		{
+			name: "settings text renders enabled intrusive settings",
+			action: func() string {
+				return telegramui.SettingsText(database.UserSettings{
+					Timezone:          "Europe/Moscow",
+					IntrusiveEnabled:  true,
+					IntrusiveInterval: interval,
+				})
+			},
+			expected: struct {
+				text string
+			}{
+				text: "Настройки\n\nЯзык: русский\nЧасовой пояс: Europe/Moscow\n" +
+					"Настойчивые напоминания: включены\nИнтервал: 45m0s",
+			},
+		},
+		{
+			name: "intrusive settings text renders disabled state",
+			action: func() string {
+				return telegramui.IntrusiveSettingsText(database.UserSettings{
+					IntrusiveEnabled:  false,
+					IntrusiveInterval: 30 * time.Minute,
+				})
+			},
+			expected: struct {
+				text string
+			}{
+				text: "Настойчивые напоминания\n\nСостояние: выключены\nИнтервал: 30m0s\n\n" +
+					"Интервал можно задать сообщением в минутах от 30 до 1440.",
+			},
+		},
+		{
+			name: "failed status text is localized",
+			action: func() string {
+				return telegramui.ReminderStatusText(database.ReminderStatusFailed)
+			},
+			expected: struct {
+				text string
+			}{text: "Ошибка отправки"},
+		},
+		{
+			name: "unknown status text returns raw value",
+			action: func() string {
+				return telegramui.ReminderStatusText(database.ReminderStatus("paused"))
+			},
+			expected: struct {
+				text string
+			}{text: "paused"},
+		},
+		{
+			name: "custom interval repeat text renders interval days",
+			action: func() string {
+				return telegramui.RepeatText(telegramui.Draft{
+					Repeat:       telegramui.RepeatCustomInterval,
+					IntervalDays: 5,
+				})
+			},
+			expected: struct {
+				text string
+			}{text: "Повторяемость: каждые 5 дн.\n"},
+		},
+		{
+			name: "custom dates repeat text renders selected count",
+			action: func() string {
+				return telegramui.RepeatText(telegramui.Draft{
+					Repeat:      telegramui.RepeatCustomDates,
+					CustomDates: []time.Time{time.Date(2026, 6, 2, 0, 0, 0, 0, location)},
+				})
+			},
+			expected: struct {
+				text string
+			}{text: "Повторяемость: выбрано дат: 1\n"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			require.Equal(t, test.expected.text, test.action())
+		})
+	}
+}
+
+func TestTimezoneControls(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name     string
+		action   func() string
+		expected struct {
+			text string
+		}
+	}{
+		{
+			name: "moscow button text shows positive utc offset",
+			action: func() string {
+				return telegramui.TimezoneButtonText(telegramui.TimezoneByIndex(0), now)
+			},
+			expected: struct {
+				text string
+			}{text: "Москва (+3)"},
+		},
+		{
+			name: "next callback advances timezone index",
+			action: func() string {
+				return telegramui.TimezoneNextCallback(0)
+			},
+			expected: struct {
+				text string
+			}{text: "settings:timezone:next:1"},
+		},
+		{
+			name: "previous callback decrements timezone index",
+			action: func() string {
+				return telegramui.TimezonePrevCallback(1)
+			},
+			expected: struct {
+				text string
+			}{text: "settings:timezone:prev:0"},
+		},
+		{
+			name: "select callback stores timezone index",
+			action: func() string {
+				return telegramui.TimezoneSelectCallback(2)
+			},
+			expected: struct {
+				text string
+			}{text: "settings:timezone:select:2"},
+		},
+		{
+			name: "negative timezone index wraps to last option",
+			action: func() string {
+				return telegramui.TimezonePrevCallback(0)
+			},
+			expected: struct {
+				text string
+			}{text: "settings:timezone:prev:11"},
+		},
+		{
+			name: "large timezone index wraps through options",
+			action: func() string {
+				return telegramui.TimezoneButtonText(telegramui.TimezoneByIndex(99), now)
+			},
+			expected: struct {
+				text string
+			}{text: "Екатеринбург (+5)"},
+		},
+		{
+			name: "timezone lookup finds configured city index",
+			action: func() string {
+				return telegramui.TimezoneSelectCallback(telegramui.TimezoneIndex("Asia/Novosibirsk"))
+			},
+			expected: struct {
+				text string
+			}{text: "settings:timezone:select:5"},
+		},
+		{
+			name: "timezone keyboard exposes arrows and selected city",
+			action: func() string {
+				rows := keyboardTexts(telegramui.TimezoneKeyboard(0, now).InlineKeyboard)
+
+				return rows[0][0] + rows[0][1] + rows[0][2]
+			},
+			expected: struct {
+				text string
+			}{text: "<Москва (+3)>"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			require.Equal(t, test.expected.text, test.action())
+		})
+	}
+}
+
+func keyboardTexts(rows any) [][]string {
+	switch typedRows := rows.(type) {
+	case [][]telego.KeyboardButton:
+		texts := make([][]string, 0, len(typedRows))
+		for _, row := range typedRows {
+			textRow := make([]string, 0, len(row))
+			for _, button := range row {
+				textRow = append(textRow, button.Text)
+			}
+
+			texts = append(texts, textRow)
+		}
+
+		return texts
+	case [][]telego.InlineKeyboardButton:
+		texts := make([][]string, 0, len(typedRows))
+		for _, row := range typedRows {
+			textRow := make([]string, 0, len(row))
+			for _, button := range row {
+				textRow = append(textRow, button.Text)
+			}
+
+			texts = append(texts, textRow)
+		}
+
+		return texts
+	default:
+		return nil
+	}
+}

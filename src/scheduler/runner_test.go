@@ -19,7 +19,7 @@ import (
 var (
 	errFindReadyReminders = errors.New("find ready reminders")
 	errSendReminder       = errors.New("send reminder")
-	errCompleteReminder   = errors.New("complete reminder")
+	errCompleteOccurrence = errors.New("complete reminder")
 )
 
 func TestRunnerProcessesReadyReminders(t *testing.T) {
@@ -63,12 +63,12 @@ func TestRunnerProcessesReadyReminders(t *testing.T) {
 						FindRemindersReadyToSend(gomock.Any(), baseTime, 50).
 						Return([]*database.ScheduledReminder{&firstReminder, &secondReminder}, nil).
 						Times(1),
-					sender.EXPECT().SendReminder(gomock.Any(), firstReminder).Return(nil).Times(1),
+					sender.EXPECT().SendReminder(gomock.Any(), firstReminder).Return(101, nil).Times(1),
 					planner.EXPECT().
 						CompleteOccurrence(gomock.Any(), firstReminder.ID, database.ReminderStatusSent, gomock.Any()).
 						Return(nil).
 						Times(1),
-					sender.EXPECT().SendReminder(gomock.Any(), secondReminder).Return(nil).Times(1),
+					sender.EXPECT().SendReminder(gomock.Any(), secondReminder).Return(102, nil).Times(1),
 					planner.EXPECT().
 						CompleteOccurrence(gomock.Any(), secondReminder.ID, database.ReminderStatusSent, gomock.Any()).
 						Return(nil).
@@ -76,7 +76,7 @@ func TestRunnerProcessesReadyReminders(t *testing.T) {
 				)
 			},
 			run: func(ctx context.Context, runner *Runner, _ *clock.Mock, _ chan struct{}) error {
-				return runner.processReadyReminders(ctx)
+				return runner.sendDueReminders(ctx)
 			},
 		},
 		{
@@ -100,7 +100,7 @@ func TestRunnerProcessesReadyReminders(t *testing.T) {
 					Times(1)
 			},
 			run: func(ctx context.Context, runner *Runner, _ *clock.Mock, _ chan struct{}) error {
-				return runner.processReadyReminders(ctx)
+				return runner.sendDueReminders(ctx)
 			},
 		},
 		{
@@ -126,13 +126,13 @@ func TestRunnerProcessesReadyReminders(t *testing.T) {
 						Times(1),
 					sender.EXPECT().
 						SendReminder(gomock.Any(), firstReminder).
-						DoAndReturn(func(context.Context, database.ScheduledReminder) error {
+						DoAndReturn(func(context.Context, database.ScheduledReminder) (int, error) {
 							close(readyForTimers)
 
-							return errSendReminder
+							return 0, errSendReminder
 						}).
 						Times(1),
-					sender.EXPECT().SendReminder(gomock.Any(), firstReminder).Return(nil).Times(1),
+					sender.EXPECT().SendReminder(gomock.Any(), firstReminder).Return(101, nil).Times(1),
 					planner.EXPECT().
 						CompleteOccurrence(gomock.Any(), firstReminder.ID, database.ReminderStatusSent, gomock.Any()).
 						Return(nil).
@@ -146,7 +146,7 @@ func TestRunnerProcessesReadyReminders(t *testing.T) {
 				errCh := make(chan error, 1)
 
 				go func() {
-					errCh <- runner.processReadyReminders(runCtx)
+					errCh <- runner.sendDueReminders(runCtx)
 				}()
 
 				<-readyForTimers
@@ -192,18 +192,18 @@ func TestRunnerProcessesReadyReminders(t *testing.T) {
 						Times(1),
 					sender.EXPECT().
 						SendReminder(gomock.Any(), firstReminder).
-						DoAndReturn(func(context.Context, database.ScheduledReminder) error {
+						DoAndReturn(func(context.Context, database.ScheduledReminder) (int, error) {
 							close(readyForTimers)
 
-							return errSendReminder
+							return 0, errSendReminder
 						}).
 						Times(1),
-					sender.EXPECT().SendReminder(gomock.Any(), firstReminder).Return(errSendReminder).Times(1),
+					sender.EXPECT().SendReminder(gomock.Any(), firstReminder).Return(0, errSendReminder).Times(1),
 					planner.EXPECT().
 						CompleteOccurrence(gomock.Any(), firstReminder.ID, database.ReminderStatusFailed, nil).
 						Return(nil).
 						Times(1),
-					sender.EXPECT().SendReminder(gomock.Any(), secondReminder).Return(nil).Times(1),
+					sender.EXPECT().SendReminder(gomock.Any(), secondReminder).Return(102, nil).Times(1),
 					planner.EXPECT().
 						CompleteOccurrence(gomock.Any(), secondReminder.ID, database.ReminderStatusSent, gomock.Any()).
 						Return(nil).
@@ -217,7 +217,7 @@ func TestRunnerProcessesReadyReminders(t *testing.T) {
 				errCh := make(chan error, 1)
 
 				go func() {
-					errCh <- runner.processReadyReminders(runCtx)
+					errCh <- runner.sendDueReminders(runCtx)
 				}()
 
 				<-readyForTimers
@@ -295,6 +295,86 @@ func TestRunnerProcessesReadyReminders(t *testing.T) {
 			expected: expected{expectedErrText: "wait scheduler interval: context canceled"},
 		},
 		{
+			name: "intrusive reminder is marked delivered without completing occurrence",
+			cfg: config.Scheduler{
+				PollInterval:      pollInterval,
+				SendRetryInterval: retryInterval,
+				BatchLimit:        10,
+				SendRetryCount:    1,
+			},
+			before: func(
+				_ *gomock.Controller,
+				storage *mocks.MockStorage,
+				sender *mocks.MockSender,
+				_ *mocks.MockPlanner,
+				_ chan struct{},
+			) {
+				intrusiveReminder := firstReminder
+				intrusiveReminder.IntrusiveEnabled = true
+				intrusiveReminder.IntrusiveInterval = 45 * time.Minute
+				intrusiveReminder.RemindAt = baseTime
+
+				gomock.InOrder(
+					storage.EXPECT().
+						FindRemindersReadyToSend(gomock.Any(), baseTime, 10).
+						Return([]*database.ScheduledReminder{&intrusiveReminder}, nil).
+						Times(1),
+					sender.EXPECT().SendReminder(gomock.Any(), intrusiveReminder).Return(301, nil).Times(1),
+					storage.EXPECT().
+						MarkReminderDelivered(gomock.Any(), database.ReminderDelivery{
+							ReminderID:     intrusiveReminder.ID,
+							MessageID:      301,
+							NextSendAt:     baseTime.Add(45 * time.Minute),
+							IntrusiveUntil: baseTime.Add(24 * time.Hour),
+						}).
+						Return(nil).
+						Times(1),
+				)
+			},
+			run: func(ctx context.Context, runner *Runner, _ *clock.Mock, _ chan struct{}) error {
+				return runner.sendDueReminders(ctx)
+			},
+		},
+		{
+			name: "expired intrusive reminder is completed as skipped",
+			cfg: config.Scheduler{
+				PollInterval:      pollInterval,
+				SendRetryInterval: retryInterval,
+				BatchLimit:        10,
+				SendRetryCount:    1,
+			},
+			before: func(
+				_ *gomock.Controller,
+				storage *mocks.MockStorage,
+				_ *mocks.MockSender,
+				planner *mocks.MockPlanner,
+				_ chan struct{},
+			) {
+				expiredReminder := firstReminder
+				expiredReminder.IntrusiveEnabled = true
+				expiredReminder.RemindAt = baseTime.Add(-24 * time.Hour)
+
+				gomock.InOrder(
+					storage.EXPECT().
+						FindRemindersReadyToSend(gomock.Any(), baseTime, 10).
+						Return([]*database.ScheduledReminder{&expiredReminder}, nil).
+						Times(1),
+					planner.EXPECT().
+						CompleteOccurrence(
+							gomock.Any(),
+							expiredReminder.ID,
+							database.ReminderStatusSkipped,
+							gomock.Any(),
+						).
+						Return(nil).
+						Times(1),
+				)
+			},
+			run: func(ctx context.Context, runner *Runner, _ *clock.Mock, _ chan struct{}) error {
+				return runner.sendDueReminders(ctx)
+			},
+		},
+		{
 			name: "storage loading error is returned",
 			cfg: config.Scheduler{
 				PollInterval:      pollInterval,
@@ -315,7 +395,7 @@ func TestRunnerProcessesReadyReminders(t *testing.T) {
 					Times(1)
 			},
 			run: func(ctx context.Context, runner *Runner, _ *clock.Mock, _ chan struct{}) error {
-				return runner.processReadyReminders(ctx)
+				return runner.sendDueReminders(ctx)
 			},
 			expected: expected{expectedErrText: "find reminders ready to send: find ready reminders"},
 		},
@@ -339,15 +419,15 @@ func TestRunnerProcessesReadyReminders(t *testing.T) {
 						FindRemindersReadyToSend(gomock.Any(), baseTime, 50).
 						Return([]*database.ScheduledReminder{&firstReminder}, nil).
 						Times(1),
-					sender.EXPECT().SendReminder(gomock.Any(), firstReminder).Return(nil).Times(1),
+					sender.EXPECT().SendReminder(gomock.Any(), firstReminder).Return(101, nil).Times(1),
 					planner.EXPECT().
 						CompleteOccurrence(gomock.Any(), firstReminder.ID, database.ReminderStatusSent, gomock.Any()).
-						Return(errCompleteReminder).
+						Return(errCompleteOccurrence).
 						Times(1),
 				)
 			},
 			run: func(ctx context.Context, runner *Runner, _ *clock.Mock, _ chan struct{}) error {
-				return runner.processReadyReminders(ctx)
+				return runner.sendDueReminders(ctx)
 			},
 			expected: expected{expectedErrText: `complete reminder 1 with status "sent": complete reminder`},
 		},
@@ -371,15 +451,15 @@ func TestRunnerProcessesReadyReminders(t *testing.T) {
 						FindRemindersReadyToSend(gomock.Any(), baseTime, 50).
 						Return([]*database.ScheduledReminder{&firstReminder}, nil).
 						Times(1),
-					sender.EXPECT().SendReminder(gomock.Any(), firstReminder).Return(errSendReminder).Times(1),
+					sender.EXPECT().SendReminder(gomock.Any(), firstReminder).Return(0, errSendReminder).Times(1),
 					planner.EXPECT().
 						CompleteOccurrence(gomock.Any(), firstReminder.ID, database.ReminderStatusFailed, nil).
-						Return(errCompleteReminder).
+						Return(errCompleteOccurrence).
 						Times(1),
 				)
 			},
 			run: func(ctx context.Context, runner *Runner, _ *clock.Mock, _ chan struct{}) error {
-				return runner.processReadyReminders(ctx)
+				return runner.sendDueReminders(ctx)
 			},
 			expected: expected{expectedErrText: `complete reminder 1 with status "failed": complete reminder`},
 		},

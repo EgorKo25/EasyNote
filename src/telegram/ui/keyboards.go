@@ -12,8 +12,19 @@ import (
 func MainKeyboard() *telego.ReplyKeyboardMarkup {
 	return tu.Keyboard(
 		tu.KeyboardRow(tu.KeyboardButton(ButtonCreateReminder)),
-		tu.KeyboardRow(tu.KeyboardButton(ButtonReminderList)),
+		tu.KeyboardRow(tu.KeyboardButton(ButtonReminders)),
+		tu.KeyboardRow(tu.KeyboardButton(ButtonSettings)),
 	).WithResizeKeyboard()
+}
+
+func RemindersKeyboard() *telego.InlineKeyboardMarkup {
+	return tu.InlineKeyboard(
+		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton(ButtonReminderList).WithCallbackData(CallbackReminderList),
+			tu.InlineKeyboardButton(ButtonReminderHistory).WithCallbackData(CallbackReminderHistory),
+		),
+		tu.InlineKeyboardRow(tu.InlineKeyboardButton("Главное меню").WithCallbackData(CallbackMainMenu)),
+	)
 }
 
 func DraftKeyboard(draft Draft, now time.Time) *telego.InlineKeyboardMarkup {
@@ -28,6 +39,8 @@ func DraftKeyboard(draft Draft, now time.Time) *telego.InlineKeyboardMarkup {
 		return repeatKeyboard()
 	case ScreenWeekdays:
 		return weekdaysKeyboard(draft)
+	case ScreenInterval:
+		return intervalKeyboard(draft)
 	default:
 		return draftMainKeyboard(draft)
 	}
@@ -82,21 +95,10 @@ func repeatKeyboard() *telego.InlineKeyboardMarkup {
 			tu.InlineKeyboardButton("Каждый день").WithCallbackData(RepeatCallback(RepeatEveryDay)),
 		),
 		tu.InlineKeyboardRow(
-			tu.InlineKeyboardButton("Каждую неделю").WithCallbackData(RepeatCallback(RepeatEveryWeek)),
+			tu.InlineKeyboardButton("Свои дни недели").WithCallbackData(RepeatCallback(RepeatCustomWeekdays)),
 		),
 		tu.InlineKeyboardRow(
-			tu.InlineKeyboardButton("Каждые 2 дня").WithCallbackData(RepeatCallback(RepeatEveryTwoDays)),
-		),
-		tu.InlineKeyboardRow(
-			tu.InlineKeyboardButton("По будням").WithCallbackData(RepeatCallback(RepeatWeekdays)),
-		),
-		tu.InlineKeyboardRow(
-			tu.InlineKeyboardButton("Свои дни недели").WithCallbackData(
-				RepeatCallback(RepeatCustomWeekdays),
-			),
-		),
-		tu.InlineKeyboardRow(
-			tu.InlineKeyboardButton("Выбрать даты").WithCallbackData(RepeatCallback(RepeatCustomDates)),
+			tu.InlineKeyboardButton("Интервал в днях").WithCallbackData(RepeatCallback(RepeatCustomInterval)),
 		),
 		tu.InlineKeyboardRow(
 			tu.InlineKeyboardButton("Без повторения").WithCallbackData(RepeatCallback(RepeatNone)),
@@ -120,6 +122,25 @@ func weekdaysKeyboard(draft Draft) *telego.InlineKeyboardMarkup {
 		),
 		tu.InlineKeyboardRow(
 			tu.InlineKeyboardButton("Готово").WithCallbackData(CallbackDraftWeekdaysDone),
+		),
+		tu.InlineKeyboardRow(tu.InlineKeyboardButton("Назад").WithCallbackData(CallbackDraftRepeat)),
+	)
+}
+
+func intervalKeyboard(draft Draft) *telego.InlineKeyboardMarkup {
+	valueText := "Интервал: не задан"
+	if draft.IntervalDays > 0 {
+		valueText = fmt.Sprintf("Интервал: %d дн.", draft.IntervalDays)
+	}
+
+	return tu.InlineKeyboard(
+		tu.InlineKeyboardRow(tu.InlineKeyboardButton(valueText).WithCallbackData(CallbackNoop)),
+		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton("-1").WithCallbackData(TimeShiftCallback(-1440)),
+			tu.InlineKeyboardButton("+1").WithCallbackData(TimeShiftCallback(1440)),
+		),
+		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton("Готово").WithCallbackData(CallbackDraftIntervalDone),
 		),
 		tu.InlineKeyboardRow(tu.InlineKeyboardButton("Назад").WithCallbackData(CallbackDraftRepeat)),
 	)
@@ -259,4 +280,105 @@ func ReminderCreatedKeyboard() *telego.InlineKeyboardMarkup {
 		),
 		tu.InlineKeyboardRow(tu.InlineKeyboardButton("Создать еще").WithCallbackData(CallbackCreateReminder)),
 	)
+}
+
+func SettingsKeyboard() *telego.InlineKeyboardMarkup {
+	return tu.InlineKeyboard(
+		tu.InlineKeyboardRow(tu.InlineKeyboardButton("Язык: русский").WithCallbackData(CallbackSettingsLanguage)),
+		tu.InlineKeyboardRow(tu.InlineKeyboardButton("Часовой пояс").WithCallbackData(CallbackSettingsTimezone)),
+		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton("Настойчивые напоминания").WithCallbackData(CallbackSettingsIntrusive),
+		),
+		tu.InlineKeyboardRow(tu.InlineKeyboardButton("Главное меню").WithCallbackData(CallbackMainMenu)),
+	)
+}
+
+func TimezoneKeyboard(index int, now time.Time) *telego.InlineKeyboardMarkup {
+	index = normalizeTimezoneIndex(index)
+	option := timezoneOptions[index]
+
+	return tu.InlineKeyboard(
+		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton("<").WithCallbackData(TimezonePrevCallback(index)),
+			tu.InlineKeyboardButton(TimezoneButtonText(option, now)).WithCallbackData(TimezoneSelectCallback(index)),
+			tu.InlineKeyboardButton(">").WithCallbackData(TimezoneNextCallback(index)),
+		),
+		tu.InlineKeyboardRow(tu.InlineKeyboardButton("Назад").WithCallbackData(CallbackSettings)),
+	)
+}
+
+func IntrusiveSettingsKeyboard() *telego.InlineKeyboardMarkup {
+	return tu.InlineKeyboard(
+		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton("Включить").WithCallbackData(CallbackSettingsIntrusiveOn),
+			tu.InlineKeyboardButton("Выключить").WithCallbackData(CallbackSettingsIntrusiveOff),
+		),
+		tu.InlineKeyboardRow(tu.InlineKeyboardButton("Назад").WithCallbackData(CallbackSettings)),
+	)
+}
+
+func TimezoneIndex(timezone string) int {
+	for index, option := range timezoneOptions {
+		if option.Timezone == timezone {
+			return index
+		}
+	}
+
+	return 0
+}
+
+func TimezoneByIndex(index int) TimezoneOption {
+	return timezoneOptions[normalizeTimezoneIndex(index)]
+}
+
+func TimezoneButtonText(option TimezoneOption, now time.Time) string {
+	location, err := time.LoadLocation(option.Timezone)
+	if err != nil {
+		return option.City
+	}
+
+	_, offset := now.In(location).Zone()
+
+	return fmt.Sprintf("%s (%+d)", option.City, offset/3600)
+}
+
+func TimezonePrevCallback(index int) string {
+	return fmt.Sprintf("%s%d", CallbackSettingsTimezonePrev, normalizeTimezoneIndex(index-1))
+}
+
+func TimezoneNextCallback(index int) string {
+	return fmt.Sprintf("%s%d", CallbackSettingsTimezoneNext, normalizeTimezoneIndex(index+1))
+}
+
+func TimezoneSelectCallback(index int) string {
+	return fmt.Sprintf("%s%d", CallbackSettingsTimezoneSelect, normalizeTimezoneIndex(index))
+}
+
+func normalizeTimezoneIndex(index int) int {
+	count := len(timezoneOptions)
+	if count == 0 {
+		return 0
+	}
+
+	index %= count
+	if index < 0 {
+		index += count
+	}
+
+	return index
+}
+
+var timezoneOptions = []TimezoneOption{
+	{City: "Москва", Timezone: "Europe/Moscow"},
+	{City: "Калининград", Timezone: "Europe/Kaliningrad"},
+	{City: "Самара", Timezone: "Europe/Samara"},
+	{City: "Екатеринбург", Timezone: "Asia/Yekaterinburg"},
+	{City: "Омск", Timezone: "Asia/Omsk"},
+	{City: "Новосибирск", Timezone: "Asia/Novosibirsk"},
+	{City: "Красноярск", Timezone: "Asia/Krasnoyarsk"},
+	{City: "Иркутск", Timezone: "Asia/Irkutsk"},
+	{City: "Якутск", Timezone: "Asia/Yakutsk"},
+	{City: "Владивосток", Timezone: "Asia/Vladivostok"},
+	{City: "Магадан", Timezone: "Asia/Magadan"},
+	{City: "Камчатка", Timezone: "Asia/Kamchatka"},
 }
