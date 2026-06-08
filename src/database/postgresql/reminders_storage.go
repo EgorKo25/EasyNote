@@ -186,7 +186,6 @@ func (d *Database) FindRemindersReadyToSend(
 			SELECT r.id
 			FROM reminders r
 			JOIN notes n ON n.id = r.note_id
-			LEFT JOIN user_settings s ON s.telegram_chat_id = n.telegram_chat_id
 			WHERE r.remind_at <= $1
 				AND r.status = 'new'
 				AND (
