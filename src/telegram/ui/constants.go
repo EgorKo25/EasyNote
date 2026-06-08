@@ -2,9 +2,10 @@ package ui
 
 const (
 	ButtonStart           = "Старт"
-	ButtonCreateReminder  = "Создать напоминание"
-	ButtonReminderList    = "Список напоминаний"
-	ButtonReminderHistory = "Прошедшие напоминания"
+	ButtonCreateReminder  = "Создать"
+	ButtonReminders       = "Напоминания"
+	ButtonReminderList    = "Активные"
+	ButtonReminderHistory = "Прошедшие"
 	ButtonSettings        = "Настройки"
 )
 

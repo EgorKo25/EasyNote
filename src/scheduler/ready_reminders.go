@@ -11,7 +11,7 @@ import (
 )
 
 func (r *Runner) processReadyReminders(ctx context.Context) error {
-	reminders, err := r.storage.FindRemindersReadyToSend(ctx, r.clock.Now(), r.cfg.BatchLimit)
+	reminders, err := r.FindRemindersReadyToSend(ctx, r.Now(), r.cfg.BatchLimit)
 	if err != nil {
 		return fmt.Errorf("find reminders ready to send: %w", err)
 	}
@@ -30,9 +30,9 @@ func (r *Runner) processReadyReminders(ctx context.Context) error {
 }
 
 func (r *Runner) processReadyReminder(ctx context.Context, reminder database.ScheduledReminder) error {
-	sentTime := r.clock.Now()
+	sentTime := r.Now()
 	if shouldSkipIntrusiveReminder(reminder, sentTime) {
-		return r.planner.CompleteOccurrence(ctx, reminder.ID, database.ReminderStatusSkipped, &sentTime)
+		return r.CompleteOccurrence(ctx, reminder.ID, database.ReminderStatusSkipped, &sentTime)
 	}
 
 	status := database.ReminderStatusSent
@@ -52,10 +52,15 @@ func (r *Runner) processReadyReminder(ctx context.Context, reminder database.Sch
 		)
 	}
 
-	sendTime := r.clock.Now()
+	sendTime := r.Now()
+
+	var completedAt *time.Time
+	if status == database.ReminderStatusSent {
+		completedAt = &sendTime
+	}
 
 	if reminder.IntrusiveEnabled {
-		if err = r.storage.MarkReminderDelivered(ctx,
+		if err = r.MarkReminderDelivered(ctx,
 			deliveryForReminder(reminder, messageID, sendTime)); err != nil {
 			return fmt.Errorf("mark reminder %d delivered: %w", reminder.ID, err)
 		}
@@ -63,7 +68,11 @@ func (r *Runner) processReadyReminder(ctx context.Context, reminder database.Sch
 		return nil
 	}
 
-	return r.planner.CompleteOccurrence(ctx, reminder.ID, status, sendTime)
+	if err = r.CompleteOccurrence(ctx, reminder.ID, status, completedAt); err != nil {
+		return fmt.Errorf("complete reminder %d with status %q: %w", reminder.ID, status, err)
+	}
+
+	return nil
 }
 
 func (r *Runner) sendReminder(
@@ -72,10 +81,10 @@ func (r *Runner) sendReminder(
 ) (int, error) {
 	var messageID int
 
-	err := r.retrier.Retry(
+	err := r.Retry(
 		ctx,
 		func() error {
-			sentMessageID, err := r.sender.SendReminder(ctx, reminder)
+			sentMessageID, err := r.SendReminder(ctx, reminder)
 			if err != nil {
 				return fmt.Errorf("send reminder: %w", err)
 			}
@@ -94,23 +103,10 @@ func (r *Runner) sendReminder(
 		},
 	)
 	if err != nil {
-		return 0, nil, fmt.Errorf("retry reminder send: %w", err)
+		return 0, fmt.Errorf("retry reminder send: %w", err)
 	}
 
 	return messageID, nil
-}
-
-func (r *Runner) (
-	ctx context.Context,
-	reminderID int64,
-	status database.ReminderStatus,
-	sentAt *time.Time,
-) error {
-	if err := r.planner.CompleteOccurrence(ctx, reminderID, status, sentAt); err != nil {
-		return fmt.Errorf("complete reminder %d with status %q: %w", reminderID, status, err)
-	}
-
-	return nil
 }
 
 func shouldSkipIntrusiveReminder(reminder database.ScheduledReminder, now time.Time) bool {

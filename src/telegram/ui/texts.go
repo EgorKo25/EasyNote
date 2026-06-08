@@ -12,6 +12,10 @@ func MainMenuText() string {
 	return "Главное меню\n\nВыберите действие на клавиатуре ниже."
 }
 
+func RemindersText() string {
+	return "Напоминания\n\nВыберите список напоминаний."
+}
+
 func DraftText(draft Draft, location *time.Location) string {
 	remindAt, title, description := emptyFieldText, emptyFieldText, emptyFieldText
 	repeat := RepeatText(draft)

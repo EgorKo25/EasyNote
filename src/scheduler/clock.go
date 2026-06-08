@@ -8,13 +8,13 @@ type Option func(*Runner)
 
 func WithClock(clock Clock) Option {
 	return func(r *Runner) {
-		r.clock = clock
+		r.Clock = clock
 	}
 }
 
 func WithRetrier(retrier Retrier) Option {
 	return func(r *Runner) {
-		r.retrier = retrier
+		r.Retrier = retrier
 	}
 }
 
