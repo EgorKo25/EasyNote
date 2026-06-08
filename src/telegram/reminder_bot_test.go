@@ -11,6 +11,7 @@ import (
 	"github.com/EgorKo25/EasyNote/src/config"
 	"github.com/EgorKo25/EasyNote/src/database"
 	telegrammocks "github.com/EgorKo25/EasyNote/src/telegram/mocks"
+	telegramui "github.com/EgorKo25/EasyNote/src/telegram/ui"
 	"github.com/mymmrac/telego"
 	"github.com/mymmrac/telego/telegoapi"
 	telegoapimock "github.com/mymmrac/telego/telegoapi/mock"
@@ -59,14 +60,14 @@ func TestReminderDraftAppliesTextInput(t *testing.T) {
 			description string
 			hour        int
 			minute      int
-			waitingFor  draftField
-			screen      draftScreen
+			waitingFor  telegramui.Field
+			screen      telegramui.Screen
 			notice      string
 		}
 	}{
 		{
 			name:  "title is saved from user message",
-			draft: reminderDraft{waitingFor: fieldTitle},
+			draft: reminderDraft{waitingFor: telegramui.FieldTitle},
 			input: "Pay rent",
 			expected: struct {
 				applied     bool
@@ -74,14 +75,14 @@ func TestReminderDraftAppliesTextInput(t *testing.T) {
 				description string
 				hour        int
 				minute      int
-				waitingFor  draftField
-				screen      draftScreen
+				waitingFor  telegramui.Field
+				screen      telegramui.Screen
 				notice      string
-			}{applied: true, title: "Pay rent", screen: draftScreenMain},
+			}{applied: true, title: "Pay rent", screen: telegramui.ScreenMain},
 		},
 		{
 			name:  "description is saved from user message",
-			draft: reminderDraft{waitingFor: fieldDescription},
+			draft: reminderDraft{waitingFor: telegramui.FieldDescription},
 			input: "Before lunch",
 			expected: struct {
 				applied     bool
@@ -89,14 +90,14 @@ func TestReminderDraftAppliesTextInput(t *testing.T) {
 				description string
 				hour        int
 				minute      int
-				waitingFor  draftField
-				screen      draftScreen
+				waitingFor  telegramui.Field
+				screen      telegramui.Screen
 				notice      string
-			}{applied: true, description: "Before lunch", screen: draftScreenMain},
+			}{applied: true, description: "Before lunch", screen: telegramui.ScreenMain},
 		},
 		{
 			name:  "short title is saved from user message",
-			draft: reminderDraft{waitingFor: fieldTitle},
+			draft: reminderDraft{waitingFor: telegramui.FieldTitle},
 			input: "Call",
 			expected: struct {
 				applied     bool
@@ -104,14 +105,14 @@ func TestReminderDraftAppliesTextInput(t *testing.T) {
 				description string
 				hour        int
 				minute      int
-				waitingFor  draftField
-				screen      draftScreen
+				waitingFor  telegramui.Field
+				screen      telegramui.Screen
 				notice      string
-			}{applied: true, title: "Call", screen: draftScreenMain},
+			}{applied: true, title: "Call", screen: telegramui.ScreenMain},
 		},
 		{
 			name:  "long description is saved from user message",
-			draft: reminderDraft{waitingFor: fieldDescription},
+			draft: reminderDraft{waitingFor: telegramui.FieldDescription},
 			input: "Prepare documents before lunch",
 			expected: struct {
 				applied     bool
@@ -119,16 +120,16 @@ func TestReminderDraftAppliesTextInput(t *testing.T) {
 				description string
 				hour        int
 				minute      int
-				waitingFor  draftField
-				screen      draftScreen
+				waitingFor  telegramui.Field
+				screen      telegramui.Screen
 				notice      string
-			}{applied: true, description: "Prepare documents before lunch", screen: draftScreenMain},
+			}{applied: true, description: "Prepare documents before lunch", screen: telegramui.ScreenMain},
 		},
 		{
 			name: "manual time input is saved from HH MM message",
 			draft: reminderDraft{
 				date:   time.Date(2099, 6, 2, 0, 0, 0, 0, time.Local),
-				screen: draftScreenTime,
+				screen: telegramui.ScreenTime,
 			},
 			input: "18:45",
 			expected: struct {
@@ -137,14 +138,14 @@ func TestReminderDraftAppliesTextInput(t *testing.T) {
 				description string
 				hour        int
 				minute      int
-				waitingFor  draftField
-				screen      draftScreen
+				waitingFor  telegramui.Field
+				screen      telegramui.Screen
 				notice      string
-			}{applied: true, hour: 18, minute: 45, screen: draftScreenMain},
+			}{applied: true, hour: 18, minute: 45, screen: telegramui.ScreenMain},
 		},
 		{
 			name:  "message is ignored when draft does not wait for text",
-			draft: reminderDraft{screen: draftScreenMain},
+			draft: reminderDraft{screen: telegramui.ScreenMain},
 			input: "ignored",
 			expected: struct {
 				applied     bool
@@ -152,16 +153,16 @@ func TestReminderDraftAppliesTextInput(t *testing.T) {
 				description string
 				hour        int
 				minute      int
-				waitingFor  draftField
-				screen      draftScreen
+				waitingFor  telegramui.Field
+				screen      telegramui.Screen
 				notice      string
-			}{applied: false, screen: draftScreenMain},
+			}{applied: false, screen: telegramui.ScreenMain},
 		},
 		{
 			name: "invalid manual time input is ignored on time screen",
 			draft: reminderDraft{
 				date:   time.Date(2099, 6, 2, 0, 0, 0, 0, time.Local),
-				screen: draftScreenTime,
+				screen: telegramui.ScreenTime,
 			},
 			input: "18-45",
 			expected: struct {
@@ -170,10 +171,10 @@ func TestReminderDraftAppliesTextInput(t *testing.T) {
 				description string
 				hour        int
 				minute      int
-				waitingFor  draftField
-				screen      draftScreen
+				waitingFor  telegramui.Field
+				screen      telegramui.Screen
 				notice      string
-			}{applied: false, screen: draftScreenTime},
+			}{applied: false, screen: telegramui.ScreenTime},
 		},
 		{
 			name:  "message is ignored when draft does not exist",
@@ -184,8 +185,8 @@ func TestReminderDraftAppliesTextInput(t *testing.T) {
 				description string
 				hour        int
 				minute      int
-				waitingFor  draftField
-				screen      draftScreen
+				waitingFor  telegramui.Field
+				screen      telegramui.Screen
 				notice      string
 			}{applied: false},
 		},
@@ -232,7 +233,7 @@ func TestReminderDraftAppliesDateCallbacks(t *testing.T) {
 			date    time.Time
 			hour    int
 			minute  int
-			screen  draftScreen
+			screen  telegramui.Screen
 		}
 	}{
 		{
@@ -244,8 +245,8 @@ func TestReminderDraftAppliesDateCallbacks(t *testing.T) {
 				date    time.Time
 				hour    int
 				minute  int
-				screen  draftScreen
-			}{applied: true, date: time.Date(2099, 6, 4, 0, 0, 0, 0, location), screen: draftScreenTime},
+				screen  telegramui.Screen
+			}{applied: true, date: time.Date(2099, 6, 4, 0, 0, 0, 0, location), screen: telegramui.ScreenTime},
 		},
 		{
 			name:  "month callback changes calendar month",
@@ -256,20 +257,20 @@ func TestReminderDraftAppliesDateCallbacks(t *testing.T) {
 				date    time.Time
 				hour    int
 				minute  int
-				screen  draftScreen
-			}{applied: true, screen: draftScreenCalendar},
+				screen  telegramui.Screen
+			}{applied: true, screen: telegramui.ScreenCalendar},
 		},
 		{
 			name:  "time preset callback changes selected time",
-			draft: reminderDraft{date: time.Date(2026, 6, 2, 0, 0, 0, 0, location), screen: draftScreenTime},
+			draft: reminderDraft{date: time.Date(2026, 6, 2, 0, 0, 0, 0, location), screen: telegramui.ScreenTime},
 			data:  "time:set:18:00",
 			expected: struct {
 				applied bool
 				date    time.Time
 				hour    int
 				minute  int
-				screen  draftScreen
-			}{applied: true, date: time.Date(2026, 6, 2, 0, 0, 0, 0, location), hour: 18, screen: draftScreenMain},
+				screen  telegramui.Screen
+			}{applied: true, date: time.Date(2026, 6, 2, 0, 0, 0, 0, location), hour: 18, screen: telegramui.ScreenMain},
 		},
 		{
 			name: "time shift callback moves selected time",
@@ -277,7 +278,7 @@ func TestReminderDraftAppliesDateCallbacks(t *testing.T) {
 				date:   time.Date(2026, 6, 2, 0, 0, 0, 0, location),
 				hour:   10,
 				minute: 5,
-				screen: draftScreenTime,
+				screen: telegramui.ScreenTime,
 			},
 			data: "time:shift:-5",
 			expected: struct {
@@ -285,8 +286,8 @@ func TestReminderDraftAppliesDateCallbacks(t *testing.T) {
 				date    time.Time
 				hour    int
 				minute  int
-				screen  draftScreen
-			}{applied: true, date: time.Date(2026, 6, 2, 0, 0, 0, 0, location), hour: 10, screen: draftScreenTime},
+				screen  telegramui.Screen
+			}{applied: true, date: time.Date(2026, 6, 2, 0, 0, 0, 0, location), hour: 10, screen: telegramui.ScreenTime},
 		},
 		{
 			name:  "invalid date callback is rejected",
@@ -297,7 +298,7 @@ func TestReminderDraftAppliesDateCallbacks(t *testing.T) {
 				date    time.Time
 				hour    int
 				minute  int
-				screen  draftScreen
+				screen  telegramui.Screen
 			}{applied: false},
 		},
 		{
@@ -309,7 +310,7 @@ func TestReminderDraftAppliesDateCallbacks(t *testing.T) {
 				date    time.Time
 				hour    int
 				minute  int
-				screen  draftScreen
+				screen  telegramui.Screen
 			}{applied: false},
 		},
 	}
@@ -343,9 +344,9 @@ func TestReminderDraftAppliesWeekdayCallbacks(t *testing.T) {
 		data     string
 		expected struct {
 			applied      bool
-			repeat       reminderRepeat
+			repeat       telegramui.Repeat
 			weekdaysMask int
-			screen       draftScreen
+			screen       telegramui.Screen
 		}
 	}{
 		{
@@ -354,69 +355,69 @@ func TestReminderDraftAppliesWeekdayCallbacks(t *testing.T) {
 			data:  "weekday:1",
 			expected: struct {
 				applied      bool
-				repeat       reminderRepeat
+				repeat       telegramui.Repeat
 				weekdaysMask int
-				screen       draftScreen
-			}{applied: true, repeat: reminderRepeatCustomWeekdays, weekdaysMask: 1, screen: draftScreenWeekdays},
+				screen       telegramui.Screen
+			}{applied: true, repeat: telegramui.RepeatCustomWeekdays, weekdaysMask: 1, screen: telegramui.ScreenWeekdays},
 		},
 		{
 			name: "thursday callback adds thursday to existing monday",
 			draft: reminderDraft{
-				repeat:       reminderRepeatCustomWeekdays,
+				repeat:       telegramui.RepeatCustomWeekdays,
 				weekdaysMask: 1,
-				screen:       draftScreenWeekdays,
+				screen:       telegramui.ScreenWeekdays,
 			},
 			data: "weekday:8",
 			expected: struct {
 				applied      bool
-				repeat       reminderRepeat
+				repeat       telegramui.Repeat
 				weekdaysMask int
-				screen       draftScreen
+				screen       telegramui.Screen
 			}{
 				applied:      true,
-				repeat:       reminderRepeatCustomWeekdays,
+				repeat:       telegramui.RepeatCustomWeekdays,
 				weekdaysMask: 1 | 8,
-				screen:       draftScreenWeekdays,
+				screen:       telegramui.ScreenWeekdays,
 			},
 		},
 		{
 			name: "selected weekday callback removes weekday from mask",
 			draft: reminderDraft{
-				repeat:       reminderRepeatCustomWeekdays,
+				repeat:       telegramui.RepeatCustomWeekdays,
 				weekdaysMask: 1 | 8,
-				screen:       draftScreenWeekdays,
+				screen:       telegramui.ScreenWeekdays,
 			},
 			data: "weekday:8",
 			expected: struct {
 				applied      bool
-				repeat       reminderRepeat
+				repeat       telegramui.Repeat
 				weekdaysMask int
-				screen       draftScreen
+				screen       telegramui.Screen
 			}{
 				applied:      true,
-				repeat:       reminderRepeatCustomWeekdays,
+				repeat:       telegramui.RepeatCustomWeekdays,
 				weekdaysMask: 1,
-				screen:       draftScreenWeekdays,
+				screen:       telegramui.ScreenWeekdays,
 			},
 		},
 		{
 			name: "sunday callback preserves existing weekend mask",
 			draft: reminderDraft{
-				repeat:       reminderRepeatCustomWeekdays,
+				repeat:       telegramui.RepeatCustomWeekdays,
 				weekdaysMask: 32,
-				screen:       draftScreenWeekdays,
+				screen:       telegramui.ScreenWeekdays,
 			},
 			data: "weekday:64",
 			expected: struct {
 				applied      bool
-				repeat       reminderRepeat
+				repeat       telegramui.Repeat
 				weekdaysMask int
-				screen       draftScreen
+				screen       telegramui.Screen
 			}{
 				applied:      true,
-				repeat:       reminderRepeatCustomWeekdays,
+				repeat:       telegramui.RepeatCustomWeekdays,
 				weekdaysMask: 32 | 64,
-				screen:       draftScreenWeekdays,
+				screen:       telegramui.ScreenWeekdays,
 			},
 		},
 		{
@@ -425,9 +426,9 @@ func TestReminderDraftAppliesWeekdayCallbacks(t *testing.T) {
 			data:  "weekday:not-a-number",
 			expected: struct {
 				applied      bool
-				repeat       reminderRepeat
+				repeat       telegramui.Repeat
 				weekdaysMask int
-				screen       draftScreen
+				screen       telegramui.Screen
 			}{applied: false},
 		},
 		{
@@ -436,9 +437,9 @@ func TestReminderDraftAppliesWeekdayCallbacks(t *testing.T) {
 			data:  "weekday-unknown:1",
 			expected: struct {
 				applied      bool
-				repeat       reminderRepeat
+				repeat       telegramui.Repeat
 				weekdaysMask int
-				screen       draftScreen
+				screen       telegramui.Screen
 			}{applied: false},
 		},
 	}
@@ -479,7 +480,7 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 	}{
 		{
 			name:   "main menu text is concise",
-			action: mainMenuText,
+			action: telegramui.MainMenuText,
 			expected: struct {
 				expectedText string
 			}{
@@ -490,13 +491,13 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 		{
 			name: "draft text shows selected date time and empty repeat",
 			action: func() string {
-				return draftText(reminderDraft{
+				return telegramui.DraftText(uiDraft(reminderDraft{
 					title:       "Pay rent",
 					description: "Before lunch",
 					date:        time.Date(2026, 6, 2, 0, 0, 0, 0, location),
 					hour:        9,
 					minute:      30,
-				}, location)
+				}), location)
 			},
 			expected: struct {
 				expectedText string
@@ -512,15 +513,15 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 		{
 			name: "draft text shows selected custom date count",
 			action: func() string {
-				return draftText(reminderDraft{
+				return telegramui.DraftText(uiDraft(reminderDraft{
 					title:       "Pay rent",
 					description: "Before lunch",
-					repeat:      reminderRepeatCustomDates,
+					repeat:      telegramui.RepeatCustomDates,
 					customDates: []time.Time{
 						time.Date(2026, 6, 2, 0, 0, 0, 0, location),
 						time.Date(2026, 6, 4, 0, 0, 0, 0, location),
 					},
-				}, location)
+				}), location)
 			},
 			expected: struct {
 				expectedText string
@@ -536,7 +537,7 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 		{
 			name: "reminder view text includes description",
 			action: func() string {
-				return reminderViewText(reminder, location)
+				return telegramui.ReminderViewText(reminder, location)
 			},
 			expected: struct {
 				expectedText string
@@ -545,7 +546,7 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 		{
 			name: "empty draft text shows missing fields and empty repeat",
 			action: func() string {
-				return draftText(reminderDraft{}, location)
+				return telegramui.DraftText(uiDraft(reminderDraft{}), location)
 			},
 			expected: struct {
 				expectedText string
@@ -561,7 +562,7 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 		{
 			name: "empty reminder list explains next action",
 			action: func() string {
-				return reminderListText(nil)
+				return telegramui.ReminderListText(nil)
 			},
 			expected: struct {
 				expectedText string
@@ -595,7 +596,7 @@ func TestReminderUIBuildsExpectedKeyboards(t *testing.T) {
 		{
 			name: "main draft keyboard has three command rows",
 			action: func() *telego.InlineKeyboardMarkup {
-				return draftKeyboard(reminderDraft{}, now)
+				return telegramui.DraftKeyboard(uiDraft(reminderDraft{}), now)
 			},
 			expected: struct {
 				rowCount        int
@@ -605,9 +606,9 @@ func TestReminderUIBuildsExpectedKeyboards(t *testing.T) {
 		{
 			name: "filled one time draft keyboard offers changing date",
 			action: func() *telego.InlineKeyboardMarkup {
-				return draftKeyboard(reminderDraft{
+				return telegramui.DraftKeyboard(uiDraft(reminderDraft{
 					date: time.Date(2026, 6, 2, 0, 0, 0, 0, time.Local),
-				}, now)
+				}), now)
 			},
 			expected: struct {
 				rowCount        int
@@ -617,7 +618,7 @@ func TestReminderUIBuildsExpectedKeyboards(t *testing.T) {
 		{
 			name: "empty recurring draft keyboard explains start date time",
 			action: func() *telego.InlineKeyboardMarkup {
-				return draftKeyboard(reminderDraft{repeat: reminderRepeatEveryDay}, now)
+				return telegramui.DraftKeyboard(uiDraft(reminderDraft{repeat: telegramui.RepeatEveryDay}), now)
 			},
 			expected: struct {
 				rowCount        int
@@ -627,10 +628,10 @@ func TestReminderUIBuildsExpectedKeyboards(t *testing.T) {
 		{
 			name: "filled recurring draft keyboard offers changing start date time",
 			action: func() *telego.InlineKeyboardMarkup {
-				return draftKeyboard(reminderDraft{
+				return telegramui.DraftKeyboard(uiDraft(reminderDraft{
 					date:   time.Date(2026, 6, 2, 0, 0, 0, 0, time.Local),
-					repeat: reminderRepeatEveryDay,
-				}, now)
+					repeat: telegramui.RepeatEveryDay,
+				}), now)
 			},
 			expected: struct {
 				rowCount        int
@@ -640,7 +641,7 @@ func TestReminderUIBuildsExpectedKeyboards(t *testing.T) {
 		{
 			name: "date choice keyboard is compact",
 			action: func() *telego.InlineKeyboardMarkup {
-				return draftKeyboard(reminderDraft{screen: draftScreenDate}, now)
+				return telegramui.DraftKeyboard(uiDraft(reminderDraft{screen: telegramui.ScreenDate}), now)
 			},
 			expected: struct {
 				rowCount        int
@@ -650,10 +651,10 @@ func TestReminderUIBuildsExpectedKeyboards(t *testing.T) {
 		{
 			name: "calendar keyboard opens explicit calendar grid",
 			action: func() *telego.InlineKeyboardMarkup {
-				return draftKeyboard(reminderDraft{
-					screen:        draftScreenCalendar,
+				return telegramui.DraftKeyboard(uiDraft(reminderDraft{
+					screen:        telegramui.ScreenCalendar,
 					calendarMonth: time.Date(2026, 6, 1, 0, 0, 0, 0, time.Local),
-				}, now)
+				}), now)
 			},
 			expected: struct {
 				rowCount        int
@@ -663,11 +664,11 @@ func TestReminderUIBuildsExpectedKeyboards(t *testing.T) {
 		{
 			name: "time keyboard has future presets, steppers and done",
 			action: func() *telego.InlineKeyboardMarkup {
-				return draftKeyboard(reminderDraft{
-					screen: draftScreenTime,
+				return telegramui.DraftKeyboard(uiDraft(reminderDraft{
+					screen: telegramui.ScreenTime,
 					date:   time.Date(2026, 6, 1, 0, 0, 0, 0, time.Local),
 					hour:   9, minute: 30,
-				}, now)
+				}), now)
 			},
 			expected: struct {
 				rowCount        int
@@ -677,7 +678,7 @@ func TestReminderUIBuildsExpectedKeyboards(t *testing.T) {
 		{
 			name: "empty reminder list keyboard still has main menu",
 			action: func() *telego.InlineKeyboardMarkup {
-				return reminderListKeyboard(nil)
+				return telegramui.ReminderListKeyboard(nil)
 			},
 			expected: struct {
 				rowCount        int
@@ -687,7 +688,7 @@ func TestReminderUIBuildsExpectedKeyboards(t *testing.T) {
 		{
 			name: "reminder list keyboard opens reminders by title buttons",
 			action: func() *telego.InlineKeyboardMarkup {
-				return reminderListKeyboard([]database.ReminderView{
+				return telegramui.ReminderListKeyboard([]database.ReminderView{
 					{ID: 1, Title: "Pay rent"},
 					{ID: 2, Title: "Call mom"},
 				})
@@ -933,12 +934,12 @@ func TestReminderUIBuildsDraftModel(t *testing.T) {
 			date          time.Time
 			hour          int
 			minute        int
-			repeat        reminderRepeat
+			repeat        telegramui.Repeat
 			customDates   []time.Time
 			weekdaysMask  int
-			screen        draftScreen
+			screen        telegramui.Screen
 			calendarMonth time.Time
-			waitingFor    draftField
+			waitingFor    telegramui.Field
 		}
 	}{
 		{
@@ -951,12 +952,12 @@ func TestReminderUIBuildsDraftModel(t *testing.T) {
 				date          time.Time
 				hour          int
 				minute        int
-				repeat        reminderRepeat
+				repeat        telegramui.Repeat
 				customDates   []time.Time
 				weekdaysMask  int
-				screen        draftScreen
+				screen        telegramui.Screen
 				calendarMonth time.Time
-				waitingFor    draftField
+				waitingFor    telegramui.Field
 			}{},
 		},
 		{
@@ -967,7 +968,7 @@ func TestReminderUIBuildsDraftModel(t *testing.T) {
 				date:        time.Date(2026, 6, 2, 0, 0, 0, 0, location),
 				hour:        9,
 				minute:      30,
-				screen:      draftScreenMain,
+				screen:      telegramui.ScreenMain,
 			},
 			expected: struct {
 				title         string
@@ -976,28 +977,28 @@ func TestReminderUIBuildsDraftModel(t *testing.T) {
 				date          time.Time
 				hour          int
 				minute        int
-				repeat        reminderRepeat
+				repeat        telegramui.Repeat
 				customDates   []time.Time
 				weekdaysMask  int
-				screen        draftScreen
+				screen        telegramui.Screen
 				calendarMonth time.Time
-				waitingFor    draftField
+				waitingFor    telegramui.Field
 			}{
 				title:       "Pay rent",
 				description: "Before lunch",
 				date:        time.Date(2026, 6, 2, 0, 0, 0, 0, location),
 				hour:        9,
 				minute:      30,
-				screen:      draftScreenMain,
+				screen:      telegramui.ScreenMain,
 			},
 		},
 		{
 			name: "recurring draft maps repeat and weekdays",
 			draft: reminderDraft{
 				title:        "Training",
-				repeat:       reminderRepeatCustomWeekdays,
+				repeat:       telegramui.RepeatCustomWeekdays,
 				weekdaysMask: 1 | 8,
-				screen:       draftScreenWeekdays,
+				screen:       telegramui.ScreenWeekdays,
 			},
 			expected: struct {
 				title         string
@@ -1006,26 +1007,26 @@ func TestReminderUIBuildsDraftModel(t *testing.T) {
 				date          time.Time
 				hour          int
 				minute        int
-				repeat        reminderRepeat
+				repeat        telegramui.Repeat
 				customDates   []time.Time
 				weekdaysMask  int
-				screen        draftScreen
+				screen        telegramui.Screen
 				calendarMonth time.Time
-				waitingFor    draftField
+				waitingFor    telegramui.Field
 			}{
 				title:        "Training",
-				repeat:       reminderRepeatCustomWeekdays,
+				repeat:       telegramui.RepeatCustomWeekdays,
 				weekdaysMask: 1 | 8,
-				screen:       draftScreenWeekdays,
+				screen:       telegramui.ScreenWeekdays,
 			},
 		},
 		{
 			name: "custom dates draft maps calendar state",
 			draft: reminderDraft{
-				repeat:        reminderRepeatCustomDates,
+				repeat:        telegramui.RepeatCustomDates,
 				customDates:   []time.Time{customDate},
 				calendarMonth: time.Date(2026, 6, 1, 0, 0, 0, 0, location),
-				screen:        draftScreenCalendar,
+				screen:        telegramui.ScreenCalendar,
 			},
 			expected: struct {
 				title         string
@@ -1034,25 +1035,25 @@ func TestReminderUIBuildsDraftModel(t *testing.T) {
 				date          time.Time
 				hour          int
 				minute        int
-				repeat        reminderRepeat
+				repeat        telegramui.Repeat
 				customDates   []time.Time
 				weekdaysMask  int
-				screen        draftScreen
+				screen        telegramui.Screen
 				calendarMonth time.Time
-				waitingFor    draftField
+				waitingFor    telegramui.Field
 			}{
-				repeat:        reminderRepeatCustomDates,
+				repeat:        telegramui.RepeatCustomDates,
 				customDates:   []time.Time{customDate},
 				calendarMonth: time.Date(2026, 6, 1, 0, 0, 0, 0, location),
-				screen:        draftScreenCalendar,
+				screen:        telegramui.ScreenCalendar,
 			},
 		},
 		{
 			name: "title input draft maps waiting field",
 			draft: reminderDraft{
-				waitingFor: fieldTitle,
+				waitingFor: telegramui.FieldTitle,
 				notice:     "Введите название",
-				screen:     draftScreenMain,
+				screen:     telegramui.ScreenMain,
 			},
 			expected: struct {
 				title         string
@@ -1061,24 +1062,24 @@ func TestReminderUIBuildsDraftModel(t *testing.T) {
 				date          time.Time
 				hour          int
 				minute        int
-				repeat        reminderRepeat
+				repeat        telegramui.Repeat
 				customDates   []time.Time
 				weekdaysMask  int
-				screen        draftScreen
+				screen        telegramui.Screen
 				calendarMonth time.Time
-				waitingFor    draftField
+				waitingFor    telegramui.Field
 			}{
-				waitingFor: fieldTitle,
+				waitingFor: telegramui.FieldTitle,
 				notice:     "Введите название",
-				screen:     draftScreenMain,
+				screen:     telegramui.ScreenMain,
 			},
 		},
 		{
 			name: "description input draft maps waiting field",
 			draft: reminderDraft{
-				waitingFor: fieldDescription,
+				waitingFor: telegramui.FieldDescription,
 				notice:     "Введите описание",
-				screen:     draftScreenMain,
+				screen:     telegramui.ScreenMain,
 			},
 			expected: struct {
 				title         string
@@ -1087,16 +1088,16 @@ func TestReminderUIBuildsDraftModel(t *testing.T) {
 				date          time.Time
 				hour          int
 				minute        int
-				repeat        reminderRepeat
+				repeat        telegramui.Repeat
 				customDates   []time.Time
 				weekdaysMask  int
-				screen        draftScreen
+				screen        telegramui.Screen
 				calendarMonth time.Time
-				waitingFor    draftField
+				waitingFor    telegramui.Field
 			}{
-				waitingFor: fieldDescription,
+				waitingFor: telegramui.FieldDescription,
 				notice:     "Введите описание",
-				screen:     draftScreenMain,
+				screen:     telegramui.ScreenMain,
 			},
 		},
 	}
@@ -1149,8 +1150,12 @@ func TestReminderBotHandlesMessages(t *testing.T) {
 			},
 		},
 		{
-			name:    "create reminder command opens draft",
-			message: telego.Message{MessageID: messageID, Chat: telego.Chat{ID: chatID}, Text: buttonCreateReminder},
+			name: "create reminder command opens draft",
+			message: telego.Message{
+				MessageID: messageID,
+				Chat:      telego.Chat{ID: chatID},
+				Text:      telegramui.ButtonCreateReminder,
+			},
 			before: func(caller *telegoapimock.MockCaller, _ *telegrammocks.MockReminderService) {
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(testTelegramResponse(t, telego.Message{MessageID: 2}), nil).
@@ -1158,8 +1163,12 @@ func TestReminderBotHandlesMessages(t *testing.T) {
 			},
 		},
 		{
-			name:    "reminders command opens reminder submenu",
-			message: telego.Message{MessageID: messageID, Chat: telego.Chat{ID: chatID}, Text: buttonReminders},
+			name: "reminders command opens reminder submenu",
+			message: telego.Message{
+				MessageID: messageID,
+				Chat:      telego.Chat{ID: chatID},
+				Text:      telegramui.ButtonReminders,
+			},
 			before: func(caller *telegoapimock.MockCaller, _ *telegrammocks.MockReminderService) {
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(testTelegramResponse(t, telego.Message{MessageID: 3}), nil).
@@ -1169,7 +1178,7 @@ func TestReminderBotHandlesMessages(t *testing.T) {
 		{
 			name:    "draft title message updates current draft",
 			message: telego.Message{MessageID: messageID, Chat: telego.Chat{ID: chatID}, Text: "Pay rent"},
-			draft:   reminderDraft{waitingFor: fieldTitle},
+			draft:   reminderDraft{waitingFor: telegramui.FieldTitle},
 			before: func(caller *telegoapimock.MockCaller, _ *telegrammocks.MockReminderService) {
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(testTelegramResponse(t, telego.Message{MessageID: 4}), nil).
@@ -1255,49 +1264,49 @@ func TestReminderBotCommandCallbacks(t *testing.T) {
 		draft    reminderDraft
 		expected struct {
 			handled bool
-			screen  draftScreen
-			waiting draftField
+			screen  telegramui.Screen
+			waiting telegramui.Field
 		}
 	}{
 		{
 			name:  "title callback waits for title",
-			data:  callbackDraftTitle,
+			data:  telegramui.CallbackDraftTitle,
 			draft: reminderDraft{},
 			expected: struct {
 				handled bool
-				screen  draftScreen
-				waiting draftField
-			}{handled: true, screen: draftScreenMain, waiting: fieldTitle},
+				screen  telegramui.Screen
+				waiting telegramui.Field
+			}{handled: true, screen: telegramui.ScreenMain, waiting: telegramui.FieldTitle},
 		},
 		{
 			name:  "description callback waits for description",
-			data:  callbackDraftDescription,
+			data:  telegramui.CallbackDraftDescription,
 			draft: reminderDraft{},
 			expected: struct {
 				handled bool
-				screen  draftScreen
-				waiting draftField
-			}{handled: true, screen: draftScreenMain, waiting: fieldDescription},
+				screen  telegramui.Screen
+				waiting telegramui.Field
+			}{handled: true, screen: telegramui.ScreenMain, waiting: telegramui.FieldDescription},
 		},
 		{
 			name:  "calendar callback opens calendar",
-			data:  callbackDraftCalendar,
-			draft: reminderDraft{screen: draftScreenDate},
+			data:  telegramui.CallbackDraftCalendar,
+			draft: reminderDraft{screen: telegramui.ScreenDate},
 			expected: struct {
 				handled bool
-				screen  draftScreen
-				waiting draftField
-			}{handled: true, screen: draftScreenCalendar},
+				screen  telegramui.Screen
+				waiting telegramui.Field
+			}{handled: true, screen: telegramui.ScreenCalendar},
 		},
 		{
 			name:  "date callback opens compact date choice",
-			data:  callbackDraftDate,
+			data:  telegramui.CallbackDraftDate,
 			draft: reminderDraft{},
 			expected: struct {
 				handled bool
-				screen  draftScreen
-				waiting draftField
-			}{handled: true, screen: draftScreenDate},
+				screen  telegramui.Screen
+				waiting telegramui.Field
+			}{handled: true, screen: telegramui.ScreenDate},
 		},
 		{
 			name:  "unknown callback is not handled",
@@ -1305,29 +1314,29 @@ func TestReminderBotCommandCallbacks(t *testing.T) {
 			draft: reminderDraft{},
 			expected: struct {
 				handled bool
-				screen  draftScreen
-				waiting draftField
+				screen  telegramui.Screen
+				waiting telegramui.Field
 			}{handled: false},
 		},
 		{
 			name:  "noop callback is not a draft command",
-			data:  callbackNoop,
-			draft: reminderDraft{screen: draftScreenMain},
+			data:  telegramui.CallbackNoop,
+			draft: reminderDraft{screen: telegramui.ScreenMain},
 			expected: struct {
 				handled bool
-				screen  draftScreen
-				waiting draftField
-			}{handled: false, screen: draftScreenMain},
+				screen  telegramui.Screen
+				waiting telegramui.Field
+			}{handled: false, screen: telegramui.ScreenMain},
 		},
 		{
 			name:  "back callback returns to main draft",
-			data:  callbackDraftBack,
-			draft: reminderDraft{screen: draftScreenCalendar},
+			data:  telegramui.CallbackDraftBack,
+			draft: reminderDraft{screen: telegramui.ScreenCalendar},
 			expected: struct {
 				handled bool
-				screen  draftScreen
-				waiting draftField
-			}{handled: true, screen: draftScreenMain},
+				screen  telegramui.Screen
+				waiting telegramui.Field
+			}{handled: true, screen: telegramui.ScreenMain},
 		},
 	}
 
@@ -1380,9 +1389,9 @@ func TestReminderBotAppliesRepeatDateAndIntervalCallbacks(t *testing.T) {
 		data     string
 		expected struct {
 			applied      bool
-			repeat       reminderRepeat
-			screen       draftScreen
-			waitingFor   draftField
+			repeat       telegramui.Repeat
+			screen       telegramui.Screen
+			waitingFor   telegramui.Field
 			intervalDays int
 			customDates  []time.Time
 			notice       string
@@ -1391,124 +1400,129 @@ func TestReminderBotAppliesRepeatDateAndIntervalCallbacks(t *testing.T) {
 		{
 			name:  "custom dates repeat opens calendar",
 			draft: reminderDraft{},
-			data:  callbackRepeatPrefix + string(reminderRepeatCustomDates),
+			data:  telegramui.CallbackRepeatPrefix + string(telegramui.RepeatCustomDates),
 			expected: struct {
 				applied      bool
-				repeat       reminderRepeat
-				screen       draftScreen
-				waitingFor   draftField
+				repeat       telegramui.Repeat
+				screen       telegramui.Screen
+				waitingFor   telegramui.Field
 				intervalDays int
 				customDates  []time.Time
 				notice       string
-			}{applied: true, repeat: reminderRepeatCustomDates, screen: draftScreenCalendar},
+			}{applied: true, repeat: telegramui.RepeatCustomDates, screen: telegramui.ScreenCalendar},
 		},
 		{
 			name:  "custom weekdays repeat opens weekdays screen",
 			draft: reminderDraft{},
-			data:  callbackRepeatPrefix + string(reminderRepeatCustomWeekdays),
+			data:  telegramui.CallbackRepeatPrefix + string(telegramui.RepeatCustomWeekdays),
 			expected: struct {
 				applied      bool
-				repeat       reminderRepeat
-				screen       draftScreen
-				waitingFor   draftField
+				repeat       telegramui.Repeat
+				screen       telegramui.Screen
+				waitingFor   telegramui.Field
 				intervalDays int
 				customDates  []time.Time
 				notice       string
-			}{applied: true, repeat: reminderRepeatCustomWeekdays, screen: draftScreenWeekdays},
+			}{applied: true, repeat: telegramui.RepeatCustomWeekdays, screen: telegramui.ScreenWeekdays},
 		},
 		{
 			name:  "custom interval repeat opens interval input",
 			draft: reminderDraft{},
-			data:  callbackRepeatPrefix + string(reminderRepeatCustomInterval),
+			data:  telegramui.CallbackRepeatPrefix + string(telegramui.RepeatCustomInterval),
 			expected: struct {
 				applied      bool
-				repeat       reminderRepeat
-				screen       draftScreen
-				waitingFor   draftField
+				repeat       telegramui.Repeat
+				screen       telegramui.Screen
+				waitingFor   telegramui.Field
 				intervalDays int
 				customDates  []time.Time
 				notice       string
 			}{
-				applied: true, repeat: reminderRepeatCustomInterval, screen: draftScreenInterval,
-				waitingFor: fieldRepeatInterval, intervalDays: 1,
+				applied: true, repeat: telegramui.RepeatCustomInterval, screen: telegramui.ScreenInterval,
+				waitingFor: telegramui.FieldRepeatInterval, intervalDays: 1,
 			},
 		},
 		{
 			name:  "custom date callback adds selected date",
-			draft: reminderDraft{repeat: reminderRepeatCustomDates},
-			data:  callbackDatePrefix + "2099-06-05",
+			draft: reminderDraft{repeat: telegramui.RepeatCustomDates},
+			data:  telegramui.CallbackDatePrefix + "2099-06-05",
 			expected: struct {
 				applied      bool
-				repeat       reminderRepeat
-				screen       draftScreen
-				waitingFor   draftField
+				repeat       telegramui.Repeat
+				screen       telegramui.Screen
+				waitingFor   telegramui.Field
 				intervalDays int
 				customDates  []time.Time
 				notice       string
 			}{
-				applied: true, repeat: reminderRepeatCustomDates, screen: draftScreenCalendar,
+				applied: true, repeat: telegramui.RepeatCustomDates, screen: telegramui.ScreenCalendar,
 				customDates: []time.Time{time.Date(2099, 6, 5, 0, 0, 0, 0, location)},
 			},
 		},
 		{
 			name: "custom date callback removes selected date",
 			draft: reminderDraft{
-				repeat:      reminderRepeatCustomDates,
+				repeat:      telegramui.RepeatCustomDates,
 				customDates: []time.Time{time.Date(2099, 6, 5, 0, 0, 0, 0, location)},
 			},
-			data: callbackDatePrefix + "2099-06-05",
+			data: telegramui.CallbackDatePrefix + "2099-06-05",
 			expected: struct {
 				applied      bool
-				repeat       reminderRepeat
-				screen       draftScreen
-				waitingFor   draftField
-				intervalDays int
-				customDates  []time.Time
-				notice       string
-			}{applied: true, repeat: reminderRepeatCustomDates, screen: draftScreenCalendar, customDates: []time.Time{}},
-		},
-		{
-			name:  "interval text saves positive interval",
-			draft: reminderDraft{waitingFor: fieldRepeatInterval, screen: draftScreenInterval},
-			data:  "5",
-			expected: struct {
-				applied      bool
-				repeat       reminderRepeat
-				screen       draftScreen
-				waitingFor   draftField
-				intervalDays int
-				customDates  []time.Time
-				notice       string
-			}{applied: true, repeat: reminderRepeatCustomInterval, screen: draftScreenMain, intervalDays: 5},
-		},
-		{
-			name:  "invalid repeat date is ignored",
-			draft: reminderDraft{repeat: reminderRepeatCustomDates},
-			data:  callbackDatePrefix + "bad-date",
-			expected: struct {
-				applied      bool
-				repeat       reminderRepeat
-				screen       draftScreen
-				waitingFor   draftField
-				intervalDays int
-				customDates  []time.Time
-				notice       string
-			}{applied: false, repeat: reminderRepeatCustomDates},
-		},
-		{
-			name:  "zero interval text keeps interval screen with notice",
-			draft: reminderDraft{waitingFor: fieldRepeatInterval, screen: draftScreenInterval},
-			data:  "0",
-			expected: struct {
-				applied      bool
-				repeat       reminderRepeat
-				screen       draftScreen
-				waitingFor   draftField
+				repeat       telegramui.Repeat
+				screen       telegramui.Screen
+				waitingFor   telegramui.Field
 				intervalDays int
 				customDates  []time.Time
 				notice       string
 			}{
-				applied: true, screen: draftScreenInterval,
+				applied:     true,
+				repeat:      telegramui.RepeatCustomDates,
+				screen:      telegramui.ScreenCalendar,
+				customDates: []time.Time{},
+			},
+		},
+		{
+			name:  "interval text saves positive interval",
+			draft: reminderDraft{waitingFor: telegramui.FieldRepeatInterval, screen: telegramui.ScreenInterval},
+			data:  "5",
+			expected: struct {
+				applied      bool
+				repeat       telegramui.Repeat
+				screen       telegramui.Screen
+				waitingFor   telegramui.Field
+				intervalDays int
+				customDates  []time.Time
+				notice       string
+			}{applied: true, repeat: telegramui.RepeatCustomInterval, screen: telegramui.ScreenMain, intervalDays: 5},
+		},
+		{
+			name:  "invalid repeat date is ignored",
+			draft: reminderDraft{repeat: telegramui.RepeatCustomDates},
+			data:  telegramui.CallbackDatePrefix + "bad-date",
+			expected: struct {
+				applied      bool
+				repeat       telegramui.Repeat
+				screen       telegramui.Screen
+				waitingFor   telegramui.Field
+				intervalDays int
+				customDates  []time.Time
+				notice       string
+			}{applied: false, repeat: telegramui.RepeatCustomDates},
+		},
+		{
+			name:  "zero interval text keeps interval screen with notice",
+			draft: reminderDraft{waitingFor: telegramui.FieldRepeatInterval, screen: telegramui.ScreenInterval},
+			data:  "0",
+			expected: struct {
+				applied      bool
+				repeat       telegramui.Repeat
+				screen       telegramui.Screen
+				waitingFor   telegramui.Field
+				intervalDays int
+				customDates  []time.Time
+				notice       string
+			}{
+				applied: true, screen: telegramui.ScreenInterval,
 				notice: "Введите интервал в днях: 1, 2, 3 ...",
 			},
 		},
@@ -1526,7 +1540,7 @@ func TestReminderBotAppliesRepeatDateAndIntervalCallbacks(t *testing.T) {
 			}
 
 			var applied bool
-			if test.draft.waitingFor == fieldRepeatInterval {
+			if test.draft.waitingFor == telegramui.FieldRepeatInterval {
 				applied = bot.applyDraftText(t.Context(), chatID, test.data)
 			} else {
 				applied = bot.applyDraftDateCallback(chatID, test.data)
@@ -1559,12 +1573,12 @@ func TestReminderBotAppliesSettingsTextInput(t *testing.T) {
 			applied     bool
 			draftExists bool
 			notice      string
-			waitingFor  draftField
+			waitingFor  telegramui.Field
 		}
 	}{
 		{
 			name:  "timezone city updates settings and clears draft",
-			draft: reminderDraft{waitingFor: fieldTimezoneCity},
+			draft: reminderDraft{waitingFor: telegramui.FieldTimezoneCity},
 			input: "Москва",
 			before: func(service *telegrammocks.MockReminderService) {
 				gomock.InOrder(
@@ -1578,12 +1592,12 @@ func TestReminderBotAppliesSettingsTextInput(t *testing.T) {
 				applied     bool
 				draftExists bool
 				notice      string
-				waitingFor  draftField
+				waitingFor  telegramui.Field
 			}{applied: true},
 		},
 		{
 			name:  "intrusive interval updates existing enabled setting",
-			draft: reminderDraft{waitingFor: fieldIntrusiveInterval},
+			draft: reminderDraft{waitingFor: telegramui.FieldIntrusiveInterval},
 			input: "45",
 			before: func(service *telegrammocks.MockReminderService) {
 				gomock.InOrder(
@@ -1600,12 +1614,12 @@ func TestReminderBotAppliesSettingsTextInput(t *testing.T) {
 				applied     bool
 				draftExists bool
 				notice      string
-				waitingFor  draftField
+				waitingFor  telegramui.Field
 			}{applied: true},
 		},
 		{
 			name:  "intrusive interval updates disabled setting",
-			draft: reminderDraft{waitingFor: fieldIntrusiveInterval},
+			draft: reminderDraft{waitingFor: telegramui.FieldIntrusiveInterval},
 			input: "120",
 			before: func(service *telegrammocks.MockReminderService) {
 				gomock.InOrder(
@@ -1622,12 +1636,12 @@ func TestReminderBotAppliesSettingsTextInput(t *testing.T) {
 				applied     bool
 				draftExists bool
 				notice      string
-				waitingFor  draftField
+				waitingFor  telegramui.Field
 			}{applied: true},
 		},
 		{
 			name:  "repeat interval input updates draft through text path",
-			draft: reminderDraft{waitingFor: fieldRepeatInterval, screen: draftScreenInterval},
+			draft: reminderDraft{waitingFor: telegramui.FieldRepeatInterval, screen: telegramui.ScreenInterval},
 			input: "7",
 			before: func(_ *telegrammocks.MockReminderService) {
 			},
@@ -1635,12 +1649,12 @@ func TestReminderBotAppliesSettingsTextInput(t *testing.T) {
 				applied     bool
 				draftExists bool
 				notice      string
-				waitingFor  draftField
+				waitingFor  telegramui.Field
 			}{applied: true, draftExists: true},
 		},
 		{
 			name:  "unknown timezone city keeps draft with notice",
-			draft: reminderDraft{waitingFor: fieldTimezoneCity},
+			draft: reminderDraft{waitingFor: telegramui.FieldTimezoneCity},
 			input: "bad city",
 			before: func(service *telegrammocks.MockReminderService) {
 				service.EXPECT().SetUserTimezoneByCity(gomock.Any(), chatID, "bad city").
@@ -1651,7 +1665,7 @@ func TestReminderBotAppliesSettingsTextInput(t *testing.T) {
 				applied     bool
 				draftExists bool
 				notice      string
-				waitingFor  draftField
+				waitingFor  telegramui.Field
 			}{
 				applied: true, draftExists: true,
 				notice: "Не удалось определить часовой пояс по этому городу.",
@@ -1659,7 +1673,7 @@ func TestReminderBotAppliesSettingsTextInput(t *testing.T) {
 		},
 		{
 			name:  "invalid intrusive interval text keeps draft with notice",
-			draft: reminderDraft{waitingFor: fieldIntrusiveInterval},
+			draft: reminderDraft{waitingFor: telegramui.FieldIntrusiveInterval},
 			input: "abc",
 			before: func(_ *telegrammocks.MockReminderService) {
 			},
@@ -1667,7 +1681,7 @@ func TestReminderBotAppliesSettingsTextInput(t *testing.T) {
 				applied     bool
 				draftExists bool
 				notice      string
-				waitingFor  draftField
+				waitingFor  telegramui.Field
 			}{
 				applied: true, draftExists: true,
 				notice: "Введите интервал в минутах от 30 до 1440.",
@@ -1723,7 +1737,7 @@ func TestReminderBotHandlesReminderCallbacks(t *testing.T) {
 	}{
 		{
 			name: "create reminder callback starts draft in current message",
-			data: callbackCreateReminder,
+			data: telegramui.CallbackCreateReminder,
 			before: func(caller *telegoapimock.MockCaller, _ *telegrammocks.MockReminderService) {
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(testTelegramResponse(t, telego.Message{MessageID: messageID}), nil).
@@ -1736,7 +1750,7 @@ func TestReminderBotHandlesReminderCallbacks(t *testing.T) {
 		},
 		{
 			name: "reminder list callback edits reminder list",
-			data: callbackReminderList,
+			data: telegramui.CallbackReminderList,
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService) {
 				gomock.InOrder(
 					service.EXPECT().Reminders(gomock.Any(), chatID).
@@ -1750,7 +1764,7 @@ func TestReminderBotHandlesReminderCallbacks(t *testing.T) {
 		},
 		{
 			name: "view reminder callback edits reminder details",
-			data: callbackViewPrefix + "10",
+			data: telegramui.CallbackViewPrefix + "10",
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService) {
 				gomock.InOrder(
 					service.EXPECT().Reminders(gomock.Any(), chatID).
@@ -1764,7 +1778,7 @@ func TestReminderBotHandlesReminderCallbacks(t *testing.T) {
 		},
 		{
 			name: "missing viewed reminder returns list view",
-			data: callbackViewPrefix + "99",
+			data: telegramui.CallbackViewPrefix + "99",
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService) {
 				gomock.InOrder(
 					service.EXPECT().Reminders(gomock.Any(), chatID).
@@ -1778,7 +1792,7 @@ func TestReminderBotHandlesReminderCallbacks(t *testing.T) {
 		},
 		{
 			name: "delete reminder callback deletes reminder and edits list",
-			data: callbackDeletePrefix + "10",
+			data: telegramui.CallbackDeletePrefix + "10",
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService) {
 				gomock.InOrder(
 					service.EXPECT().DeleteReminder(gomock.Any(), chatID, int64(10)).
@@ -1795,7 +1809,7 @@ func TestReminderBotHandlesReminderCallbacks(t *testing.T) {
 		},
 		{
 			name: "invalid view callback returns parse error",
-			data: callbackViewPrefix + "bad",
+			data: telegramui.CallbackViewPrefix + "bad",
 			before: func(_ *telegoapimock.MockCaller, _ *telegrammocks.MockReminderService) {
 			},
 			expected: struct {
@@ -1805,7 +1819,7 @@ func TestReminderBotHandlesReminderCallbacks(t *testing.T) {
 		},
 		{
 			name: "view reminder service error is returned",
-			data: callbackViewPrefix + "10",
+			data: telegramui.CallbackViewPrefix + "10",
 			before: func(_ *telegoapimock.MockCaller, service *telegrammocks.MockReminderService) {
 				service.EXPECT().Reminders(gomock.Any(), chatID).
 					Return(nil, errLoadReminders).
@@ -1875,8 +1889,8 @@ func TestReminderBotAcknowledgesDeliveredReminders(t *testing.T) {
 	}{
 		{
 			name:   "completed delivered reminder is acknowledged",
-			data:   callbackReminderDone + "10",
-			prefix: callbackReminderDone,
+			data:   telegramui.CallbackReminderDone + "10",
+			prefix: telegramui.CallbackReminderDone,
 			status: database.ReminderStatusCompleted,
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService) {
 				gomock.InOrder(
@@ -1894,8 +1908,8 @@ func TestReminderBotAcknowledgesDeliveredReminders(t *testing.T) {
 		},
 		{
 			name:   "canceled delivered reminder is acknowledged",
-			data:   callbackReminderCancelDelivered + "11",
-			prefix: callbackReminderCancelDelivered,
+			data:   telegramui.CallbackReminderCancelDelivered + "11",
+			prefix: telegramui.CallbackReminderCancelDelivered,
 			status: database.ReminderStatusCanceled,
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService) {
 				gomock.InOrder(
@@ -1913,8 +1927,8 @@ func TestReminderBotAcknowledgesDeliveredReminders(t *testing.T) {
 		},
 		{
 			name:   "second completed delivered reminder is acknowledged",
-			data:   callbackReminderDone + "12",
-			prefix: callbackReminderDone,
+			data:   telegramui.CallbackReminderDone + "12",
+			prefix: telegramui.CallbackReminderDone,
 			status: database.ReminderStatusCompleted,
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService) {
 				gomock.InOrder(
@@ -1932,8 +1946,8 @@ func TestReminderBotAcknowledgesDeliveredReminders(t *testing.T) {
 		},
 		{
 			name:   "second canceled delivered reminder is acknowledged",
-			data:   callbackReminderCancelDelivered + "13",
-			prefix: callbackReminderCancelDelivered,
+			data:   telegramui.CallbackReminderCancelDelivered + "13",
+			prefix: telegramui.CallbackReminderCancelDelivered,
 			status: database.ReminderStatusCanceled,
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService) {
 				gomock.InOrder(
@@ -1951,8 +1965,8 @@ func TestReminderBotAcknowledgesDeliveredReminders(t *testing.T) {
 		},
 		{
 			name:   "invalid delivered reminder id returns parse error",
-			data:   callbackReminderDone + "bad",
-			prefix: callbackReminderDone,
+			data:   telegramui.CallbackReminderDone + "bad",
+			prefix: telegramui.CallbackReminderDone,
 			status: database.ReminderStatusCompleted,
 			before: func(_ *telegoapimock.MockCaller, _ *telegrammocks.MockReminderService) {
 			},
@@ -1962,8 +1976,8 @@ func TestReminderBotAcknowledgesDeliveredReminders(t *testing.T) {
 		},
 		{
 			name:   "complete delivered reminder service error is returned",
-			data:   callbackReminderDone + "14",
-			prefix: callbackReminderDone,
+			data:   telegramui.CallbackReminderDone + "14",
+			prefix: telegramui.CallbackReminderDone,
 			status: database.ReminderStatusCompleted,
 			before: func(_ *telegoapimock.MockCaller, service *telegrammocks.MockReminderService) {
 				service.EXPECT().CompleteOccurrence(
@@ -1981,8 +1995,8 @@ func TestReminderBotAcknowledgesDeliveredReminders(t *testing.T) {
 		},
 		{
 			name:   "unsupported delivered reminder status is returned",
-			data:   callbackReminderDone + "15",
-			prefix: callbackReminderDone,
+			data:   telegramui.CallbackReminderDone + "15",
+			prefix: telegramui.CallbackReminderDone,
 			status: database.ReminderStatusSent,
 			before: func(_ *telegoapimock.MockCaller, _ *telegrammocks.MockReminderService) {
 			},
@@ -2040,12 +2054,12 @@ func TestReminderBotHandlesSettingsCallbacks(t *testing.T) {
 		expected struct {
 			handled         bool
 			expectedErrText string
-			waitingFor      draftField
+			waitingFor      telegramui.Field
 		}
 	}{
 		{
 			name: "language callback edits language message",
-			data: callbackSettingsLanguage,
+			data: telegramui.CallbackSettingsLanguage,
 			before: func(caller *telegoapimock.MockCaller, _ *telegrammocks.MockReminderService) {
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(testTelegramResponse(t, telego.Message{MessageID: messageID}), nil).
@@ -2054,12 +2068,12 @@ func TestReminderBotHandlesSettingsCallbacks(t *testing.T) {
 			expected: struct {
 				handled         bool
 				expectedErrText string
-				waitingFor      draftField
+				waitingFor      telegramui.Field
 			}{handled: true},
 		},
 		{
 			name: "timezone callback waits for city",
-			data: callbackSettingsTimezone,
+			data: telegramui.CallbackSettingsTimezone,
 			before: func(caller *telegoapimock.MockCaller, _ *telegrammocks.MockReminderService) {
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(testTelegramResponse(t, telego.Message{MessageID: messageID}), nil).
@@ -2068,12 +2082,12 @@ func TestReminderBotHandlesSettingsCallbacks(t *testing.T) {
 			expected: struct {
 				handled         bool
 				expectedErrText string
-				waitingFor      draftField
-			}{handled: true, waitingFor: fieldTimezoneCity},
+				waitingFor      telegramui.Field
+			}{handled: true, waitingFor: telegramui.FieldTimezoneCity},
 		},
 		{
 			name: "intrusive callback waits for interval and edits settings",
-			data: callbackSettingsIntrusive,
+			data: telegramui.CallbackSettingsIntrusive,
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService) {
 				gomock.InOrder(
 					service.EXPECT().UserSettings(gomock.Any(), chatID).Return(database.UserSettings{
@@ -2092,12 +2106,12 @@ func TestReminderBotHandlesSettingsCallbacks(t *testing.T) {
 			expected: struct {
 				handled         bool
 				expectedErrText string
-				waitingFor      draftField
-			}{handled: true, waitingFor: fieldIntrusiveInterval},
+				waitingFor      telegramui.Field
+			}{handled: true, waitingFor: telegramui.FieldIntrusiveInterval},
 		},
 		{
 			name: "intrusive on callback enables intrusive reminders",
-			data: callbackSettingsIntrusiveOn,
+			data: telegramui.CallbackSettingsIntrusiveOn,
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService) {
 				gomock.InOrder(
 					service.EXPECT().
@@ -2122,7 +2136,7 @@ func TestReminderBotHandlesSettingsCallbacks(t *testing.T) {
 			expected: struct {
 				handled         bool
 				expectedErrText string
-				waitingFor      draftField
+				waitingFor      telegramui.Field
 			}{handled: true},
 		},
 		{
@@ -2133,12 +2147,12 @@ func TestReminderBotHandlesSettingsCallbacks(t *testing.T) {
 			expected: struct {
 				handled         bool
 				expectedErrText string
-				waitingFor      draftField
+				waitingFor      telegramui.Field
 			}{handled: false},
 		},
 		{
 			name: "intrusive off callback returns service error",
-			data: callbackSettingsIntrusiveOff,
+			data: telegramui.CallbackSettingsIntrusiveOff,
 			before: func(_ *telegoapimock.MockCaller, service *telegrammocks.MockReminderService) {
 				service.EXPECT().
 					SetIntrusiveSettings(gomock.Any(), chatID, false, 30*time.Minute).
@@ -2148,7 +2162,7 @@ func TestReminderBotHandlesSettingsCallbacks(t *testing.T) {
 			expected: struct {
 				handled         bool
 				expectedErrText string
-				waitingFor      draftField
+				waitingFor      telegramui.Field
 			}{handled: true, expectedErrText: "disable intrusive reminders: disable intrusive"},
 		},
 	}
@@ -2373,7 +2387,7 @@ func TestReminderBotSavesDraft(t *testing.T) {
 		expected struct {
 			expectedErr error
 			draftExists bool
-			screen      draftScreen
+			screen      telegramui.Screen
 			notice      string
 		}
 	}{
@@ -2460,7 +2474,7 @@ func TestReminderBotSavesDraft(t *testing.T) {
 				title:        "Training",
 				date:         futureDate,
 				hour:         7,
-				repeat:       reminderRepeatCustomWeekdays,
+				repeat:       telegramui.RepeatCustomWeekdays,
 				weekdaysMask: 2 | 8,
 			},
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService) {
@@ -2490,11 +2504,11 @@ func TestReminderBotSavesDraft(t *testing.T) {
 			expected: struct {
 				expectedErr error
 				draftExists bool
-				screen      draftScreen
+				screen      telegramui.Screen
 				notice      string
 			}{
 				draftExists: true,
-				screen:      draftScreenMain,
+				screen:      telegramui.ScreenMain,
 				notice:      "\u0427\u0442\u043e\u0431\u044b \u0441\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u043d\u0430\u043f\u043e\u043c\u0438\u043d\u0430\u043d\u0438\u0435, \u0434\u043e\u0431\u0430\u0432\u044c\u0442\u0435 \u043d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 \u0438 \u0434\u0430\u0442\u0443 \u0441 \u0432\u0440\u0435\u043c\u0435\u043d\u0435\u043c.",
 			},
 		},
@@ -2509,11 +2523,11 @@ func TestReminderBotSavesDraft(t *testing.T) {
 			expected: struct {
 				expectedErr error
 				draftExists bool
-				screen      draftScreen
+				screen      telegramui.Screen
 				notice      string
 			}{
 				draftExists: true,
-				screen:      draftScreenTime,
+				screen:      telegramui.ScreenTime,
 				notice:      "\u042d\u0442\u043e \u0432\u0440\u0435\u043c\u044f \u0443\u0436\u0435 \u043f\u0440\u043e\u0448\u043b\u043e. \u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0431\u0443\u0434\u0443\u0449\u0443\u044e \u0434\u0430\u0442\u0443 \u0438 \u0432\u0440\u0435\u043c\u044f.",
 			},
 		},
@@ -2523,7 +2537,7 @@ func TestReminderBotSavesDraft(t *testing.T) {
 				title:  "Training",
 				date:   futureDate,
 				hour:   7,
-				repeat: reminderRepeatCustomWeekdays,
+				repeat: telegramui.RepeatCustomWeekdays,
 			},
 			before: func(caller *telegoapimock.MockCaller, _ *telegrammocks.MockReminderService) {
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -2533,11 +2547,11 @@ func TestReminderBotSavesDraft(t *testing.T) {
 			expected: struct {
 				expectedErr error
 				draftExists bool
-				screen      draftScreen
+				screen      telegramui.Screen
 				notice      string
 			}{
 				draftExists: true,
-				screen:      draftScreenWeekdays,
+				screen:      telegramui.ScreenWeekdays,
 				notice:      "Выберите хотя бы один день недели.",
 			},
 		},
@@ -2616,7 +2630,7 @@ func TestReminderBotCreatesDraftReminderVariants(t *testing.T) {
 		},
 		{
 			name:  "workdays draft creates weekdays reminder with workdays mask",
-			draft: reminderDraft{title: "Standup", repeat: reminderRepeatWeekdays},
+			draft: reminderDraft{title: "Standup", repeat: telegramui.RepeatWeekdays},
 			before: func(service *telegrammocks.MockReminderService) {
 				service.EXPECT().
 					CreateWeekdaysReminder(gomock.Any(), chatID, "Standup", "", remindAt, database.WeekdaysMaskWorkdays).
@@ -2632,7 +2646,7 @@ func TestReminderBotCreatesDraftReminderVariants(t *testing.T) {
 			name: "custom weekdays draft creates weekdays reminder with selected mask",
 			draft: reminderDraft{
 				title:        "Training",
-				repeat:       reminderRepeatCustomWeekdays,
+				repeat:       telegramui.RepeatCustomWeekdays,
 				weekdaysMask: database.WeekdayMaskTuesday | database.WeekdayMaskThursday,
 			},
 			before: func(service *telegrammocks.MockReminderService) {
@@ -2655,7 +2669,7 @@ func TestReminderBotCreatesDraftReminderVariants(t *testing.T) {
 		},
 		{
 			name:  "every two days draft creates interval reminder",
-			draft: reminderDraft{title: "Medicine", repeat: reminderRepeatEveryTwoDays},
+			draft: reminderDraft{title: "Medicine", repeat: telegramui.RepeatEveryTwoDays},
 			before: func(service *telegrammocks.MockReminderService) {
 				service.EXPECT().
 					CreateIntervalReminder(gomock.Any(), chatID, "Medicine", "", remindAt, 2).
@@ -2672,7 +2686,7 @@ func TestReminderBotCreatesDraftReminderVariants(t *testing.T) {
 			draft: reminderDraft{
 				title:       "Trip",
 				description: "Pack",
-				repeat:      reminderRepeatCustomDates,
+				repeat:      telegramui.RepeatCustomDates,
 				customDates: []time.Time{customDate},
 				hour:        8,
 				minute:      15,
@@ -2699,7 +2713,7 @@ func TestReminderBotCreatesDraftReminderVariants(t *testing.T) {
 		},
 		{
 			name:  "interval service error is returned",
-			draft: reminderDraft{title: "Medicine", repeat: reminderRepeatEveryDay},
+			draft: reminderDraft{title: "Medicine", repeat: telegramui.RepeatEveryDay},
 			before: func(service *telegrammocks.MockReminderService) {
 				service.EXPECT().
 					CreateIntervalReminder(gomock.Any(), chatID, "Medicine", "", remindAt, 1).
@@ -2713,7 +2727,7 @@ func TestReminderBotCreatesDraftReminderVariants(t *testing.T) {
 		},
 		{
 			name:   "unsupported repeat returns explicit error",
-			draft:  reminderDraft{title: "Unknown", repeat: reminderRepeat("unsupported")},
+			draft:  reminderDraft{title: "Unknown", repeat: telegramui.Repeat("unsupported")},
 			before: func(_ *telegrammocks.MockReminderService) {},
 			expected: struct {
 				reminder        database.ReminderView

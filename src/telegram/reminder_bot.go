@@ -12,6 +12,7 @@ import (
 	"github.com/EgorKo25/EasyNote/src/config"
 	"github.com/EgorKo25/EasyNote/src/database"
 	"github.com/EgorKo25/EasyNote/src/logger"
+	telegramui "github.com/EgorKo25/EasyNote/src/telegram/ui"
 	"github.com/mymmrac/telego"
 	tu "github.com/mymmrac/telego/telegoutil"
 )
@@ -102,13 +103,13 @@ type reminderDraft struct {
 	date          time.Time
 	hour          int
 	minute        int
-	repeat        reminderRepeat
+	repeat        telegramui.Repeat
 	customDates   []time.Time
 	weekdaysMask  int
 	intervalDays  int
-	screen        draftScreen
+	screen        telegramui.Screen
 	calendarMonth time.Time
-	waitingFor    draftField
+	waitingFor    telegramui.Field
 }
 
 func (b *ReminderBot) Info() string {
@@ -187,7 +188,7 @@ func (b *ReminderBot) handleMessage(ctx context.Context, message telego.Message)
 		ctx,
 		chatID,
 		"Не понял команду. Используйте основную клавиатуру.",
-		mainKeyboard(),
+		telegramui.MainKeyboard(),
 	); err != nil {
 		return err
 	}
@@ -221,13 +222,13 @@ func (b *ReminderBot) handleKnownMessage(
 
 func (b *ReminderBot) runKnownMessageCommand(ctx context.Context, chatID int64, text string) (error, bool) {
 	switch text {
-	case "/start", buttonStart:
+	case "/start", telegramui.ButtonStart:
 		return b.sendStart(ctx, chatID), true
-	case buttonCreateReminder:
+	case telegramui.ButtonCreateReminder:
 		return b.startReminderDraft(ctx, chatID), true
-	case buttonReminders:
+	case telegramui.ButtonReminders:
 		return b.sendReminders(ctx, chatID), true
-	case buttonSettings:
+	case telegramui.ButtonSettings:
 		return b.sendSettings(ctx, chatID), true
 	default:
 		return nil, false
@@ -235,9 +236,9 @@ func (b *ReminderBot) runKnownMessageCommand(ctx context.Context, chatID int64, 
 }
 
 func shouldDeleteKnownMessage(text string) bool {
-	return text == buttonCreateReminder ||
-		text == buttonReminders ||
-		text == buttonSettings
+	return text == telegramui.ButtonCreateReminder ||
+		text == telegramui.ButtonReminders ||
+		text == telegramui.ButtonSettings
 }
 
 func (b *ReminderBot) handleCallback(ctx context.Context, query telego.CallbackQuery) error {
@@ -250,13 +251,13 @@ func (b *ReminderBot) handleCallback(ctx context.Context, query telego.CallbackQ
 		return fmt.Errorf("answer callback: %w", err)
 	}
 
-	if query.Data == callbackNoop {
+	if query.Data == telegramui.CallbackNoop {
 		return nil
 	}
 
 	messageID := query.Message.GetMessageID()
-	if query.Data == callbackMainMenu {
-		return b.replaceUI(ctx, chatID, mainMenuText(), mainKeyboard())
+	if query.Data == telegramui.CallbackMainMenu {
+		return b.replaceUI(ctx, chatID, telegramui.MainMenuText(), telegramui.MainKeyboard())
 	}
 
 	if handled, err := b.handleSettingsCallback(ctx, chatID, messageID, query.Data); handled {
@@ -276,33 +277,33 @@ func (b *ReminderBot) handleCallback(ctx context.Context, query telego.CallbackQ
 
 func (b *ReminderBot) handleReminderCallback(ctx context.Context, chatID int64, messageID int, data string) error {
 	switch {
-	case data == callbackCreateReminder:
+	case data == telegramui.CallbackCreateReminder:
 		return b.startReminderDraftInMessage(ctx, chatID, messageID)
-	case data == callbackReminderList || data == callbackReminderBackList:
+	case data == telegramui.CallbackReminderList || data == telegramui.CallbackReminderBackList:
 		return b.editReminderList(ctx, chatID, messageID)
-	case data == callbackReminderHistory:
+	case data == telegramui.CallbackReminderHistory:
 		return b.editReminderHistory(ctx, chatID, messageID)
-	case strings.HasPrefix(data, callbackReminderDone):
+	case strings.HasPrefix(data, telegramui.CallbackReminderDone):
 		return b.acknowledgeReminder(
 			ctx,
 			chatID,
 			messageID,
 			data,
-			callbackReminderDone,
+			telegramui.CallbackReminderDone,
 			database.ReminderStatusCompleted,
 		)
-	case strings.HasPrefix(data, callbackReminderCancelDelivered):
+	case strings.HasPrefix(data, telegramui.CallbackReminderCancelDelivered):
 		return b.acknowledgeReminder(
 			ctx,
 			chatID,
 			messageID,
 			data,
-			callbackReminderCancelDelivered,
+			telegramui.CallbackReminderCancelDelivered,
 			database.ReminderStatusCanceled,
 		)
-	case strings.HasPrefix(data, callbackDeletePrefix):
+	case strings.HasPrefix(data, telegramui.CallbackDeletePrefix):
 		return b.deleteReminder(ctx, chatID, messageID, data)
-	case strings.HasPrefix(data, callbackViewPrefix):
+	case strings.HasPrefix(data, telegramui.CallbackViewPrefix):
 		return b.viewReminder(ctx, chatID, messageID, data)
 	default:
 		return nil
@@ -316,25 +317,25 @@ func (b *ReminderBot) handleSettingsCallback(
 	data string,
 ) (bool, error) {
 	switch data {
-	case callbackSettings:
+	case telegramui.CallbackSettings:
 		return true, b.editSettings(ctx, chatID, messageID)
-	case callbackSettingsLanguage:
-		return true, b.editUI(ctx, chatID, messageID, "Язык приложения: русский", settingsKeyboard())
-	case callbackSettingsTimezone:
-		b.setDraftWaitingFor(chatID, fieldTimezoneCity)
+	case telegramui.CallbackSettingsLanguage:
+		return true, b.editUI(ctx, chatID, messageID, "Язык приложения: русский", telegramui.SettingsKeyboard())
+	case telegramui.CallbackSettingsTimezone:
+		b.setDraftWaitingFor(chatID, telegramui.FieldTimezoneCity)
 
 		return true, b.editUI(ctx, chatID, messageID, "Введите город, чтобы определить часовой пояс.", nil)
-	case callbackSettingsIntrusive:
-		b.setDraftWaitingFor(chatID, fieldIntrusiveInterval)
+	case telegramui.CallbackSettingsIntrusive:
+		b.setDraftWaitingFor(chatID, telegramui.FieldIntrusiveInterval)
 
 		return true, b.editIntrusiveSettings(ctx, chatID, messageID)
-	case callbackSettingsIntrusiveOn:
+	case telegramui.CallbackSettingsIntrusiveOn:
 		if err := b.service.SetIntrusiveSettings(ctx, chatID, true, 30*time.Minute); err != nil {
 			return true, fmt.Errorf("enable intrusive reminders: %w", err)
 		}
 
 		return true, b.editIntrusiveSettings(ctx, chatID, messageID)
-	case callbackSettingsIntrusiveOff:
+	case telegramui.CallbackSettingsIntrusiveOff:
 		if err := b.service.SetIntrusiveSettings(ctx, chatID, false, 30*time.Minute); err != nil {
 			return true, fmt.Errorf("disable intrusive reminders: %w", err)
 		}
@@ -369,28 +370,28 @@ func (b *ReminderBot) handleDraftNavigationCallback(
 	data string,
 ) (bool, error) {
 	switch data {
-	case callbackDraftTitle:
-		b.setDraftWaitingFor(chatID, fieldTitle)
+	case telegramui.CallbackDraftTitle:
+		b.setDraftWaitingFor(chatID, telegramui.FieldTitle)
 
 		return true, b.editDraft(ctx, chatID, messageID)
-	case callbackDraftDescription:
-		b.setDraftWaitingFor(chatID, fieldDescription)
+	case telegramui.CallbackDraftDescription:
+		b.setDraftWaitingFor(chatID, telegramui.FieldDescription)
 
 		return true, b.editDraft(ctx, chatID, messageID)
-	case callbackDraftDate:
-		b.setDraftScreen(chatID, draftScreenDate)
+	case telegramui.CallbackDraftDate:
+		b.setDraftScreen(chatID, telegramui.ScreenDate)
 
 		return true, b.editDraft(ctx, chatID, messageID)
-	case callbackDraftCalendar:
-		b.setDraftScreen(chatID, draftScreenCalendar)
+	case telegramui.CallbackDraftCalendar:
+		b.setDraftScreen(chatID, telegramui.ScreenCalendar)
 
 		return true, b.editDraft(ctx, chatID, messageID)
-	case callbackDraftRepeat:
-		b.setDraftScreen(chatID, draftScreenRepeat)
+	case telegramui.CallbackDraftRepeat:
+		b.setDraftScreen(chatID, telegramui.ScreenRepeat)
 
 		return true, b.editDraft(ctx, chatID, messageID)
-	case callbackDraftBack:
-		b.setDraftScreen(chatID, draftScreenMain)
+	case telegramui.CallbackDraftBack:
+		b.setDraftScreen(chatID, telegramui.ScreenMain)
 
 		return true, b.editDraft(ctx, chatID, messageID)
 	default:
@@ -405,12 +406,12 @@ func (b *ReminderBot) handleDraftDoneCallback(
 	data string,
 ) (bool, error) {
 	switch data {
-	case callbackDraftCustomDone:
-		b.setDraftScreen(chatID, draftScreenTime)
+	case telegramui.CallbackDraftCustomDone:
+		b.setDraftScreen(chatID, telegramui.ScreenTime)
 
 		return true, b.editDraft(ctx, chatID, messageID)
-	case callbackDraftWeekdaysDone, callbackDraftIntervalDone:
-		b.setDraftScreen(chatID, draftScreenMain)
+	case telegramui.CallbackDraftWeekdaysDone, telegramui.CallbackDraftIntervalDone:
+		b.setDraftScreen(chatID, telegramui.ScreenMain)
 
 		return true, b.editDraft(ctx, chatID, messageID)
 	default:
@@ -425,20 +426,20 @@ func (b *ReminderBot) handleDraftFinalCommandCallback(
 	data string,
 ) (bool, error) {
 	switch data {
-	case callbackDraftSave:
+	case telegramui.CallbackDraftSave:
 		return true, b.saveDraft(ctx, chatID, messageID)
-	case callbackDraftTimeDone:
-		b.setDraftScreen(chatID, draftScreenMain)
+	case telegramui.CallbackDraftTimeDone:
+		b.setDraftScreen(chatID, telegramui.ScreenMain)
 
 		return true, b.editDraft(ctx, chatID, messageID)
-	case callbackDraftCancel:
+	case telegramui.CallbackDraftCancel:
 		b.deleteDraft(chatID)
 
 		return true, b.replaceUI(
 			ctx,
 			chatID,
-			"Создание напоминания отменено.\n\n"+mainMenuText(),
-			mainKeyboard(),
+			"Создание напоминания отменено.\n\n"+telegramui.MainMenuText(),
+			telegramui.MainKeyboard(),
 		)
 	default:
 		return false, nil
@@ -446,11 +447,11 @@ func (b *ReminderBot) handleDraftFinalCommandCallback(
 }
 
 func (b *ReminderBot) sendStart(ctx context.Context, chatID int64) error {
-	return b.replaceUI(ctx, chatID, mainMenuText(), mainKeyboard())
+	return b.replaceUI(ctx, chatID, telegramui.MainMenuText(), telegramui.MainKeyboard())
 }
 
 func (b *ReminderBot) sendReminders(ctx context.Context, chatID int64) error {
-	return b.replaceUI(ctx, chatID, remindersText(), remindersKeyboard())
+	return b.replaceUI(ctx, chatID, telegramui.RemindersText(), telegramui.RemindersKeyboard())
 }
 
 func (b *ReminderBot) startReminderDraft(ctx context.Context, chatID int64) error {
@@ -472,13 +473,24 @@ func (b *ReminderBot) startReminderDraftInMessage(ctx context.Context, chatID in
 func (b *ReminderBot) replaceDraft(ctx context.Context, chatID int64) error {
 	draft := b.draft(chatID)
 
-	return b.replaceUI(ctx, chatID, draftText(draft, b.location(chatID)), draftKeyboard(draft, b.now(chatID)))
+	return b.replaceUI(
+		ctx,
+		chatID,
+		telegramui.DraftText(uiDraft(draft), b.location(chatID)),
+		telegramui.DraftKeyboard(uiDraft(draft), b.now(chatID)),
+	)
 }
 
 func (b *ReminderBot) editDraft(ctx context.Context, chatID int64, messageID int) error {
 	draft := b.draft(chatID)
 
-	return b.editUI(ctx, chatID, messageID, draftText(draft, b.location(chatID)), draftKeyboard(draft, b.now(chatID)))
+	return b.editUI(
+		ctx,
+		chatID,
+		messageID,
+		telegramui.DraftText(uiDraft(draft), b.location(chatID)),
+		telegramui.DraftKeyboard(uiDraft(draft), b.now(chatID)),
+	)
 }
 
 func (b *ReminderBot) sendReminderList(ctx context.Context, chatID int64) error {
@@ -487,7 +499,12 @@ func (b *ReminderBot) sendReminderList(ctx context.Context, chatID int64) error 
 		return fmt.Errorf("load reminders: %w", err)
 	}
 
-	return b.replaceUI(ctx, chatID, reminderListText(reminders), reminderListKeyboard(reminders))
+	return b.replaceUI(
+		ctx,
+		chatID,
+		telegramui.ReminderListText(reminders),
+		telegramui.ReminderListKeyboard(reminders),
+	)
 }
 
 func (b *ReminderBot) editReminderList(ctx context.Context, chatID int64, messageID int) error {
@@ -496,7 +513,13 @@ func (b *ReminderBot) editReminderList(ctx context.Context, chatID int64, messag
 		return fmt.Errorf("load reminders: %w", err)
 	}
 
-	return b.editUI(ctx, chatID, messageID, reminderListText(reminders), reminderListKeyboard(reminders))
+	return b.editUI(
+		ctx,
+		chatID,
+		messageID,
+		telegramui.ReminderListText(reminders),
+		telegramui.ReminderListKeyboard(reminders),
+	)
 }
 
 func (b *ReminderBot) sendReminderHistory(ctx context.Context, chatID int64) error {
@@ -509,7 +532,12 @@ func (b *ReminderBot) sendReminderHistory(ctx context.Context, chatID int64) err
 		return fmt.Errorf("load reminder history: %w", err)
 	}
 
-	return b.replaceUI(ctx, chatID, reminderHistoryText(reminders, b.location(chatID)), mainKeyboard())
+	return b.replaceUI(
+		ctx,
+		chatID,
+		telegramui.ReminderHistoryText(reminders, b.location(chatID)),
+		telegramui.MainKeyboard(),
+	)
 }
 
 func (b *ReminderBot) editReminderHistory(ctx context.Context, chatID int64, messageID int) error {
@@ -522,7 +550,7 @@ func (b *ReminderBot) editReminderHistory(ctx context.Context, chatID int64, mes
 		return fmt.Errorf("load reminder history: %w", err)
 	}
 
-	return b.editUI(ctx, chatID, messageID, reminderHistoryText(reminders, b.location(chatID)), nil)
+	return b.editUI(ctx, chatID, messageID, telegramui.ReminderHistoryText(reminders, b.location(chatID)), nil)
 }
 
 func (b *ReminderBot) sendSettings(ctx context.Context, chatID int64) error {
@@ -535,7 +563,7 @@ func (b *ReminderBot) sendSettings(ctx context.Context, chatID int64) error {
 		return fmt.Errorf("load user settings: %w", err)
 	}
 
-	return b.replaceUI(ctx, chatID, settingsText(settings), settingsKeyboard())
+	return b.replaceUI(ctx, chatID, telegramui.SettingsText(settings), telegramui.SettingsKeyboard())
 }
 
 func (b *ReminderBot) editSettings(ctx context.Context, chatID int64, messageID int) error {
@@ -548,7 +576,7 @@ func (b *ReminderBot) editSettings(ctx context.Context, chatID int64, messageID 
 		return fmt.Errorf("load user settings: %w", err)
 	}
 
-	return b.editUI(ctx, chatID, messageID, settingsText(settings), settingsKeyboard())
+	return b.editUI(ctx, chatID, messageID, telegramui.SettingsText(settings), telegramui.SettingsKeyboard())
 }
 
 func (b *ReminderBot) editIntrusiveSettings(ctx context.Context, chatID int64, messageID int) error {
@@ -561,7 +589,13 @@ func (b *ReminderBot) editIntrusiveSettings(ctx context.Context, chatID int64, m
 		return fmt.Errorf("load user settings: %w", err)
 	}
 
-	return b.editUI(ctx, chatID, messageID, intrusiveSettingsText(settings), intrusiveSettingsKeyboard())
+	return b.editUI(
+		ctx,
+		chatID,
+		messageID,
+		telegramui.IntrusiveSettingsText(settings),
+		telegramui.IntrusiveSettingsKeyboard(),
+	)
 }
 
 func (b *ReminderBot) saveDraft(ctx context.Context, chatID int64, messageID int) error {
@@ -583,13 +617,13 @@ func (b *ReminderBot) saveDraft(ctx context.Context, chatID int64, messageID int
 		ctx,
 		chatID,
 		messageID,
-		"Напоминание сохранено.\n\n"+reminderViewText(reminder, b.location(chatID)),
-		reminderCreatedKeyboard(),
+		"Напоминание сохранено.\n\n"+telegramui.ReminderViewText(reminder, b.location(chatID)),
+		telegramui.ReminderCreatedKeyboard(),
 	)
 }
 
 func (b *ReminderBot) draftReminderTime(chatID int64, draft reminderDraft) time.Time {
-	if draft.repeat != reminderRepeatCustomDates || len(draft.customDates) == 0 {
+	if draft.repeat != telegramui.RepeatCustomDates || len(draft.customDates) == 0 {
 		return draft.remindAt(b.location(chatID))
 	}
 
@@ -619,14 +653,14 @@ func (b *ReminderBot) setDraftValidationNotice(chatID int64, draft reminderDraft
 		return true
 	}
 
-	if draft.repeat == reminderRepeatCustomWeekdays && draft.weekdaysMask == 0 {
-		b.setDraftScreenNotice(chatID, draftScreenWeekdays, "Выберите хотя бы один день недели.")
+	if draft.repeat == telegramui.RepeatCustomWeekdays && draft.weekdaysMask == 0 {
+		b.setDraftScreenNotice(chatID, telegramui.ScreenWeekdays, "Выберите хотя бы один день недели.")
 
 		return true
 	}
 
-	if draft.repeat == reminderRepeatCustomInterval && draft.intervalDays <= 0 {
-		b.setDraftScreenNotice(chatID, draftScreenInterval, "Введите интервал в днях: 1, 2, 3 ...")
+	if draft.repeat == telegramui.RepeatCustomInterval && draft.intervalDays <= 0 {
+		b.setDraftScreenNotice(chatID, telegramui.ScreenInterval, "Введите интервал в днях: 1, 2, 3 ...")
 
 		return true
 	}
@@ -641,7 +675,7 @@ func (b *ReminderBot) setDraftValidationNotice(chatID int64, draft reminderDraft
 }
 
 func (b *ReminderBot) viewReminder(ctx context.Context, chatID int64, messageID int, data string) error {
-	reminderID, err := strconv.ParseInt(strings.TrimPrefix(data, callbackViewPrefix), 10, 64)
+	reminderID, err := strconv.ParseInt(strings.TrimPrefix(data, telegramui.CallbackViewPrefix), 10, 64)
 	if err != nil {
 		return fmt.Errorf("parse reminder id: %w", err)
 	}
@@ -657,8 +691,8 @@ func (b *ReminderBot) viewReminder(ctx context.Context, chatID int64, messageID 
 				ctx,
 				chatID,
 				messageID,
-				reminderViewText(reminder, b.location(chatID)),
-				reminderDetailsKeyboard(reminder),
+				telegramui.ReminderViewText(reminder, b.location(chatID)),
+				telegramui.ReminderDetailsKeyboard(reminder),
 			)
 		}
 	}
@@ -667,13 +701,13 @@ func (b *ReminderBot) viewReminder(ctx context.Context, chatID int64, messageID 
 		ctx,
 		chatID,
 		messageID,
-		"Напоминание не найдено.\n\n"+reminderListText(reminders),
-		reminderListKeyboard(reminders),
+		"Напоминание не найдено.\n\n"+telegramui.ReminderListText(reminders),
+		telegramui.ReminderListKeyboard(reminders),
 	)
 }
 
 func (b *ReminderBot) deleteReminder(ctx context.Context, chatID int64, messageID int, data string) error {
-	reminderID, err := strconv.ParseInt(strings.TrimPrefix(data, callbackDeletePrefix), 10, 64)
+	reminderID, err := strconv.ParseInt(strings.TrimPrefix(data, telegramui.CallbackDeletePrefix), 10, 64)
 	if err != nil {
 		return fmt.Errorf("parse reminder id: %w", err)
 	}
@@ -691,8 +725,8 @@ func (b *ReminderBot) deleteReminder(ctx context.Context, chatID int64, messageI
 		ctx,
 		chatID,
 		messageID,
-		"Напоминание удалено.\n\n"+reminderListText(reminders),
-		reminderListKeyboard(reminders),
+		"Напоминание удалено.\n\n"+telegramui.ReminderListText(reminders),
+		telegramui.ReminderListKeyboard(reminders),
 	)
 }
 
@@ -709,20 +743,16 @@ func (b *ReminderBot) acknowledgeReminder(
 		return fmt.Errorf("parse delivered reminder id: %w", err)
 	}
 
+	if status != database.ReminderStatusCompleted && status != database.ReminderStatusCanceled {
+		return fmt.Errorf(
+			"acknowledge delivered reminder: %w: %s",
+			errUnsupportedDeliveredReminderStatus,
+			status,
+		)
+	}
+
 	completedAt := time.Now()
-
-	switch status {
-	case database.ReminderStatusCompleted:
-	case database.ReminderStatusCanceled:
-	default:
-		err = fmt.Errorf("%w: %s", errUnsupportedDeliveredReminderStatus, status)
-	}
-
-	if err == nil {
-		err = b.service.CompleteOccurrence(ctx, reminderID, status, &completedAt)
-	}
-
-	if err != nil {
+	if err = b.service.CompleteOccurrence(ctx, reminderID, status, &completedAt); err != nil {
 		return fmt.Errorf("acknowledge delivered reminder: %w", err)
 	}
 
@@ -800,24 +830,24 @@ func (b *ReminderBot) applyDraftText(ctx context.Context, chatID int64, text str
 	}
 
 	switch draft.waitingFor {
-	case fieldTitle:
+	case telegramui.FieldTitle:
 		draft.title = text
-	case fieldDescription:
+	case telegramui.FieldDescription:
 		draft.description = text
-	case fieldTimezoneCity:
+	case telegramui.FieldTimezoneCity:
 		b.mu.Unlock()
 
 		return b.applyTimezoneCity(ctx, chatID, text)
-	case fieldIntrusiveInterval:
+	case telegramui.FieldIntrusiveInterval:
 		b.mu.Unlock()
 
 		return b.applyIntrusiveInterval(ctx, chatID, text)
-	case fieldRepeatInterval:
+	case telegramui.FieldRepeatInterval:
 		b.mu.Unlock()
 
 		return b.applyDraftIntervalDays(chatID, text)
 	default:
-		if draft.screen != draftScreenTime {
+		if draft.screen != telegramui.ScreenTime {
 			b.mu.Unlock()
 
 			return false
@@ -832,7 +862,7 @@ func (b *ReminderBot) applyDraftText(ctx context.Context, chatID int64, text str
 
 	draft.notice = ""
 	draft.waitingFor = ""
-	draft.screen = draftScreenMain
+	draft.screen = telegramui.ScreenMain
 	b.draftByChat[chatID] = draft
 	b.mu.Unlock()
 
@@ -891,7 +921,7 @@ func (b *ReminderBot) applyIntrusiveInterval(ctx context.Context, chatID int64, 
 func (b *ReminderBot) applyDraftIntervalDays(chatID int64, text string) bool {
 	days, err := strconv.Atoi(text)
 	if err != nil || days <= 0 {
-		b.setDraftScreenNotice(chatID, draftScreenInterval, "Введите интервал в днях: 1, 2, 3 ...")
+		b.setDraftScreenNotice(chatID, telegramui.ScreenInterval, "Введите интервал в днях: 1, 2, 3 ...")
 
 		return true
 	}
@@ -901,11 +931,11 @@ func (b *ReminderBot) applyDraftIntervalDays(chatID int64, text string) bool {
 
 	draft := b.draftByChat[chatID]
 	draft.intervalDays = days
-	draft.repeat = reminderRepeatCustomInterval
+	draft.repeat = telegramui.RepeatCustomInterval
 
 	draft.waitingFor = ""
 	draft.notice = ""
-	draft.screen = draftScreenMain
+	draft.screen = telegramui.ScreenMain
 	b.draftByChat[chatID] = draft
 
 	return true
@@ -922,10 +952,10 @@ func applyDraftTimeText(draft *reminderDraft, text string, location *time.Locati
 
 	if !draft.remindAt(location).After(now) {
 		draft.notice = draftPastTimeNotice
-		draft.screen = draftScreenTime
+		draft.screen = telegramui.ScreenTime
 	} else {
 		draft.notice = ""
-		draft.screen = draftScreenMain
+		draft.screen = telegramui.ScreenMain
 	}
 
 	draft.waitingFor = ""
@@ -934,27 +964,27 @@ func applyDraftTimeText(draft *reminderDraft, text string, location *time.Locati
 }
 
 func (b *ReminderBot) applyDraftDateCallback(chatID int64, data string) bool {
-	if value, ok := strings.CutPrefix(data, callbackMonthPrefix); ok {
+	if value, ok := strings.CutPrefix(data, telegramui.CallbackMonthPrefix); ok {
 		return b.applyDraftMonth(chatID, value)
 	}
 
-	if value, ok := strings.CutPrefix(data, callbackDatePrefix); ok {
+	if value, ok := strings.CutPrefix(data, telegramui.CallbackDatePrefix); ok {
 		return b.applyDraftDate(chatID, value)
 	}
 
-	if value, ok := strings.CutPrefix(data, callbackTimeSetPrefix); ok {
+	if value, ok := strings.CutPrefix(data, telegramui.CallbackTimeSetPrefix); ok {
 		return b.applyDraftTime(chatID, value)
 	}
 
-	if value, ok := strings.CutPrefix(data, callbackTimeShiftPrefix); ok {
+	if value, ok := strings.CutPrefix(data, telegramui.CallbackTimeShiftPrefix); ok {
 		return b.applyDraftTimeShift(chatID, value)
 	}
 
-	if value, ok := strings.CutPrefix(data, callbackRepeatPrefix); ok {
+	if value, ok := strings.CutPrefix(data, telegramui.CallbackRepeatPrefix); ok {
 		return b.applyDraftRepeat(chatID, value)
 	}
 
-	if value, ok := strings.CutPrefix(data, callbackWeekdayPrefix); ok {
+	if value, ok := strings.CutPrefix(data, telegramui.CallbackWeekdayPrefix); ok {
 		return b.applyDraftWeekday(chatID, value)
 	}
 
@@ -968,15 +998,15 @@ func (b *ReminderBot) createDraftReminder(
 	remindAt time.Time,
 ) (database.ReminderView, error) {
 	switch draft.repeat {
-	case reminderRepeatNone:
+	case telegramui.RepeatNone:
 		return b.createDraftOneTimeReminder(ctx, chatID, draft, remindAt)
-	case reminderRepeatWeekdays:
+	case telegramui.RepeatWeekdays:
 		return b.createDraftWeekdaysReminder(ctx, chatID, draft, remindAt, database.WeekdaysMaskWorkdays)
-	case reminderRepeatCustomWeekdays:
+	case telegramui.RepeatCustomWeekdays:
 		return b.createDraftWeekdaysReminder(ctx, chatID, draft, remindAt, draft.weekdaysMask)
-	case reminderRepeatCustomDates:
+	case telegramui.RepeatCustomDates:
 		return b.createDraftCustomDatesReminder(ctx, chatID, draft)
-	case reminderRepeatCustomInterval:
+	case telegramui.RepeatCustomInterval:
 		return b.createDraftIntervalReminder(ctx, chatID, draft, remindAt, draft.intervalDays)
 	default:
 		intervalDays, ok := intervalDaysForRepeat(draft.repeat)
@@ -1046,13 +1076,13 @@ func (b *ReminderBot) createDraftCustomDatesReminder(
 	return reminder, nil
 }
 
-func intervalDaysForRepeat(repeat reminderRepeat) (int, bool) {
+func intervalDaysForRepeat(repeat telegramui.Repeat) (int, bool) {
 	switch repeat {
-	case reminderRepeatEveryDay:
+	case telegramui.RepeatEveryDay:
 		return 1, true
-	case reminderRepeatEveryTwoDays:
+	case telegramui.RepeatEveryTwoDays:
 		return 2, true
-	case reminderRepeatEveryWeek:
+	case telegramui.RepeatEveryWeek:
 		return 7, true
 	default:
 		return 0, false
@@ -1097,18 +1127,18 @@ func (b *ReminderBot) applyDraftMonth(chatID int64, value string) bool {
 		return false
 	}
 
-	nowMonth := firstDayOfMonth(b.now(chatID))
-	if firstDayOfMonth(month).Before(nowMonth) {
+	nowMonth := telegramui.FirstDayOfMonth(b.now(chatID))
+	if telegramui.FirstDayOfMonth(month).Before(nowMonth) {
 		draft.notice = "Нельзя выбрать месяц в прошлом. Выберите текущий или будущий месяц."
-		draft.screen = draftScreenCalendar
+		draft.screen = telegramui.ScreenCalendar
 		b.draftByChat[chatID] = draft
 
 		return true
 	}
 
-	draft.calendarMonth = firstDayOfMonth(month)
+	draft.calendarMonth = telegramui.FirstDayOfMonth(month)
 	draft.notice = ""
-	draft.screen = draftScreenCalendar
+	draft.screen = telegramui.ScreenCalendar
 	b.draftByChat[chatID] = draft
 
 	return true
@@ -1123,23 +1153,23 @@ func (b *ReminderBot) applyDraftRepeat(chatID int64, value string) bool {
 		return false
 	}
 
-	draft.repeat = reminderRepeat(value)
+	draft.repeat = telegramui.Repeat(value)
 	draft.notice = ""
 
 	switch draft.repeat {
-	case reminderRepeatCustomDates:
-		draft.screen = draftScreenCalendar
-	case reminderRepeatCustomWeekdays:
-		draft.screen = draftScreenWeekdays
-	case reminderRepeatCustomInterval:
+	case telegramui.RepeatCustomDates:
+		draft.screen = telegramui.ScreenCalendar
+	case telegramui.RepeatCustomWeekdays:
+		draft.screen = telegramui.ScreenWeekdays
+	case telegramui.RepeatCustomInterval:
 		if draft.intervalDays == 0 {
 			draft.intervalDays = 1
 		}
 
-		draft.waitingFor = fieldRepeatInterval
-		draft.screen = draftScreenInterval
+		draft.waitingFor = telegramui.FieldRepeatInterval
+		draft.screen = telegramui.ScreenInterval
 	default:
-		draft.screen = draftScreenMain
+		draft.screen = telegramui.ScreenMain
 	}
 
 	b.draftByChat[chatID] = draft
@@ -1162,9 +1192,9 @@ func (b *ReminderBot) applyDraftWeekday(chatID int64, value string) bool {
 	}
 
 	draft.weekdaysMask ^= mask
-	draft.repeat = reminderRepeatCustomWeekdays
+	draft.repeat = telegramui.RepeatCustomWeekdays
 	draft.notice = ""
-	draft.screen = draftScreenWeekdays
+	draft.screen = telegramui.ScreenWeekdays
 	b.draftByChat[chatID] = draft
 
 	return true
@@ -1187,19 +1217,19 @@ func (b *ReminderBot) applyDraftDate(chatID int64, value string) bool {
 	}
 
 	now := b.now(chatID)
-	if date.Before(beginningOfDay(now)) {
+	if date.Before(telegramui.BeginningOfDay(now)) {
 		draft.notice = "Нельзя выбрать дату в прошлом. Выберите сегодняшнюю или будущую дату."
-		draft.screen = draftScreenCalendar
+		draft.screen = telegramui.ScreenCalendar
 		b.draftByChat[chatID] = draft
 
 		return true
 	}
 
-	if draft.repeat == reminderRepeatCustomDates {
+	if draft.repeat == telegramui.RepeatCustomDates {
 		draft.customDates = toggleDraftCustomDate(draft.customDates, date)
-		draft.calendarMonth = firstDayOfMonth(date)
+		draft.calendarMonth = telegramui.FirstDayOfMonth(date)
 		draft.notice = ""
-		draft.screen = draftScreenCalendar
+		draft.screen = telegramui.ScreenCalendar
 		b.draftByChat[chatID] = draft
 
 		return true
@@ -1207,7 +1237,7 @@ func (b *ReminderBot) applyDraftDate(chatID int64, value string) bool {
 
 	draft.date = date
 
-	draft.calendarMonth = firstDayOfMonth(date)
+	draft.calendarMonth = telegramui.FirstDayOfMonth(date)
 	if !draft.remindAt(location).After(now) {
 		next := nextReminderTime(now)
 		draft.hour = next.Hour()
@@ -1215,7 +1245,7 @@ func (b *ReminderBot) applyDraftDate(chatID int64, value string) bool {
 	}
 
 	draft.notice = ""
-	draft.screen = draftScreenTime
+	draft.screen = telegramui.ScreenTime
 	b.draftByChat[chatID] = draft
 
 	return true
@@ -1258,7 +1288,7 @@ func (b *ReminderBot) applyDraftTime(chatID int64, value string) bool {
 		draft.notice = ""
 	}
 
-	draft.screen = draftScreenMain
+	draft.screen = telegramui.ScreenMain
 	b.draftByChat[chatID] = draft
 
 	return true
@@ -1278,7 +1308,7 @@ func (b *ReminderBot) applyDraftTimeShift(chatID int64, value string) bool {
 		return false
 	}
 
-	if draft.screen == draftScreenInterval {
+	if draft.screen == telegramui.ScreenInterval {
 		days := draft.intervalDays
 		if days == 0 {
 			days = 1
@@ -1290,9 +1320,9 @@ func (b *ReminderBot) applyDraftTimeShift(chatID int64, value string) bool {
 		}
 
 		draft.intervalDays = days
-		draft.repeat = reminderRepeatCustomInterval
+		draft.repeat = telegramui.RepeatCustomInterval
 		draft.notice = ""
-		draft.screen = draftScreenInterval
+		draft.screen = telegramui.ScreenInterval
 		b.draftByChat[chatID] = draft
 
 		return true
@@ -1309,20 +1339,20 @@ func (b *ReminderBot) applyDraftTimeShift(chatID int64, value string) bool {
 		draft.notice = ""
 	}
 
-	draft.screen = draftScreenTime
+	draft.screen = telegramui.ScreenTime
 	b.draftByChat[chatID] = draft
 
 	return true
 }
 
-func (b *ReminderBot) setDraftWaitingFor(chatID int64, field draftField) {
+func (b *ReminderBot) setDraftWaitingFor(chatID int64, field telegramui.Field) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
 	draft := b.draftByChat[chatID]
 	draft.waitingFor = field
 	draft.notice = ""
-	draft.screen = draftScreenMain
+	draft.screen = telegramui.ScreenMain
 	b.draftByChat[chatID] = draft
 }
 
@@ -1333,7 +1363,7 @@ func (b *ReminderBot) setDraftNotice(chatID int64, notice string) {
 	draft := b.draftByChat[chatID]
 	draft.notice = notice
 	draft.waitingFor = ""
-	draft.screen = draftScreenMain
+	draft.screen = telegramui.ScreenMain
 	b.draftByChat[chatID] = draft
 }
 
@@ -1344,11 +1374,11 @@ func (b *ReminderBot) setDraftTimeNotice(chatID int64, notice string) {
 	draft := b.draftByChat[chatID]
 	draft.notice = notice
 	draft.waitingFor = ""
-	draft.screen = draftScreenTime
+	draft.screen = telegramui.ScreenTime
 	b.draftByChat[chatID] = draft
 }
 
-func (b *ReminderBot) setDraftScreenNotice(chatID int64, screen draftScreen, notice string) {
+func (b *ReminderBot) setDraftScreenNotice(chatID int64, screen telegramui.Screen, notice string) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -1359,13 +1389,13 @@ func (b *ReminderBot) setDraftScreenNotice(chatID int64, screen draftScreen, not
 	b.draftByChat[chatID] = draft
 }
 
-func (b *ReminderBot) setDraftScreen(chatID int64, screen draftScreen) {
+func (b *ReminderBot) setDraftScreen(chatID int64, screen telegramui.Screen) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
 	draft := b.draftByChat[chatID]
 	if draft.calendarMonth.IsZero() {
-		draft.calendarMonth = firstDayOfMonth(b.now(chatID))
+		draft.calendarMonth = telegramui.FirstDayOfMonth(b.now(chatID))
 	}
 
 	draft.waitingFor = ""
@@ -1483,8 +1513,26 @@ func newReminderDraft(now time.Time) reminderDraft {
 	return reminderDraft{
 		hour:          next.Hour(),
 		minute:        next.Minute(),
-		screen:        draftScreenMain,
-		calendarMonth: firstDayOfMonth(next),
+		screen:        telegramui.ScreenMain,
+		calendarMonth: telegramui.FirstDayOfMonth(next),
+	}
+}
+
+func uiDraft(draft reminderDraft) telegramui.Draft {
+	return telegramui.Draft{
+		Title:         draft.title,
+		Description:   draft.description,
+		Notice:        draft.notice,
+		Date:          draft.date,
+		Hour:          draft.hour,
+		Minute:        draft.minute,
+		Repeat:        draft.repeat,
+		CustomDates:   draft.customDates,
+		WeekdaysMask:  draft.weekdaysMask,
+		IntervalDays:  draft.intervalDays,
+		Screen:        draft.screen,
+		CalendarMonth: draft.calendarMonth,
+		WaitingFor:    draft.waitingFor,
 	}
 }
 
