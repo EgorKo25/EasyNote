@@ -9,41 +9,56 @@ import (
 )
 
 const (
-	buttonStart          = telegramui.ButtonStart
-	buttonCreateReminder = telegramui.ButtonCreateReminder
-	buttonReminderList   = telegramui.ButtonReminderList
+	buttonStart           = telegramui.ButtonStart
+	buttonCreateReminder  = telegramui.ButtonCreateReminder
+	buttonReminderList    = telegramui.ButtonReminderList
+	buttonReminderHistory = telegramui.ButtonReminderHistory
+	buttonSettings        = telegramui.ButtonSettings
 )
 
 const (
-	callbackDraftTitle        = telegramui.CallbackDraftTitle
-	callbackDraftDescription  = telegramui.CallbackDraftDescription
-	callbackDraftDate         = telegramui.CallbackDraftDate
-	callbackDraftCalendar     = telegramui.CallbackDraftCalendar
-	callbackDraftRepeat       = telegramui.CallbackDraftRepeat
-	callbackDraftBack         = telegramui.CallbackDraftBack
-	callbackDraftSave         = telegramui.CallbackDraftSave
-	callbackDraftCancel       = telegramui.CallbackDraftCancel
-	callbackDraftTimeDone     = telegramui.CallbackDraftTimeDone
-	callbackDraftCustomDone   = telegramui.CallbackDraftCustomDone
-	callbackDraftWeekdaysDone = telegramui.CallbackDraftWeekdaysDone
-	callbackNoop              = telegramui.CallbackNoop
-	callbackMainMenu          = telegramui.CallbackMainMenu
-	callbackCreateReminder    = telegramui.CallbackCreateReminder
-	callbackReminderList      = telegramui.CallbackReminderList
-	callbackReminderBackList  = telegramui.CallbackReminderBackList
-	callbackDatePrefix        = telegramui.CallbackDatePrefix
-	callbackMonthPrefix       = telegramui.CallbackMonthPrefix
-	callbackTimeSetPrefix     = telegramui.CallbackTimeSetPrefix
-	callbackTimeShiftPrefix   = telegramui.CallbackTimeShiftPrefix
-	callbackRepeatPrefix      = telegramui.CallbackRepeatPrefix
-	callbackWeekdayPrefix     = telegramui.CallbackWeekdayPrefix
-	callbackViewPrefix        = telegramui.CallbackViewPrefix
-	callbackDeletePrefix      = telegramui.CallbackDeletePrefix
+	callbackDraftTitle              = telegramui.CallbackDraftTitle
+	callbackDraftDescription        = telegramui.CallbackDraftDescription
+	callbackDraftDate               = telegramui.CallbackDraftDate
+	callbackDraftCalendar           = telegramui.CallbackDraftCalendar
+	callbackDraftRepeat             = telegramui.CallbackDraftRepeat
+	callbackDraftBack               = telegramui.CallbackDraftBack
+	callbackDraftSave               = telegramui.CallbackDraftSave
+	callbackDraftCancel             = telegramui.CallbackDraftCancel
+	callbackDraftTimeDone           = telegramui.CallbackDraftTimeDone
+	callbackDraftCustomDone         = telegramui.CallbackDraftCustomDone
+	callbackDraftWeekdaysDone       = telegramui.CallbackDraftWeekdaysDone
+	callbackDraftIntervalDone       = telegramui.CallbackDraftIntervalDone
+	callbackSettings                = telegramui.CallbackSettings
+	callbackSettingsLanguage        = telegramui.CallbackSettingsLanguage
+	callbackSettingsTimezone        = telegramui.CallbackSettingsTimezone
+	callbackSettingsIntrusive       = telegramui.CallbackSettingsIntrusive
+	callbackSettingsIntrusiveOn     = telegramui.CallbackSettingsIntrusiveOn
+	callbackSettingsIntrusiveOff    = telegramui.CallbackSettingsIntrusiveOff
+	callbackReminderDone            = telegramui.CallbackReminderDone
+	callbackReminderCancelDelivered = telegramui.CallbackReminderCancelDelivered
+	callbackReminderHistory         = telegramui.CallbackReminderHistory
+	callbackNoop                    = telegramui.CallbackNoop
+	callbackMainMenu                = telegramui.CallbackMainMenu
+	callbackCreateReminder          = telegramui.CallbackCreateReminder
+	callbackReminderList            = telegramui.CallbackReminderList
+	callbackReminderBackList        = telegramui.CallbackReminderBackList
+	callbackDatePrefix              = telegramui.CallbackDatePrefix
+	callbackMonthPrefix             = telegramui.CallbackMonthPrefix
+	callbackTimeSetPrefix           = telegramui.CallbackTimeSetPrefix
+	callbackTimeShiftPrefix         = telegramui.CallbackTimeShiftPrefix
+	callbackRepeatPrefix            = telegramui.CallbackRepeatPrefix
+	callbackWeekdayPrefix           = telegramui.CallbackWeekdayPrefix
+	callbackViewPrefix              = telegramui.CallbackViewPrefix
+	callbackDeletePrefix            = telegramui.CallbackDeletePrefix
 )
 
 const (
-	fieldTitle       draftField = telegramui.FieldTitle
-	fieldDescription draftField = telegramui.FieldDescription
+	fieldTitle             draftField = telegramui.FieldTitle
+	fieldDescription       draftField = telegramui.FieldDescription
+	fieldTimezoneCity      draftField = telegramui.FieldTimezoneCity
+	fieldIntrusiveInterval draftField = telegramui.FieldIntrusiveInterval
+	fieldRepeatInterval    draftField = telegramui.FieldRepeatInterval
 )
 
 const (
@@ -53,6 +68,7 @@ const (
 	draftScreenTime     draftScreen = telegramui.ScreenTime
 	draftScreenRepeat   draftScreen = telegramui.ScreenRepeat
 	draftScreenWeekdays draftScreen = telegramui.ScreenWeekdays
+	draftScreenInterval draftScreen = telegramui.ScreenInterval
 )
 
 const (
@@ -63,6 +79,7 @@ const (
 	reminderRepeatWeekdays       reminderRepeat = telegramui.RepeatWeekdays
 	reminderRepeatCustomWeekdays reminderRepeat = telegramui.RepeatCustomWeekdays
 	reminderRepeatCustomDates    reminderRepeat = telegramui.RepeatCustomDates
+	reminderRepeatCustomInterval reminderRepeat = telegramui.RepeatCustomInterval
 )
 
 type reminderRepeat = telegramui.Repeat
@@ -89,6 +106,14 @@ func reminderCreatedKeyboard() *telego.InlineKeyboardMarkup {
 	return telegramui.ReminderCreatedKeyboard()
 }
 
+func settingsKeyboard() *telego.InlineKeyboardMarkup {
+	return telegramui.SettingsKeyboard()
+}
+
+func intrusiveSettingsKeyboard() *telego.InlineKeyboardMarkup {
+	return telegramui.IntrusiveSettingsKeyboard()
+}
+
 func mainMenuText() string {
 	return telegramui.MainMenuText()
 }
@@ -103,6 +128,18 @@ func reminderViewText(reminder database.ReminderView, location *time.Location) s
 
 func reminderListText(reminders []database.ReminderView) string {
 	return telegramui.ReminderListText(reminders)
+}
+
+func reminderHistoryText(reminders []database.ReminderView, location *time.Location) string {
+	return telegramui.ReminderHistoryText(reminders, location)
+}
+
+func settingsText(settings database.UserSettings) string {
+	return telegramui.SettingsText(settings)
+}
+
+func intrusiveSettingsText(settings database.UserSettings) string {
+	return telegramui.IntrusiveSettingsText(settings)
 }
 
 func firstDayOfMonth(value time.Time) time.Time {
@@ -124,6 +161,7 @@ func uiDraft(draft reminderDraft) telegramui.Draft {
 		Repeat:        draft.repeat,
 		CustomDates:   draft.customDates,
 		WeekdaysMask:  draft.weekdaysMask,
+		IntervalDays:  draft.intervalDays,
 		Screen:        draft.screen,
 		CalendarMonth: draft.calendarMonth,
 		WaitingFor:    draft.waitingFor,

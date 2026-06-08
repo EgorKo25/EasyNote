@@ -15,6 +15,7 @@ type Draft struct {
 	Repeat        Repeat
 	CustomDates   []time.Time
 	WeekdaysMask  int
+	IntervalDays  int
 	Screen        Screen
 	CalendarMonth time.Time
 	WaitingFor    Field

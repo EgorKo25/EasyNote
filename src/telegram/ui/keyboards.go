@@ -13,6 +13,8 @@ func MainKeyboard() *telego.ReplyKeyboardMarkup {
 	return tu.Keyboard(
 		tu.KeyboardRow(tu.KeyboardButton(ButtonCreateReminder)),
 		tu.KeyboardRow(tu.KeyboardButton(ButtonReminderList)),
+		tu.KeyboardRow(tu.KeyboardButton(ButtonReminderHistory)),
+		tu.KeyboardRow(tu.KeyboardButton(ButtonSettings)),
 	).WithResizeKeyboard()
 }
 
@@ -28,6 +30,8 @@ func DraftKeyboard(draft Draft, now time.Time) *telego.InlineKeyboardMarkup {
 		return repeatKeyboard()
 	case ScreenWeekdays:
 		return weekdaysKeyboard(draft)
+	case ScreenInterval:
+		return intervalKeyboard(draft)
 	default:
 		return draftMainKeyboard(draft)
 	}
@@ -82,21 +86,10 @@ func repeatKeyboard() *telego.InlineKeyboardMarkup {
 			tu.InlineKeyboardButton("Каждый день").WithCallbackData(RepeatCallback(RepeatEveryDay)),
 		),
 		tu.InlineKeyboardRow(
-			tu.InlineKeyboardButton("Каждую неделю").WithCallbackData(RepeatCallback(RepeatEveryWeek)),
+			tu.InlineKeyboardButton("Свои дни недели").WithCallbackData(RepeatCallback(RepeatCustomWeekdays)),
 		),
 		tu.InlineKeyboardRow(
-			tu.InlineKeyboardButton("Каждые 2 дня").WithCallbackData(RepeatCallback(RepeatEveryTwoDays)),
-		),
-		tu.InlineKeyboardRow(
-			tu.InlineKeyboardButton("По будням").WithCallbackData(RepeatCallback(RepeatWeekdays)),
-		),
-		tu.InlineKeyboardRow(
-			tu.InlineKeyboardButton("Свои дни недели").WithCallbackData(
-				RepeatCallback(RepeatCustomWeekdays),
-			),
-		),
-		tu.InlineKeyboardRow(
-			tu.InlineKeyboardButton("Выбрать даты").WithCallbackData(RepeatCallback(RepeatCustomDates)),
+			tu.InlineKeyboardButton("Интервал в днях").WithCallbackData(RepeatCallback(RepeatCustomInterval)),
 		),
 		tu.InlineKeyboardRow(
 			tu.InlineKeyboardButton("Без повторения").WithCallbackData(RepeatCallback(RepeatNone)),
@@ -120,6 +113,25 @@ func weekdaysKeyboard(draft Draft) *telego.InlineKeyboardMarkup {
 		),
 		tu.InlineKeyboardRow(
 			tu.InlineKeyboardButton("Готово").WithCallbackData(CallbackDraftWeekdaysDone),
+		),
+		tu.InlineKeyboardRow(tu.InlineKeyboardButton("Назад").WithCallbackData(CallbackDraftRepeat)),
+	)
+}
+
+func intervalKeyboard(draft Draft) *telego.InlineKeyboardMarkup {
+	valueText := "Интервал: не задан"
+	if draft.IntervalDays > 0 {
+		valueText = fmt.Sprintf("Интервал: %d дн.", draft.IntervalDays)
+	}
+
+	return tu.InlineKeyboard(
+		tu.InlineKeyboardRow(tu.InlineKeyboardButton(valueText).WithCallbackData(CallbackNoop)),
+		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton("-1").WithCallbackData(TimeShiftCallback(-1440)),
+			tu.InlineKeyboardButton("+1").WithCallbackData(TimeShiftCallback(1440)),
+		),
+		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton("Готово").WithCallbackData(CallbackDraftIntervalDone),
 		),
 		tu.InlineKeyboardRow(tu.InlineKeyboardButton("Назад").WithCallbackData(CallbackDraftRepeat)),
 	)
@@ -258,5 +270,26 @@ func ReminderCreatedKeyboard() *telego.InlineKeyboardMarkup {
 			tu.InlineKeyboardButton("Список").WithCallbackData(CallbackReminderList),
 		),
 		tu.InlineKeyboardRow(tu.InlineKeyboardButton("Создать еще").WithCallbackData(CallbackCreateReminder)),
+	)
+}
+
+func SettingsKeyboard() *telego.InlineKeyboardMarkup {
+	return tu.InlineKeyboard(
+		tu.InlineKeyboardRow(tu.InlineKeyboardButton("Язык: русский").WithCallbackData(CallbackSettingsLanguage)),
+		tu.InlineKeyboardRow(tu.InlineKeyboardButton("Часовой пояс").WithCallbackData(CallbackSettingsTimezone)),
+		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton("Настойчивые напоминания").WithCallbackData(CallbackSettingsIntrusive),
+		),
+		tu.InlineKeyboardRow(tu.InlineKeyboardButton("Главное меню").WithCallbackData(CallbackMainMenu)),
+	)
+}
+
+func IntrusiveSettingsKeyboard() *telego.InlineKeyboardMarkup {
+	return tu.InlineKeyboard(
+		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton("Включить").WithCallbackData(CallbackSettingsIntrusiveOn),
+			tu.InlineKeyboardButton("Выключить").WithCallbackData(CallbackSettingsIntrusiveOff),
+		),
+		tu.InlineKeyboardRow(tu.InlineKeyboardButton("Назад").WithCallbackData(CallbackSettings)),
 	)
 }

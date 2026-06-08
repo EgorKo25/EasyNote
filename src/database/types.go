@@ -21,10 +21,12 @@ type Note struct {
 type ReminderStatus string
 
 const (
-	ReminderStatusNew      ReminderStatus = "new"
-	ReminderStatusSent     ReminderStatus = "sent"
-	ReminderStatusFailed   ReminderStatus = "failed"
-	ReminderStatusCanceled ReminderStatus = "canceled"
+	ReminderStatusNew       ReminderStatus = "new"
+	ReminderStatusSent      ReminderStatus = "sent"
+	ReminderStatusFailed    ReminderStatus = "failed"
+	ReminderStatusCanceled  ReminderStatus = "canceled"
+	ReminderStatusCompleted ReminderStatus = "completed"
+	ReminderStatusSkipped   ReminderStatus = "skipped"
 )
 
 type Reminder struct {
@@ -36,8 +38,12 @@ type Reminder struct {
 
 	Status ReminderStatus
 
-	Attempts int
-	SentAt   *time.Time
+	Attempts          int
+	SentAt            *time.Time
+	LastSentAt        *time.Time
+	NextSendAt        *time.Time
+	IntrusiveUntil    *time.Time
+	TelegramMessageID *int
 
 	CreatedAt time.Time
 }
@@ -55,6 +61,10 @@ type ScheduledReminder struct {
 	RemindAt time.Time
 
 	Index int
+
+	IntrusiveEnabled  bool
+	IntrusiveInterval time.Duration
+	TelegramMessageID *int
 }
 
 type ReminderView struct {
@@ -121,4 +131,20 @@ type RecurringReminderRequest struct {
 	FirstRemindAt  time.Time
 	Rule           ReminderRule
 	CustomDates    []time.Time
+}
+
+type UserSettings struct {
+	TelegramChatID    int64
+	Language          string
+	Timezone          string
+	IntrusiveEnabled  bool
+	IntrusiveInterval time.Duration
+	UpdatedAt         time.Time
+}
+
+type ReminderDelivery struct {
+	ReminderID     int64
+	MessageID      int
+	NextSendAt     time.Time
+	IntrusiveUntil time.Time
 }

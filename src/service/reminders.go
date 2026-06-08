@@ -13,6 +13,8 @@ import (
 var ErrReminderTitleEmpty = errors.New("reminder title is empty")
 var ErrCustomReminderDatesEmpty = errors.New("custom reminder dates are empty")
 var ErrWeekdaysMaskEmpty = errors.New("weekdays mask is empty")
+var ErrIntrusiveIntervalOutOfRange = errors.New("intrusive reminder interval is out of range")
+var ErrUnknownTimezoneCity = errors.New("unknown timezone city")
 
 func NewReminderService(repository ReminderCommandRepository, planner ReminderCreationPlanner) *ReminderService {
 	return &ReminderService{repository: repository, ReminderCreationPlanner: planner}
@@ -37,11 +39,26 @@ type ReminderCreationPlanner interface {
 		ctx context.Context,
 		request database.RecurringReminderRequest,
 	) (database.ReminderView, error)
+	CompleteOccurrence(
+		ctx context.Context,
+		reminderID int64,
+		status database.ReminderStatus,
+		sentAt *time.Time,
+	) error
 }
 
 type ReminderCommandRepository interface {
 	FindRemindersByChat(ctx context.Context, telegramChatID int64) ([]database.ReminderView, error)
+	FindReminderHistoryByChat(ctx context.Context, telegramChatID int64) ([]database.ReminderView, error)
 	CancelReminder(ctx context.Context, telegramChatID int64, reminderID int64) error
+	UserSettings(ctx context.Context, telegramChatID int64) (database.UserSettings, error)
+	UpdateUserTimezone(ctx context.Context, telegramChatID int64, timezone string) error
+	UpdateIntrusiveSettings(
+		ctx context.Context,
+		telegramChatID int64,
+		enabled bool,
+		interval time.Duration,
+	) error
 }
 
 func (s *ReminderService) CreateReminder(
@@ -141,9 +158,75 @@ func (s *ReminderService) Reminders(ctx context.Context, telegramChatID int64) (
 	return reminders, nil
 }
 
+func (s *ReminderService) ReminderHistory(ctx context.Context, telegramChatID int64) ([]database.ReminderView, error) {
+	reminders, err := s.repository.FindReminderHistoryByChat(ctx, telegramChatID)
+	if err != nil {
+		return nil, fmt.Errorf("find reminder history: %w", err)
+	}
+
+	return reminders, nil
+}
+
 func (s *ReminderService) DeleteReminder(ctx context.Context, telegramChatID int64, reminderID int64) error {
 	if err := s.repository.CancelReminder(ctx, telegramChatID, reminderID); err != nil {
 		return fmt.Errorf("delete reminder: %w", err)
+	}
+
+	return nil
+}
+
+func (s *ReminderService) CompleteReminder(ctx context.Context, reminderID int64) error {
+	now := time.Now()
+	if err := s.CompleteOccurrence(ctx, reminderID, database.ReminderStatusCompleted, &now); err != nil {
+		return fmt.Errorf("complete reminder: %w", err)
+	}
+
+	return nil
+}
+
+func (s *ReminderService) CancelDeliveredReminder(ctx context.Context, reminderID int64) error {
+	now := time.Now()
+	if err := s.CompleteOccurrence(ctx, reminderID, database.ReminderStatusCanceled, &now); err != nil {
+		return fmt.Errorf("cancel delivered reminder: %w", err)
+	}
+
+	return nil
+}
+
+func (s *ReminderService) UserSettings(ctx context.Context, telegramChatID int64) (database.UserSettings, error) {
+	settings, err := s.repository.UserSettings(ctx, telegramChatID)
+	if err != nil {
+		return database.UserSettings{}, fmt.Errorf("load user settings: %w", err)
+	}
+
+	return settings, nil
+}
+
+func (s *ReminderService) SetUserTimezoneByCity(ctx context.Context, telegramChatID int64, city string) error {
+	timezone, ok := timezoneForCity(city)
+	if !ok {
+		return fmt.Errorf("%w: %s", ErrUnknownTimezoneCity, city)
+	}
+
+	if err := s.repository.UpdateUserTimezone(ctx, telegramChatID, timezone); err != nil {
+		return fmt.Errorf("set user timezone: %w", err)
+	}
+
+	return nil
+}
+
+func (s *ReminderService) SetIntrusiveSettings(
+	ctx context.Context,
+	telegramChatID int64,
+	enabled bool,
+	interval time.Duration,
+) error {
+	if interval < 30*time.Minute || interval > 24*time.Hour {
+		return fmt.Errorf("set intrusive settings: %w", ErrIntrusiveIntervalOutOfRange)
+	}
+
+	if err := s.repository.UpdateIntrusiveSettings(ctx, telegramChatID, enabled, interval); err != nil {
+		return fmt.Errorf("set intrusive settings: %w", err)
 	}
 
 	return nil
@@ -187,4 +270,31 @@ func earliestDate(dates []time.Time) time.Time {
 	}
 
 	return earliest
+}
+
+func timezoneForCity(city string) (string, bool) {
+	normalized := strings.ToLower(strings.TrimSpace(city))
+	timezones := map[string]string{
+		"москва":           "Europe/Moscow",
+		"moscow":           "Europe/Moscow",
+		"санкт-петербург":  "Europe/Moscow",
+		"saint petersburg": "Europe/Moscow",
+		"екатеринбург":     "Asia/Yekaterinburg",
+		"новосибирск":      "Asia/Novosibirsk",
+		"красноярск":       "Asia/Krasnoyarsk",
+		"иркутск":          "Asia/Irkutsk",
+		"владивосток":      "Asia/Vladivostok",
+		"new york":         "America/New_York",
+		"los angeles":      "America/Los_Angeles",
+		"chicago":          "America/Chicago",
+		"denver":           "America/Denver",
+		"london":           "Europe/London",
+		"berlin":           "Europe/Berlin",
+		"paris":            "Europe/Paris",
+		"tokyo":            "Asia/Tokyo",
+	}
+
+	timezone, ok := timezones[normalized]
+
+	return timezone, ok
 }

@@ -14,10 +14,11 @@ type Storage interface {
 		now time.Time,
 		limit int,
 	) ([]*database.ScheduledReminder, error)
+	MarkReminderDelivered(ctx context.Context, delivery database.ReminderDelivery) error
 }
 
 type Sender interface {
-	SendReminder(ctx context.Context, reminder database.ScheduledReminder) error
+	SendReminder(ctx context.Context, reminder database.ScheduledReminder) (int, error)
 }
 
 type Planner interface {
