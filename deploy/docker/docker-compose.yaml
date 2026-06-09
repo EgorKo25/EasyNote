@@ -57,3 +57,6 @@ services:
 volumes:
   easy_note_postgres_data:
   easy_note_logs:
+
+networks:
+  easy-note-net:
