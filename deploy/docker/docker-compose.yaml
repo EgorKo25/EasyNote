@@ -1,4 +1,12 @@
 services:
+  mihomo:
+    image: metacubex/mihomo:latest
+    container_name: mihomo
+    restart: unless-stopped
+    volumes:
+      - /opt/mihomo:/root/.config/mihomo
+    networks:
+      - easy-note-net
   app:
     image: ${APP_IMAGE:-easynote:local}
     container_name: easy-note-app
@@ -8,13 +16,12 @@ services:
     environment:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?TELEGRAM_BOT_TOKEN is required}
       TZ: ${TZ:-Europe/Moscow}
-      HTTP_PROXY: ${HTTP_PROXY}
-      HTTPS_PROXY: ${HTTPS_PROXY}
-      http_proxy: ${http_proxy}
-      https_proxy: ${https_proxy}
-      NO_PROXY: ${NO_PROXY}
-      no_proxy: ${no_proxy}
-
+      HTTP_PROXY: "http://mihomo:7890"
+      HTTPS_PROXY: "http://mihomo:7890"
+      http_proxy: "http://mihomo:7890"
+      https_proxy: "http://mihomo:7890"
+      NO_PROXY: "localhost,127.0.0.1,postgres,db,easy-note-postgres"
+      no_proxy: "localhost,127.0.0.1,postgres,db,easy-note-postgres"
       DATABASE_HOST: postgres
       DATABASE_PORT: "5432"
       DATABASE_USER: ${POSTGRES_USER:-postgres}
