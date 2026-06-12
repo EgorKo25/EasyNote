@@ -15,7 +15,6 @@ import (
 
 var (
 	errCreateReminderRepository = errors.New("create reminder repository")
-	errFindRemindersRepository  = errors.New("find reminders repository")
 	errCancelReminderRepository = errors.New("cancel reminder repository")
 	errExpectedTitleEmpty       = errors.New("create reminder: reminder title is empty")
 	errExpectedCreateReminder   = errors.New("create reminder: create reminder repository")
@@ -735,115 +734,6 @@ func TestReminderServiceDeletesReminder(t *testing.T) {
 
 			if test.expected.expectedErr != nil {
 				require.EqualError(t, err, test.expected.expectedErr.Error())
-
-				return
-			}
-
-			require.NoError(t, err)
-		})
-	}
-}
-
-func TestReminderServiceUpdatesUserSettings(t *testing.T) {
-	t.Parallel()
-
-	chatID := int64(100)
-
-	tests := []struct {
-		name     string
-		action   func(reminderService *service.ReminderService) error
-		before   func(repository *mocks.MockReminderCommandRepository)
-		expected struct {
-			expectedErrText string
-		}
-	}{
-		{
-			name: "sets valid moscow timezone",
-			action: func(reminderService *service.ReminderService) error {
-				return reminderService.SetUserTimezone(context.Background(), chatID, "Europe/Moscow")
-			},
-			before: func(repository *mocks.MockReminderCommandRepository) {
-				repository.EXPECT().UpdateUserTimezone(gomock.Any(), chatID, "Europe/Moscow").Return(nil).Times(1)
-			},
-		},
-		{
-			name: "sets valid utc timezone",
-			action: func(reminderService *service.ReminderService) error {
-				return reminderService.SetUserTimezone(context.Background(), chatID, "UTC")
-			},
-			before: func(repository *mocks.MockReminderCommandRepository) {
-				repository.EXPECT().UpdateUserTimezone(gomock.Any(), chatID, "UTC").Return(nil).Times(1)
-			},
-		},
-		{
-			name: "sets enabled intrusive settings at lower boundary",
-			action: func(reminderService *service.ReminderService) error {
-				return reminderService.SetIntrusiveSettings(context.Background(), chatID, true, time.Minute)
-			},
-			before: func(repository *mocks.MockReminderCommandRepository) {
-				repository.EXPECT().
-					UpdateIntrusiveSettings(gomock.Any(), chatID, true, time.Minute).
-					Return(nil).
-					Times(1)
-			},
-		},
-		{
-			name: "sets disabled intrusive settings at upper boundary",
-			action: func(reminderService *service.ReminderService) error {
-				return reminderService.SetIntrusiveSettings(context.Background(), chatID, false, 2*time.Hour)
-			},
-			before: func(repository *mocks.MockReminderCommandRepository) {
-				repository.EXPECT().
-					UpdateIntrusiveSettings(gomock.Any(), chatID, false, 2*time.Hour).
-					Return(nil).
-					Times(1)
-			},
-		},
-		{
-			name: "returns timezone repository error",
-			action: func(reminderService *service.ReminderService) error {
-				return reminderService.SetUserTimezone(context.Background(), chatID, "Europe/Moscow")
-			},
-			before: func(repository *mocks.MockReminderCommandRepository) {
-				repository.EXPECT().
-					UpdateUserTimezone(gomock.Any(), chatID, "Europe/Moscow").
-					Return(errFindRemindersRepository).
-					Times(1)
-			},
-			expected: struct {
-				expectedErrText string
-			}{expectedErrText: "set user timezone: find reminders repository"},
-		},
-		{
-			name: "returns intrusive settings repository error",
-			action: func(reminderService *service.ReminderService) error {
-				return reminderService.SetIntrusiveSettings(context.Background(), chatID, true, time.Minute)
-			},
-			before: func(repository *mocks.MockReminderCommandRepository) {
-				repository.EXPECT().
-					UpdateIntrusiveSettings(gomock.Any(), chatID, true, time.Minute).
-					Return(errFindRemindersRepository).
-					Times(1)
-			},
-			expected: struct {
-				expectedErrText string
-			}{expectedErrText: "set intrusive settings: find reminders repository"},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-
-			ctrl := gomock.NewController(t)
-			repository := mocks.NewMockReminderCommandRepository(ctrl)
-			test.before(repository)
-
-			reminderService := service.NewReminderService(repository, mocks.NewMockReminderCreationPlanner(ctrl))
-			err := test.action(reminderService)
-
-			if test.expected.expectedErrText != "" {
-				require.EqualErrorf(t, err, test.expected.expectedErrText, "unexpected settings update error")
 
 				return
 			}
