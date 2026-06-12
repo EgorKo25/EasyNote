@@ -51,7 +51,7 @@ func main() {
 	reminderPlanner := planner.New(database)
 	reminderService := service.NewReminderService(database, reminderPlanner)
 	reminderRunner := scheduler.NewRunner(database, telegramSender, reminderPlanner, cfg.Scheduler)
-	reminderBot := telegram.NewReminderBot(telegramSender, reminderService, cfg.Telegram)
+	reminderBot := telegram.NewReminderBot(telegramSender, reminderService, database, cfg.Telegram)
 
 	runner := background.NewRunner()
 

@@ -28,11 +28,11 @@ func TestTextRendering(t *testing.T) {
 		}
 	}{
 		{
-			name:   "main menu text explains keyboard action",
+			name:   "main menu text stays visually empty",
 			action: telegramui.MainMenuText,
 			expected: struct {
 				text string
-			}{text: "Выберите действие на клавиатуре ниже."},
+			}{text: " "},
 		},
 		{
 			name: "filled draft text shows reminder fields",
