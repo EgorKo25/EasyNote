@@ -131,33 +131,33 @@ func (mr *MockReminderServiceMockRecorder) DeleteReminder(ctx, telegramChatID, r
 }
 
 // ReminderHistory mocks base method.
-func (m *MockReminderService) ReminderHistory(ctx context.Context, telegramChatID int64) ([]database.ReminderView, error) {
+func (m *MockReminderService) ReminderHistory(ctx context.Context, telegramChatID int64, limit, offset int) ([]database.ReminderView, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ReminderHistory", ctx, telegramChatID)
+	ret := m.ctrl.Call(m, "ReminderHistory", ctx, telegramChatID, limit, offset)
 	ret0, _ := ret[0].([]database.ReminderView)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ReminderHistory indicates an expected call of ReminderHistory.
-func (mr *MockReminderServiceMockRecorder) ReminderHistory(ctx, telegramChatID any) *gomock.Call {
+func (mr *MockReminderServiceMockRecorder) ReminderHistory(ctx, telegramChatID, limit, offset any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReminderHistory", reflect.TypeOf((*MockReminderService)(nil).ReminderHistory), ctx, telegramChatID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReminderHistory", reflect.TypeOf((*MockReminderService)(nil).ReminderHistory), ctx, telegramChatID, limit, offset)
 }
 
 // Reminders mocks base method.
-func (m *MockReminderService) Reminders(ctx context.Context, telegramChatID int64) ([]database.ReminderView, error) {
+func (m *MockReminderService) Reminders(ctx context.Context, telegramChatID int64, limit, offset int) ([]database.ReminderView, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Reminders", ctx, telegramChatID)
+	ret := m.ctrl.Call(m, "Reminders", ctx, telegramChatID, limit, offset)
 	ret0, _ := ret[0].([]database.ReminderView)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Reminders indicates an expected call of Reminders.
-func (mr *MockReminderServiceMockRecorder) Reminders(ctx, telegramChatID any) *gomock.Call {
+func (mr *MockReminderServiceMockRecorder) Reminders(ctx, telegramChatID, limit, offset any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Reminders", reflect.TypeOf((*MockReminderService)(nil).Reminders), ctx, telegramChatID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Reminders", reflect.TypeOf((*MockReminderService)(nil).Reminders), ctx, telegramChatID, limit, offset)
 }
 
 // SetIntrusiveSettings mocks base method.

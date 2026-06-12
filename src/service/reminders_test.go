@@ -685,7 +685,7 @@ func TestReminderServiceLoadsReminders(t *testing.T) {
 			name: "loads one reminder",
 			before: func(repository *mocks.MockReminderCommandRepository) {
 				repository.EXPECT().
-					FindRemindersByChat(gomock.Any(), chatID).
+					FindRemindersByChat(gomock.Any(), chatID, 2, 4).
 					Return([]database.ReminderView{{ID: 1, Title: "Pay rent"}}, nil).
 					Times(1)
 			},
@@ -698,7 +698,7 @@ func TestReminderServiceLoadsReminders(t *testing.T) {
 			name: "loads several reminders",
 			before: func(repository *mocks.MockReminderCommandRepository) {
 				repository.EXPECT().
-					FindRemindersByChat(gomock.Any(), chatID).
+					FindRemindersByChat(gomock.Any(), chatID, 2, 4).
 					Return([]database.ReminderView{{ID: 1}, {ID: 2}}, nil).
 					Times(1)
 			},
@@ -711,7 +711,7 @@ func TestReminderServiceLoadsReminders(t *testing.T) {
 			name: "loads empty reminder list",
 			before: func(repository *mocks.MockReminderCommandRepository) {
 				repository.EXPECT().
-					FindRemindersByChat(gomock.Any(), chatID).
+					FindRemindersByChat(gomock.Any(), chatID, 2, 4).
 					Return([]database.ReminderView{}, nil).
 					Times(1)
 			},
@@ -724,7 +724,7 @@ func TestReminderServiceLoadsReminders(t *testing.T) {
 			name: "keeps repository reminder order",
 			before: func(repository *mocks.MockReminderCommandRepository) {
 				repository.EXPECT().
-					FindRemindersByChat(gomock.Any(), chatID).
+					FindRemindersByChat(gomock.Any(), chatID, 2, 4).
 					Return([]database.ReminderView{{ID: 2}, {ID: 1}}, nil).
 					Times(1)
 			},
@@ -737,7 +737,7 @@ func TestReminderServiceLoadsReminders(t *testing.T) {
 			name: "repository find error is returned",
 			before: func(repository *mocks.MockReminderCommandRepository) {
 				repository.EXPECT().
-					FindRemindersByChat(gomock.Any(), chatID).
+					FindRemindersByChat(gomock.Any(), chatID, 2, 4).
 					Return(nil, errFindRemindersRepository).
 					Times(1)
 			},
@@ -750,7 +750,7 @@ func TestReminderServiceLoadsReminders(t *testing.T) {
 			name: "nil reminder list is returned explicitly",
 			before: func(repository *mocks.MockReminderCommandRepository) {
 				repository.EXPECT().
-					FindRemindersByChat(gomock.Any(), chatID).
+					FindRemindersByChat(gomock.Any(), chatID, 2, 4).
 					Return(nil, nil).
 					Times(1)
 			},
@@ -770,7 +770,7 @@ func TestReminderServiceLoadsReminders(t *testing.T) {
 			test.before(repository)
 
 			reminderService := service.NewReminderService(repository, mocks.NewMockReminderCreationPlanner(ctrl))
-			reminders, err := reminderService.Reminders(context.Background(), chatID)
+			reminders, err := reminderService.Reminders(context.Background(), chatID, 2, 4)
 
 			if test.expected.expectedErr != nil {
 				require.EqualError(t, err, test.expected.expectedErr.Error())
@@ -867,6 +867,226 @@ func TestReminderServiceDeletesReminder(t *testing.T) {
 
 			if test.expected.expectedErr != nil {
 				require.EqualError(t, err, test.expected.expectedErr.Error())
+
+				return
+			}
+
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestReminderServiceLoadsReminderHistory(t *testing.T) {
+	t.Parallel()
+
+	chatID := int64(100)
+	limit := 2
+	offset := 4
+
+	tests := []struct {
+		name     string
+		before   func(repository *mocks.MockReminderCommandRepository)
+		expected struct {
+			reminders       []database.ReminderView
+			expectedErrText string
+		}
+	}{
+		{
+			name: "loads completed reminder history page",
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					FindReminderHistoryByChat(gomock.Any(), chatID, limit, offset).
+					Return([]database.ReminderView{{ID: 1, Status: database.ReminderStatusCompleted}}, nil).
+					Times(1)
+			},
+			expected: struct {
+				reminders       []database.ReminderView
+				expectedErrText string
+			}{reminders: []database.ReminderView{{ID: 1, Status: database.ReminderStatusCompleted}}},
+		},
+		{
+			name: "loads canceled reminder history page",
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					FindReminderHistoryByChat(gomock.Any(), chatID, limit, offset).
+					Return([]database.ReminderView{{ID: 2, Status: database.ReminderStatusCanceled}}, nil).
+					Times(1)
+			},
+			expected: struct {
+				reminders       []database.ReminderView
+				expectedErrText string
+			}{reminders: []database.ReminderView{{ID: 2, Status: database.ReminderStatusCanceled}}},
+		},
+		{
+			name: "loads empty reminder history page",
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					FindReminderHistoryByChat(gomock.Any(), chatID, limit, offset).
+					Return([]database.ReminderView{}, nil).
+					Times(1)
+			},
+			expected: struct {
+				reminders       []database.ReminderView
+				expectedErrText string
+			}{reminders: []database.ReminderView{}},
+		},
+		{
+			name: "keeps reminder history repository order",
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					FindReminderHistoryByChat(gomock.Any(), chatID, limit, offset).
+					Return([]database.ReminderView{{ID: 4}, {ID: 3}}, nil).
+					Times(1)
+			},
+			expected: struct {
+				reminders       []database.ReminderView
+				expectedErrText string
+			}{reminders: []database.ReminderView{{ID: 4}, {ID: 3}}},
+		},
+		{
+			name: "repository history error is returned",
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					FindReminderHistoryByChat(gomock.Any(), chatID, limit, offset).
+					Return(nil, errFindRemindersRepository).
+					Times(1)
+			},
+			expected: struct {
+				reminders       []database.ReminderView
+				expectedErrText string
+			}{expectedErrText: "find reminder history: find reminders repository"},
+		},
+		{
+			name: "nil reminder history list is returned explicitly",
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					FindReminderHistoryByChat(gomock.Any(), chatID, limit, offset).
+					Return(nil, nil).
+					Times(1)
+			},
+			expected: struct {
+				reminders       []database.ReminderView
+				expectedErrText string
+			}{reminders: nil},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctrl := gomock.NewController(t)
+			repository := mocks.NewMockReminderCommandRepository(ctrl)
+			test.before(repository)
+
+			reminderService := service.NewReminderService(repository, mocks.NewMockReminderCreationPlanner(ctrl))
+			reminders, err := reminderService.ReminderHistory(context.Background(), chatID, limit, offset)
+
+			if test.expected.expectedErrText != "" {
+				require.EqualErrorf(t, err, test.expected.expectedErrText, "unexpected reminder history error")
+				require.Equal(t, test.expected.reminders, reminders)
+
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, test.expected.reminders, reminders)
+		})
+	}
+}
+
+func TestReminderServiceUpdatesUserSettings(t *testing.T) {
+	t.Parallel()
+
+	chatID := int64(100)
+
+	tests := []struct {
+		name     string
+		action   func(reminderService *service.ReminderService) error
+		before   func(repository *mocks.MockReminderCommandRepository)
+		expected struct {
+			expectedErrText string
+		}
+	}{
+		{
+			name: "sets valid moscow timezone",
+			action: func(reminderService *service.ReminderService) error {
+				return reminderService.SetUserTimezone(context.Background(), chatID, "Europe/Moscow")
+			},
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().UpdateUserTimezone(gomock.Any(), chatID, "Europe/Moscow").Return(nil).Times(1)
+			},
+		},
+		{
+			name: "sets valid utc timezone with surrounding spaces",
+			action: func(reminderService *service.ReminderService) error {
+				return reminderService.SetUserTimezone(context.Background(), chatID, " UTC ")
+			},
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().UpdateUserTimezone(gomock.Any(), chatID, "UTC").Return(nil).Times(1)
+			},
+		},
+		{
+			name: "sets enabled intrusive settings at lower boundary",
+			action: func(reminderService *service.ReminderService) error {
+				return reminderService.SetIntrusiveSettings(context.Background(), chatID, true, time.Minute)
+			},
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					UpdateIntrusiveSettings(gomock.Any(), chatID, true, time.Minute).
+					Return(nil).
+					Times(1)
+			},
+		},
+		{
+			name: "sets disabled intrusive settings at upper boundary",
+			action: func(reminderService *service.ReminderService) error {
+				return reminderService.SetIntrusiveSettings(context.Background(), chatID, false, 2*time.Hour)
+			},
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					UpdateIntrusiveSettings(gomock.Any(), chatID, false, 2*time.Hour).
+					Return(nil).
+					Times(1)
+			},
+		},
+		{
+			name: "rejects blank timezone",
+			action: func(reminderService *service.ReminderService) error {
+				return reminderService.SetUserTimezone(context.Background(), chatID, " ")
+			},
+			before: func(_ *mocks.MockReminderCommandRepository) {
+			},
+			expected: struct {
+				expectedErrText string
+			}{expectedErrText: "unknown timezone: "},
+		},
+		{
+			name: "rejects intrusive interval below lower boundary",
+			action: func(reminderService *service.ReminderService) error {
+				return reminderService.SetIntrusiveSettings(context.Background(), chatID, true, time.Second)
+			},
+			before: func(_ *mocks.MockReminderCommandRepository) {
+			},
+			expected: struct {
+				expectedErrText string
+			}{expectedErrText: "set intrusive settings: intrusive reminder interval is out of range"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctrl := gomock.NewController(t)
+			repository := mocks.NewMockReminderCommandRepository(ctrl)
+			test.before(repository)
+
+			reminderService := service.NewReminderService(repository, mocks.NewMockReminderCreationPlanner(ctrl))
+			err := test.action(reminderService)
+
+			if test.expected.expectedErrText != "" {
+				require.EqualErrorf(t, err, test.expected.expectedErrText, "unexpected settings update error")
 
 				return
 			}
