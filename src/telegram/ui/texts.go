@@ -8,7 +8,7 @@ import (
 )
 
 func MainMenuText() string {
-	return " "
+	return "Главное меню\n\nВыберите действие на клавиатуре."
 }
 
 func RemindersText() string {
