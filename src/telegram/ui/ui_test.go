@@ -32,7 +32,7 @@ func TestTextRendering(t *testing.T) {
 			action: telegramui.MainMenuText,
 			expected: struct {
 				text string
-			}{text: "Главное меню\n\nВыберите действие на клавиатуре ниже."},
+			}{text: "Выберите действие на клавиатуре ниже."},
 		},
 		{
 			name: "filled draft text shows reminder fields",
@@ -50,7 +50,7 @@ func TestTextRendering(t *testing.T) {
 			}{
 				text: "Создание напоминания\n\nДата и время: 02.06.2026 09:30\n" +
 					"Название: Pay rent\nОписание: Before lunch\n" +
-					"Повторяемость: не задана\n\nВыберите дату и время кнопкой ниже.",
+					"Повторять: нет\n\nВыберите дату и время кнопкой ниже.",
 			},
 		},
 		{
@@ -63,7 +63,7 @@ func TestTextRendering(t *testing.T) {
 			},
 			expected: struct {
 				text string
-			}{text: "Повторяемость: выбрано дней недели: 3\n"},
+			}{text: "Повторять: выбрано дней недели: 3\n"},
 		},
 		{
 			name: "reminder view text includes formatted time",
@@ -92,7 +92,7 @@ func TestTextRendering(t *testing.T) {
 				text string
 			}{
 				text: "Создание напоминания\n\nДата и время: не задано\nНазвание: не задано\n" +
-					"Описание: не задано\nПовторяемость: не задана\n\nВведите название напоминания сообщением.",
+					"Описание: не задано\nПовторять: нет\n\nВведите название напоминания сообщением.",
 			},
 		},
 	}
@@ -113,7 +113,7 @@ func TestKeyboardRendering(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		action   func() *telego.InlineKeyboardMarkup
+		action   func() any
 		expected struct {
 			rows      int
 			firstText string
@@ -121,7 +121,7 @@ func TestKeyboardRendering(t *testing.T) {
 	}{
 		{
 			name: "empty one-time telegramui.Draft asks for date",
-			action: func() *telego.InlineKeyboardMarkup {
+			action: func() any {
 				return telegramui.DraftKeyboard(telegramui.Draft{}, now)
 			},
 			expected: struct {
@@ -131,7 +131,7 @@ func TestKeyboardRendering(t *testing.T) {
 		},
 		{
 			name: "filled recurring telegramui.Draft asks to change start date time",
-			action: func() *telego.InlineKeyboardMarkup {
+			action: func() any {
 				return telegramui.DraftKeyboard(telegramui.Draft{
 					Date:   time.Date(2026, 6, 2, 0, 0, 0, 0, time.Local),
 					Repeat: telegramui.RepeatEveryDay,
@@ -144,7 +144,7 @@ func TestKeyboardRendering(t *testing.T) {
 		},
 		{
 			name: "date choice screen has quick choices",
-			action: func() *telego.InlineKeyboardMarkup {
+			action: func() any {
 				return telegramui.DraftKeyboard(telegramui.Draft{Screen: telegramui.ScreenDate}, now)
 			},
 			expected: struct {
@@ -154,7 +154,7 @@ func TestKeyboardRendering(t *testing.T) {
 		},
 		{
 			name: "calendar screen renders month grid",
-			action: func() *telego.InlineKeyboardMarkup {
+			action: func() any {
 				return telegramui.DraftKeyboard(telegramui.Draft{
 					Screen:        telegramui.ScreenCalendar,
 					CalendarMonth: now,
@@ -167,7 +167,7 @@ func TestKeyboardRendering(t *testing.T) {
 		},
 		{
 			name: "time screen renders presets and steppers",
-			action: func() *telego.InlineKeyboardMarkup {
+			action: func() any {
 				return telegramui.DraftKeyboard(telegramui.Draft{
 					Screen: telegramui.ScreenTime,
 					Date:   time.Date(2026, 6, 1, 0, 0, 0, 0, time.Local),
@@ -180,14 +180,14 @@ func TestKeyboardRendering(t *testing.T) {
 			}{rows: 4, firstText: "09:00"},
 		},
 		{
-			name: "empty reminder list keeps main menu action",
-			action: func() *telego.InlineKeyboardMarkup {
+			name: "empty reminder list keeps pagination and back actions",
+			action: func() any {
 				return telegramui.ReminderListKeyboard(nil)
 			},
 			expected: struct {
 				rows      int
 				firstText string
-			}{rows: 1, firstText: "Главное меню"},
+			}{rows: 2, firstText: "<-"},
 		},
 	}
 
@@ -195,10 +195,10 @@ func TestKeyboardRendering(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			keyboard := test.action()
+			rows := keyboardTexts(test.action())
 
-			require.Len(t, keyboard.InlineKeyboard, test.expected.rows)
-			require.Equal(t, test.expected.firstText, keyboard.InlineKeyboard[0][0].Text)
+			require.Len(t, rows, test.expected.rows)
+			require.Equal(t, test.expected.firstText, rows[0][0])
 		})
 	}
 }
@@ -306,11 +306,11 @@ func TestMenuAndActionKeyboards(t *testing.T) {
 		{
 			name: "reminders keyboard exposes active and past lists",
 			action: func() [][]string {
-				return keyboardTexts(telegramui.RemindersKeyboard().InlineKeyboard)
+				return keyboardTexts(telegramui.RemindersKeyboard().Keyboard)
 			},
 			expected: struct {
 				rows [][]string
-			}{rows: [][]string{{"Активные", "Прошедшие"}, {"Главное меню"}}},
+			}{rows: [][]string{{"Активные", "Прошедшие"}, {"Назад"}}},
 		},
 		{
 			name: "reminder details keyboard exposes back delete and main menu",
@@ -333,20 +333,20 @@ func TestMenuAndActionKeyboards(t *testing.T) {
 		{
 			name: "settings keyboard exposes user setting actions",
 			action: func() [][]string {
-				return keyboardTexts(telegramui.SettingsKeyboard().InlineKeyboard)
+				return keyboardTexts(telegramui.SettingsKeyboard().Keyboard)
 			},
 			expected: struct {
 				rows [][]string
-			}{rows: [][]string{{"Язык: русский"}, {"Часовой пояс"}, {"Настойчивые напоминания"}, {"Главное меню"}}},
+			}{rows: [][]string{{"Язык: русский"}, {"Часовой пояс"}, {"Настойчивые напоминания"}, {"Назад"}}},
 		},
 		{
 			name: "intrusive settings keyboard exposes enable disable and back",
 			action: func() [][]string {
-				return keyboardTexts(telegramui.IntrusiveSettingsKeyboard().InlineKeyboard)
+				return keyboardTexts(telegramui.IntrusiveSettingsKeyboard(false).Keyboard)
 			},
 			expected: struct {
 				rows [][]string
-			}{rows: [][]string{{"Включить", "Выключить"}, {"Назад"}}},
+			}{rows: [][]string{{"Выключено"}, {"Интервал"}, {"Назад"}}},
 		},
 		{
 			name: "repeat draft screen exposes repeat choices",
@@ -357,7 +357,7 @@ func TestMenuAndActionKeyboards(t *testing.T) {
 			},
 			expected: struct {
 				rows [][]string
-			}{rows: [][]string{{"Каждый день"}, {"Свои дни недели"}, {"Интервал в днях"}, {"Без повторения"}}},
+			}{rows: [][]string{{"Каждый день"}, {"По будням"}, {"Свои дни недели"}, {"Интервал в днях"}}},
 		},
 		{
 			name: "weekdays draft screen marks selected weekdays",
@@ -425,11 +425,11 @@ func TestSettingsHistoryAndStatusTexts(t *testing.T) {
 					Title:    "Pay rent",
 					RemindAt: time.Date(2026, 6, 2, 6, 30, 0, 0, time.UTC),
 					Status:   database.ReminderStatusCompleted,
-				}}, location)
+				}})
 			},
 			expected: struct {
 				text string
-			}{text: "Прошедшие напоминания\n\n02.06.2026 09:30\nPay rent\nСтатус: Выполнено"},
+			}{text: "Прошедшие напоминания\n\nВыберите напоминание из списка."},
 		},
 		{
 			name: "settings text renders enabled intrusive settings",
@@ -457,10 +457,7 @@ func TestSettingsHistoryAndStatusTexts(t *testing.T) {
 			},
 			expected: struct {
 				text string
-			}{
-				text: "Настойчивые напоминания\n\nСостояние: выключены\nИнтервал: 30m0s\n\n" +
-					"Интервал можно задать сообщением в минутах от 30 до 1440.",
-			},
+			}{text: "Настойчивые напоминания\n\nСостояние: выключены\nИнтервал: 30m0s"},
 		},
 		{
 			name: "failed status text is localized",
@@ -490,7 +487,7 @@ func TestSettingsHistoryAndStatusTexts(t *testing.T) {
 			},
 			expected: struct {
 				text string
-			}{text: "Повторяемость: каждые 5 дн.\n"},
+			}{text: "Повторять: каждые 5 дн.\n"},
 		},
 		{
 			name: "custom dates repeat text renders selected count",
@@ -502,7 +499,7 @@ func TestSettingsHistoryAndStatusTexts(t *testing.T) {
 			},
 			expected: struct {
 				text string
-			}{text: "Повторяемость: выбрано дат: 1\n"},
+			}{text: "Повторять: выбрано дат: 1\n"},
 		},
 	}
 
@@ -593,13 +590,13 @@ func TestTimezoneControls(t *testing.T) {
 		{
 			name: "timezone keyboard exposes arrows and selected city",
 			action: func() string {
-				rows := keyboardTexts(telegramui.TimezoneKeyboard(0, now).InlineKeyboard)
+				rows := keyboardTexts(telegramui.TimezoneKeyboard(0, now).Keyboard)
 
 				return rows[0][0] + rows[0][1] + rows[0][2]
 			},
 			expected: struct {
 				text string
-			}{text: "<Москва (+3)>"},
+			}{text: "<-Москва (+3)->"},
 		},
 	}
 
@@ -614,6 +611,10 @@ func TestTimezoneControls(t *testing.T) {
 
 func keyboardTexts(rows any) [][]string {
 	switch typedRows := rows.(type) {
+	case *telego.InlineKeyboardMarkup:
+		return keyboardTexts(typedRows.InlineKeyboard)
+	case *telego.ReplyKeyboardMarkup:
+		return keyboardTexts(typedRows.Keyboard)
 	case [][]telego.KeyboardButton:
 		texts := make([][]string, 0, len(typedRows))
 		for _, row := range typedRows {

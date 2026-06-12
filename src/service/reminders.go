@@ -48,8 +48,18 @@ type ReminderCreationPlanner interface {
 }
 
 type ReminderCommandRepository interface {
-	FindRemindersByChat(ctx context.Context, telegramChatID int64) ([]database.ReminderView, error)
-	FindReminderHistoryByChat(ctx context.Context, telegramChatID int64) ([]database.ReminderView, error)
+	FindRemindersByChat(
+		ctx context.Context,
+		telegramChatID int64,
+		limit int,
+		offset int,
+	) ([]database.ReminderView, error)
+	FindReminderHistoryByChat(
+		ctx context.Context,
+		telegramChatID int64,
+		limit int,
+		offset int,
+	) ([]database.ReminderView, error)
 	CancelReminder(ctx context.Context, telegramChatID int64, reminderID int64) error
 	UserSettings(ctx context.Context, telegramChatID int64) (database.UserSettings, error)
 	UpdateUserTimezone(ctx context.Context, telegramChatID int64, timezone string) error
@@ -149,8 +159,13 @@ func (s *ReminderService) CreateCustomDatesReminder(
 	return s.createRecurringReminder(ctx, telegramChatID, title, description, firstRemindAt, rule, selectedDates)
 }
 
-func (s *ReminderService) Reminders(ctx context.Context, telegramChatID int64) ([]database.ReminderView, error) {
-	reminders, err := s.repository.FindRemindersByChat(ctx, telegramChatID)
+func (s *ReminderService) Reminders(
+	ctx context.Context,
+	telegramChatID int64,
+	limit int,
+	offset int,
+) ([]database.ReminderView, error) {
+	reminders, err := s.repository.FindRemindersByChat(ctx, telegramChatID, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("find reminders: %w", err)
 	}
@@ -158,8 +173,13 @@ func (s *ReminderService) Reminders(ctx context.Context, telegramChatID int64) (
 	return reminders, nil
 }
 
-func (s *ReminderService) ReminderHistory(ctx context.Context, telegramChatID int64) ([]database.ReminderView, error) {
-	reminders, err := s.repository.FindReminderHistoryByChat(ctx, telegramChatID)
+func (s *ReminderService) ReminderHistory(
+	ctx context.Context,
+	telegramChatID int64,
+	limit int,
+	offset int,
+) ([]database.ReminderView, error) {
+	reminders, err := s.repository.FindReminderHistoryByChat(ctx, telegramChatID, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("find reminder history: %w", err)
 	}
@@ -207,7 +227,7 @@ func (s *ReminderService) SetIntrusiveSettings(
 	enabled bool,
 	interval time.Duration,
 ) error {
-	if interval < 30*time.Minute || interval > 24*time.Hour {
+	if interval < time.Minute || interval > 2*time.Hour {
 		return fmt.Errorf("set intrusive settings: %w", ErrIntrusiveIntervalOutOfRange)
 	}
 
