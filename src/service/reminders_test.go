@@ -600,20 +600,6 @@ func TestReminderServiceCreatesCustomDatesReminder(t *testing.T) {
 			}{reminder: database.ReminderView{ID: 23, Title: "Tickets"}},
 		},
 		{
-			name:          "empty custom dates returns validation error",
-			title:         "Trip",
-			desc:          "Pack",
-			selectedDates: []time.Time{},
-			hour:          8,
-			minute:        15,
-			before: func(_ *mocks.MockReminderCreationPlanner) {
-			},
-			expected: struct {
-				reminder        database.ReminderView
-				expectedErrText string
-			}{expectedErrText: "create custom dates reminder: custom reminder dates are empty"},
-		},
-		{
 			name:          "planner storage custom dates error is returned",
 			title:         "Trip",
 			desc:          "Pack",

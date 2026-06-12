@@ -11,7 +11,6 @@ import (
 )
 
 var ErrReminderTitleEmpty = errors.New("reminder title is empty")
-var ErrCustomReminderDatesEmpty = errors.New("custom reminder dates are empty")
 var ErrWeekdaysMaskEmpty = errors.New("weekdays mask is empty")
 
 func NewReminderService(repository ReminderCommandRepository, planner ReminderCreationPlanner) *ReminderService {
@@ -59,7 +58,6 @@ type ReminderCommandRepository interface {
 		offset int,
 	) ([]database.ReminderView, error)
 	CancelReminder(ctx context.Context, telegramChatID int64, reminderID int64) error
-	UserSettings(ctx context.Context, telegramChatID int64) (database.UserSettings, error)
 	UpdateUserTimezone(ctx context.Context, telegramChatID int64, timezone string) error
 	UpdateIntrusiveSettings(
 		ctx context.Context,
@@ -146,10 +144,6 @@ func (s *ReminderService) CreateCustomDatesReminder(
 	minute int,
 	location *time.Location,
 ) (database.ReminderView, error) {
-	if len(selectedDates) == 0 {
-		return database.ReminderView{}, fmt.Errorf("create custom dates reminder: %w", ErrCustomReminderDatesEmpty)
-	}
-
 	firstDate := earliestDate(selectedDates)
 	firstRemindAt := time.Date(firstDate.Year(), firstDate.Month(), firstDate.Day(), hour, minute, 0, 0, location)
 	rule := database.ReminderRule{Type: database.ReminderRuleTypeCustomDates}
@@ -163,15 +157,6 @@ func (s *ReminderService) DeleteReminder(ctx context.Context, telegramChatID int
 	}
 
 	return nil
-}
-
-func (s *ReminderService) UserSettings(ctx context.Context, telegramChatID int64) (database.UserSettings, error) {
-	settings, err := s.repository.UserSettings(ctx, telegramChatID)
-	if err != nil {
-		return database.UserSettings{}, fmt.Errorf("load user settings: %w", err)
-	}
-
-	return settings, nil
 }
 
 func (s *ReminderService) SetUserTimezone(ctx context.Context, telegramChatID int64, timezone string) error {

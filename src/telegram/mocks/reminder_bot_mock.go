@@ -158,21 +158,6 @@ func (mr *MockReminderServiceMockRecorder) SetUserTimezone(ctx, telegramChatID, 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetUserTimezone", reflect.TypeOf((*MockReminderService)(nil).SetUserTimezone), ctx, telegramChatID, timezone)
 }
 
-// UserSettings mocks base method.
-func (m *MockReminderService) UserSettings(ctx context.Context, telegramChatID int64) (database.UserSettings, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UserSettings", ctx, telegramChatID)
-	ret0, _ := ret[0].(database.UserSettings)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// UserSettings indicates an expected call of UserSettings.
-func (mr *MockReminderServiceMockRecorder) UserSettings(ctx, telegramChatID any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UserSettings", reflect.TypeOf((*MockReminderService)(nil).UserSettings), ctx, telegramChatID)
-}
-
 // MockReminderQueryRepository is a mock of ReminderQueryRepository interface.
 type MockReminderQueryRepository struct {
 	ctrl     *gomock.Controller
@@ -225,4 +210,19 @@ func (m *MockReminderQueryRepository) FindRemindersByChat(ctx context.Context, t
 func (mr *MockReminderQueryRepositoryMockRecorder) FindRemindersByChat(ctx, telegramChatID, limit, offset any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindRemindersByChat", reflect.TypeOf((*MockReminderQueryRepository)(nil).FindRemindersByChat), ctx, telegramChatID, limit, offset)
+}
+
+// UserSettings mocks base method.
+func (m *MockReminderQueryRepository) UserSettings(ctx context.Context, telegramChatID int64) (database.UserSettings, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UserSettings", ctx, telegramChatID)
+	ret0, _ := ret[0].(database.UserSettings)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UserSettings indicates an expected call of UserSettings.
+func (mr *MockReminderQueryRepositoryMockRecorder) UserSettings(ctx, telegramChatID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UserSettings", reflect.TypeOf((*MockReminderQueryRepository)(nil).UserSettings), ctx, telegramChatID)
 }
