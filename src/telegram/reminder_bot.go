@@ -22,48 +22,55 @@ var errUnsupportedDeliveredReminderStatus = errors.New("unsupported delivered re
 
 const draftPastTimeNotice = "Выбранное время уже прошло. Выберите будущее время."
 
-func NewReminderBot(sender *Sender, service ReminderService, cfg config.Telegram) *ReminderBot {
+func NewReminderBot(
+	sender *Sender,
+	service ReminderService,
+	repository ReminderQueryRepository,
+	cfg config.Telegram,
+) *ReminderBot {
 	return &ReminderBot{
 		bot:            sender.bot,
 		cfg:            cfg,
 		service:        service,
+		repository:     repository,
 		log:            logger.Get("telegram/reminder-bot"),
 		draftByChat:    make(map[int64]reminderDraft),
 		uiByChat:       make(map[int64]int),
 		locationByChat: make(map[int64]*time.Location),
-		pageByChat:     make(map[int64]reminderPage),
+		listByChat:     make(map[int64]reminderListState),
 		timezoneByChat: make(map[int64]int),
 		menuByChat:     make(map[int64]chatMenu),
 	}
 }
 
 type ReminderBot struct {
-	bot     *telego.Bot
-	cfg     config.Telegram
-	service ReminderService
-	log     logger.Logger
+	bot        *telego.Bot
+	cfg        config.Telegram
+	service    ReminderService
+	repository ReminderQueryRepository
+	log        logger.Logger
 
 	mu             sync.Mutex
 	locationMu     sync.RWMutex
 	draftByChat    map[int64]reminderDraft
 	uiByChat       map[int64]int
 	locationByChat map[int64]*time.Location
-	pageByChat     map[int64]reminderPage
+	listByChat     map[int64]reminderListState
 	timezoneByChat map[int64]int
 	menuByChat     map[int64]chatMenu
 }
 
-type reminderPage struct {
-	kind   reminderPageKind
+type reminderListState struct {
+	kind   reminderListKind
 	offset int
 }
 
-type reminderPageKind string
+type reminderListKind string
 
 const (
 	reminderPageSize                     = 2
-	reminderPageActive  reminderPageKind = "active"
-	reminderPageHistory reminderPageKind = "history"
+	reminderListActive  reminderListKind = "active"
+	reminderListHistory reminderListKind = "history"
 )
 
 type chatMenu string
@@ -114,8 +121,6 @@ type ReminderService interface {
 		minute int,
 		location *time.Location,
 	) (database.ReminderView, error)
-	Reminders(ctx context.Context, telegramChatID int64, limit int, offset int) ([]database.ReminderView, error)
-	ReminderHistory(ctx context.Context, telegramChatID int64, limit int, offset int) ([]database.ReminderView, error)
 	DeleteReminder(ctx context.Context, telegramChatID int64, reminderID int64) error
 	CompleteOccurrence(
 		ctx context.Context,
@@ -126,6 +131,21 @@ type ReminderService interface {
 	UserSettings(ctx context.Context, telegramChatID int64) (database.UserSettings, error)
 	SetUserTimezone(ctx context.Context, telegramChatID int64, timezone string) error
 	SetIntrusiveSettings(ctx context.Context, telegramChatID int64, enabled bool, interval time.Duration) error
+}
+
+type ReminderQueryRepository interface {
+	FindRemindersByChat(
+		ctx context.Context,
+		telegramChatID int64,
+		limit int,
+		offset int,
+	) ([]database.ReminderView, error)
+	FindReminderHistoryByChat(
+		ctx context.Context,
+		telegramChatID int64,
+		limit int,
+		offset int,
+	) ([]database.ReminderView, error)
 }
 
 type reminderDraft struct {
@@ -751,7 +771,7 @@ func (b *ReminderBot) editReminderHistory(ctx context.Context, chatID int64, mes
 		return err
 	}
 
-	reminders, err := b.service.ReminderHistory(ctx, chatID, reminderPageSize, 0)
+	reminders, err := b.repository.FindReminderHistoryByChat(ctx, chatID, reminderPageSize, 0)
 	if err != nil {
 		return fmt.Errorf("load reminder history: %w", err)
 	}
@@ -767,7 +787,7 @@ func (b *ReminderBot) editReminderHistory(ctx context.Context, chatID int64, mes
 func (b *ReminderBot) sendReminderListPage(ctx context.Context, chatID int64, offset int) error {
 	offset = normalizePageOffset(offset)
 
-	reminders, err := b.service.Reminders(ctx, chatID, reminderPageSize, offset)
+	reminders, err := b.repository.FindRemindersByChat(ctx, chatID, reminderPageSize, offset)
 	if err != nil {
 		return fmt.Errorf("load reminders: %w", err)
 	}
@@ -776,7 +796,7 @@ func (b *ReminderBot) sendReminderListPage(ctx context.Context, chatID int64, of
 		return b.sendReminderListPage(ctx, chatID, offset-reminderPageSize)
 	}
 
-	b.setReminderPage(chatID, reminderPage{kind: reminderPageActive, offset: offset})
+	b.setReminderListState(chatID, reminderListState{kind: reminderListActive, offset: offset})
 	b.setChatMenu(chatID, chatMenuReminderList)
 
 	return b.replaceUI(
@@ -794,7 +814,7 @@ func (b *ReminderBot) sendReminderHistoryPage(ctx context.Context, chatID int64,
 
 	offset = normalizePageOffset(offset)
 
-	reminders, err := b.service.ReminderHistory(ctx, chatID, reminderPageSize, offset)
+	reminders, err := b.repository.FindReminderHistoryByChat(ctx, chatID, reminderPageSize, offset)
 	if err != nil {
 		return fmt.Errorf("load reminder history: %w", err)
 	}
@@ -803,7 +823,7 @@ func (b *ReminderBot) sendReminderHistoryPage(ctx context.Context, chatID int64,
 		return b.sendReminderHistoryPage(ctx, chatID, offset-reminderPageSize)
 	}
 
-	b.setReminderPage(chatID, reminderPage{kind: reminderPageHistory, offset: offset})
+	b.setReminderListState(chatID, reminderListState{kind: reminderListHistory, offset: offset})
 	b.setChatMenu(chatID, chatMenuReminderList)
 
 	return b.replaceUI(
@@ -815,12 +835,12 @@ func (b *ReminderBot) sendReminderHistoryPage(ctx context.Context, chatID int64,
 }
 
 func (b *ReminderBot) sendShiftedReminderPage(ctx context.Context, chatID int64, shift int) error {
-	page := b.reminderPage(chatID)
-	switch page.kind {
-	case reminderPageHistory:
-		return b.sendReminderHistoryPage(ctx, chatID, page.offset+shift)
+	list := b.reminderListState(chatID)
+	switch list.kind {
+	case reminderListHistory:
+		return b.sendReminderHistoryPage(ctx, chatID, list.offset+shift)
 	default:
-		return b.sendReminderListPage(ctx, chatID, page.offset+shift)
+		return b.sendReminderListPage(ctx, chatID, list.offset+shift)
 	}
 }
 
@@ -925,8 +945,9 @@ func (b *ReminderBot) shiftIntrusiveInterval(ctx context.Context, chatID int64, 
 	}
 
 	interval := settings.IntrusiveInterval + time.Duration(minutes)*time.Minute
-	interval = max(interval, time.Minute)
-	interval = min(interval, 2*time.Hour)
+	if interval < time.Minute || interval > 2*time.Hour {
+		return b.sendIntrusiveInterval(ctx, chatID)
+	}
 
 	if err = b.service.SetIntrusiveSettings(ctx, chatID, settings.IntrusiveEnabled, interval); err != nil {
 		return fmt.Errorf("set intrusive interval: %w", err)
@@ -1148,14 +1169,14 @@ func (b *ReminderBot) viewReminderByReply(ctx context.Context, chatID int64, tex
 		return fmt.Errorf("parse reminder id: %w", err)
 	}
 
-	page := b.reminderPage(chatID)
+	list := b.reminderListState(chatID)
 
 	var reminders []database.ReminderView
 
-	if page.kind == reminderPageHistory {
-		reminders, err = b.service.ReminderHistory(ctx, chatID, reminderPageSize, page.offset)
+	if list.kind == reminderListHistory {
+		reminders, err = b.repository.FindReminderHistoryByChat(ctx, chatID, reminderPageSize, list.offset)
 	} else {
-		reminders, err = b.service.Reminders(ctx, chatID, reminderPageSize, page.offset)
+		reminders, err = b.repository.FindRemindersByChat(ctx, chatID, reminderPageSize, list.offset)
 	}
 
 	if err != nil {
@@ -1258,9 +1279,9 @@ func (b *ReminderBot) viewReminder(ctx context.Context, chatID int64, messageID 
 		return fmt.Errorf("parse reminder id: %w", err)
 	}
 
-	page := b.reminderPage(chatID)
+	list := b.reminderListState(chatID)
 
-	reminders, err := b.service.Reminders(ctx, chatID, reminderPageSize, page.offset)
+	reminders, err := b.repository.FindRemindersByChat(ctx, chatID, reminderPageSize, list.offset)
 	if err != nil {
 		return fmt.Errorf("load reminders: %w", err)
 	}
@@ -1295,9 +1316,9 @@ func (b *ReminderBot) deleteReminder(ctx context.Context, chatID int64, messageI
 		return fmt.Errorf("delete reminder: %w", err)
 	}
 
-	page := b.reminderPage(chatID)
+	list := b.reminderListState(chatID)
 
-	reminders, err := b.service.Reminders(ctx, chatID, reminderPageSize, page.offset)
+	reminders, err := b.repository.FindRemindersByChat(ctx, chatID, reminderPageSize, list.offset)
 	if err != nil {
 		return fmt.Errorf("load reminders after delete: %w", err)
 	}
@@ -1447,7 +1468,7 @@ func (b *ReminderBot) applyDraftText(ctx context.Context, chatID int64, text str
 
 func (b *ReminderBot) applyIntrusiveInterval(ctx context.Context, chatID int64, text string) bool {
 	minutes, err := strconv.Atoi(text)
-	if err != nil {
+	if err != nil || minutes < 1 || minutes > 120 {
 		b.setDraftNotice(chatID, "Введите интервал в минутах от 1 до 120.")
 
 		return true
@@ -1999,22 +2020,22 @@ func (b *ReminderBot) currentUIMessageID(chatID int64) int {
 	return b.uiByChat[chatID]
 }
 
-func (b *ReminderBot) setReminderPage(chatID int64, page reminderPage) {
+func (b *ReminderBot) setReminderListState(chatID int64, list reminderListState) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	if b.pageByChat == nil {
-		b.pageByChat = make(map[int64]reminderPage)
+	if b.listByChat == nil {
+		b.listByChat = make(map[int64]reminderListState)
 	}
 
-	b.pageByChat[chatID] = page
+	b.listByChat[chatID] = list
 }
 
-func (b *ReminderBot) reminderPage(chatID int64) reminderPage {
+func (b *ReminderBot) reminderListState(chatID int64) reminderListState {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	return b.pageByChat[chatID]
+	return b.listByChat[chatID]
 }
 
 func (b *ReminderBot) setTimezoneIndex(chatID int64, index int) {

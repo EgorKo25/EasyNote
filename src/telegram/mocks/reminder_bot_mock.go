@@ -130,36 +130,6 @@ func (mr *MockReminderServiceMockRecorder) DeleteReminder(ctx, telegramChatID, r
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteReminder", reflect.TypeOf((*MockReminderService)(nil).DeleteReminder), ctx, telegramChatID, reminderID)
 }
 
-// ReminderHistory mocks base method.
-func (m *MockReminderService) ReminderHistory(ctx context.Context, telegramChatID int64, limit, offset int) ([]database.ReminderView, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ReminderHistory", ctx, telegramChatID, limit, offset)
-	ret0, _ := ret[0].([]database.ReminderView)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ReminderHistory indicates an expected call of ReminderHistory.
-func (mr *MockReminderServiceMockRecorder) ReminderHistory(ctx, telegramChatID, limit, offset any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReminderHistory", reflect.TypeOf((*MockReminderService)(nil).ReminderHistory), ctx, telegramChatID, limit, offset)
-}
-
-// Reminders mocks base method.
-func (m *MockReminderService) Reminders(ctx context.Context, telegramChatID int64, limit, offset int) ([]database.ReminderView, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Reminders", ctx, telegramChatID, limit, offset)
-	ret0, _ := ret[0].([]database.ReminderView)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// Reminders indicates an expected call of Reminders.
-func (mr *MockReminderServiceMockRecorder) Reminders(ctx, telegramChatID, limit, offset any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Reminders", reflect.TypeOf((*MockReminderService)(nil).Reminders), ctx, telegramChatID, limit, offset)
-}
-
 // SetIntrusiveSettings mocks base method.
 func (m *MockReminderService) SetIntrusiveSettings(ctx context.Context, telegramChatID int64, enabled bool, interval time.Duration) error {
 	m.ctrl.T.Helper()
@@ -201,4 +171,58 @@ func (m *MockReminderService) UserSettings(ctx context.Context, telegramChatID i
 func (mr *MockReminderServiceMockRecorder) UserSettings(ctx, telegramChatID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UserSettings", reflect.TypeOf((*MockReminderService)(nil).UserSettings), ctx, telegramChatID)
+}
+
+// MockReminderQueryRepository is a mock of ReminderQueryRepository interface.
+type MockReminderQueryRepository struct {
+	ctrl     *gomock.Controller
+	recorder *MockReminderQueryRepositoryMockRecorder
+	isgomock struct{}
+}
+
+// MockReminderQueryRepositoryMockRecorder is the mock recorder for MockReminderQueryRepository.
+type MockReminderQueryRepositoryMockRecorder struct {
+	mock *MockReminderQueryRepository
+}
+
+// NewMockReminderQueryRepository creates a new mock instance.
+func NewMockReminderQueryRepository(ctrl *gomock.Controller) *MockReminderQueryRepository {
+	mock := &MockReminderQueryRepository{ctrl: ctrl}
+	mock.recorder = &MockReminderQueryRepositoryMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockReminderQueryRepository) EXPECT() *MockReminderQueryRepositoryMockRecorder {
+	return m.recorder
+}
+
+// FindReminderHistoryByChat mocks base method.
+func (m *MockReminderQueryRepository) FindReminderHistoryByChat(ctx context.Context, telegramChatID int64, limit, offset int) ([]database.ReminderView, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindReminderHistoryByChat", ctx, telegramChatID, limit, offset)
+	ret0, _ := ret[0].([]database.ReminderView)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FindReminderHistoryByChat indicates an expected call of FindReminderHistoryByChat.
+func (mr *MockReminderQueryRepositoryMockRecorder) FindReminderHistoryByChat(ctx, telegramChatID, limit, offset any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindReminderHistoryByChat", reflect.TypeOf((*MockReminderQueryRepository)(nil).FindReminderHistoryByChat), ctx, telegramChatID, limit, offset)
+}
+
+// FindRemindersByChat mocks base method.
+func (m *MockReminderQueryRepository) FindRemindersByChat(ctx context.Context, telegramChatID int64, limit, offset int) ([]database.ReminderView, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindRemindersByChat", ctx, telegramChatID, limit, offset)
+	ret0, _ := ret[0].([]database.ReminderView)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FindRemindersByChat indicates an expected call of FindRemindersByChat.
+func (mr *MockReminderQueryRepositoryMockRecorder) FindRemindersByChat(ctx, telegramChatID, limit, offset any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindRemindersByChat", reflect.TypeOf((*MockReminderQueryRepository)(nil).FindRemindersByChat), ctx, telegramChatID, limit, offset)
 }

@@ -13,6 +13,79 @@
 - Do not change the linter configuration.
 - Do not add `nolint` directives to production files. `nolint` is allowed only in test files.
 
+## Token Efficiency And No Background Reasoning
+
+* Do not output background reasoning, internal chain of thought, detailed reflections, or “thinking out loud” unless the user explicitly asks for it.
+* Do not waste tokens on obvious explanations, task restatements, long introductions, or intermediate reasoning that does not help complete the task.
+* Before starting work, briefly describe the action plan, but do not reveal detailed internal reasoning.
+* During the work, report only meaningful statuses: what has been completed, what is blocked, which checks were run, and what the result was.
+* In the final response, include only useful results: changed files, completed checks, errors, coverage, branch name, pull request, and the completed work matrix.
+* Do not write long explanations for choices when the solution is standard for the repository or already follows from the task rules.
+* If a defect or failed test needs to be explained, keep it brief and specific: what failed, where it failed, and why it is related to production code or the test.
+* Do not imitate “thinking”, “analysis”, or “hypothesis checking” in text. Instead, perform the actions and briefly report the result.
+
+
+## Task Execution
+
+* Every task must be completed fully. Do not stop after a partial implementation, a partial test set, or a partial refactor unless the task is blocked by a real external issue.
+* Do not mark the task as completed if any required step was skipped, including tests, lint, coverage check, branch creation, or pull request creation.
+* If the task cannot be completed 100%, clearly report what is incomplete, why it is incomplete, what was already done, and what exact decision is required from the user.
+* Do not silently downgrade the task scope. If the requested scope is too large, still make the best complete attempt and report remaining gaps explicitly.
+* Do not replace the requested implementation with an easier adjacent solution unless it preserves the same behavior and satisfies the original task.
+* Do not leave TODO comments, temporary code, debug prints, unused files, or commented-out code after completing the task.
+
+## Branch And Pull Request Workflow
+
+* Every task must be performed in a separate Git branch.
+* The branch name must be short, meaningful, and related to the task.
+* Do not work directly in `main`, `master`, `develop`, or another shared integration branch.
+* After the task is completed, open a pull request for the branch.
+* The pull request must contain a clear summary of the changes, the completed test/lint/coverage checks, and any known issues.
+* When pull request review comments are present, read every comment, fix every valid remark, and reply under each comment with a brief summary in the same language as the original comment.
+* If branch creation or pull request creation is impossible because of missing permissions, missing remote configuration, or unavailable tools, report this explicitly and do not claim that the task is fully completed.
+
+## Scope Control
+
+* Do not change unrelated files.
+* Do not perform opportunistic refactoring outside the requested task.
+* Do not rename public APIs, packages, files, database fields, configuration keys, or exported types unless the task explicitly requires it.
+* Do not introduce new dependencies unless they are necessary for the task and the reason is explained.
+* Do not change generated files manually. Regenerate them through the repository's documented generation commands.
+* Do not change migrations, schemas, or public contracts when the task is only about tests.
+
+## Final Report
+
+* The final response must include:
+
+    * what was changed;
+    * what files were changed;
+    * what tests were added or updated;
+    * what commands were run;
+    * whether tests passed or failed;
+    * whether `golangci-lint run` passed or failed;
+    * current target package coverage;
+    * a matrix of completed work;
+    * the branch name;
+    * the pull request link or an explicit reason why the pull request was not created.
+
+## Test Reliability
+
+* Tests must be deterministic and must not depend on wall-clock time, network access, external services, shared local state, or execution order unless the task explicitly requires integration testing.
+* Use clock abstractions or controlled test time where time-dependent behavior is tested.
+* Clean up temporary files, database records, goroutines, channels, and test resources.
+* Do not use sleeps as synchronization in unit tests unless there is no reasonable alternative and the reason is explained.
+* Do not make tests pass by weakening assertions.
+* Do not delete or skip existing failing tests unless the user explicitly approves it.
+
+## Git Hygiene
+
+* Before starting, check the current Git status.
+* Do not overwrite or remove user changes.
+* If there are unrelated uncommitted changes, leave them untouched and report them.
+* Keep commits focused on the requested task.
+* Do not include local configuration, secrets, logs, binaries, coverage files, or temporary artifacts in the commit.
+
+
 ## Test Structure
 - Use the table-driven approach in every test.
 - Each test must contain at least 4 positive cases and 2 negative cases.
