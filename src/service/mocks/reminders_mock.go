@@ -125,74 +125,31 @@ func (mr *MockReminderCommandRepositoryMockRecorder) CancelReminder(ctx, telegra
 }
 
 // FindReminderHistoryByChat mocks base method.
-func (m *MockReminderCommandRepository) FindReminderHistoryByChat(ctx context.Context, telegramChatID int64) ([]database.ReminderView, error) {
+func (m *MockReminderCommandRepository) FindReminderHistoryByChat(ctx context.Context, telegramChatID int64, limit, offset int) ([]database.ReminderView, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "FindReminderHistoryByChat", ctx, telegramChatID)
+	ret := m.ctrl.Call(m, "FindReminderHistoryByChat", ctx, telegramChatID, limit, offset)
 	ret0, _ := ret[0].([]database.ReminderView)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // FindReminderHistoryByChat indicates an expected call of FindReminderHistoryByChat.
-func (mr *MockReminderCommandRepositoryMockRecorder) FindReminderHistoryByChat(ctx, telegramChatID any) *gomock.Call {
+func (mr *MockReminderCommandRepositoryMockRecorder) FindReminderHistoryByChat(ctx, telegramChatID, limit, offset any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindReminderHistoryByChat", reflect.TypeOf((*MockReminderCommandRepository)(nil).FindReminderHistoryByChat), ctx, telegramChatID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindReminderHistoryByChat", reflect.TypeOf((*MockReminderCommandRepository)(nil).FindReminderHistoryByChat), ctx, telegramChatID, limit, offset)
 }
 
 // FindRemindersByChat mocks base method.
-func (m *MockReminderCommandRepository) FindRemindersByChat(ctx context.Context, telegramChatID int64) ([]database.ReminderView, error) {
+func (m *MockReminderCommandRepository) FindRemindersByChat(ctx context.Context, telegramChatID int64, limit, offset int) ([]database.ReminderView, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "FindRemindersByChat", ctx, telegramChatID)
+	ret := m.ctrl.Call(m, "FindRemindersByChat", ctx, telegramChatID, limit, offset)
 	ret0, _ := ret[0].([]database.ReminderView)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // FindRemindersByChat indicates an expected call of FindRemindersByChat.
-func (mr *MockReminderCommandRepositoryMockRecorder) FindRemindersByChat(ctx, telegramChatID any) *gomock.Call {
+func (mr *MockReminderCommandRepositoryMockRecorder) FindRemindersByChat(ctx, telegramChatID, limit, offset any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindRemindersByChat", reflect.TypeOf((*MockReminderCommandRepository)(nil).FindRemindersByChat), ctx, telegramChatID)
-}
-
-// UpdateIntrusiveSettings mocks base method.
-func (m *MockReminderCommandRepository) UpdateIntrusiveSettings(ctx context.Context, telegramChatID int64, enabled bool, interval time.Duration) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateIntrusiveSettings", ctx, telegramChatID, enabled, interval)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// UpdateIntrusiveSettings indicates an expected call of UpdateIntrusiveSettings.
-func (mr *MockReminderCommandRepositoryMockRecorder) UpdateIntrusiveSettings(ctx, telegramChatID, enabled, interval any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateIntrusiveSettings", reflect.TypeOf((*MockReminderCommandRepository)(nil).UpdateIntrusiveSettings), ctx, telegramChatID, enabled, interval)
-}
-
-// UpdateUserTimezone mocks base method.
-func (m *MockReminderCommandRepository) UpdateUserTimezone(ctx context.Context, telegramChatID int64, timezone string) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateUserTimezone", ctx, telegramChatID, timezone)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// UpdateUserTimezone indicates an expected call of UpdateUserTimezone.
-func (mr *MockReminderCommandRepositoryMockRecorder) UpdateUserTimezone(ctx, telegramChatID, timezone any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateUserTimezone", reflect.TypeOf((*MockReminderCommandRepository)(nil).UpdateUserTimezone), ctx, telegramChatID, timezone)
-}
-
-// UserSettings mocks base method.
-func (m *MockReminderCommandRepository) UserSettings(ctx context.Context, telegramChatID int64) (database.UserSettings, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UserSettings", ctx, telegramChatID)
-	ret0, _ := ret[0].(database.UserSettings)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// UserSettings indicates an expected call of UserSettings.
-func (mr *MockReminderCommandRepositoryMockRecorder) UserSettings(ctx, telegramChatID any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UserSettings", reflect.TypeOf((*MockReminderCommandRepository)(nil).UserSettings), ctx, telegramChatID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindRemindersByChat", reflect.TypeOf((*MockReminderCommandRepository)(nil).FindRemindersByChat), ctx, telegramChatID, limit, offset)
 }

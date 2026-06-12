@@ -17,14 +17,18 @@ func MainKeyboard() *telego.ReplyKeyboardMarkup {
 	).WithResizeKeyboard()
 }
 
-func RemindersKeyboard() *telego.InlineKeyboardMarkup {
-	return tu.InlineKeyboard(
-		tu.InlineKeyboardRow(
-			tu.InlineKeyboardButton(ButtonReminderList).WithCallbackData(CallbackReminderList),
-			tu.InlineKeyboardButton(ButtonReminderHistory).WithCallbackData(CallbackReminderHistory),
-		),
-		tu.InlineKeyboardRow(tu.InlineKeyboardButton("Главное меню").WithCallbackData(CallbackMainMenu)),
-	)
+func CreateKeyboard() *telego.ReplyKeyboardMarkup {
+	return tu.Keyboard(
+		tu.KeyboardRow(tu.KeyboardButton(ButtonCreateReminderKind)),
+		tu.KeyboardRow(tu.KeyboardButton(ButtonBack)),
+	).WithResizeKeyboard()
+}
+
+func RemindersKeyboard() *telego.ReplyKeyboardMarkup {
+	return tu.Keyboard(
+		tu.KeyboardRow(tu.KeyboardButton(ButtonReminderList), tu.KeyboardButton(ButtonReminderHistory)),
+		tu.KeyboardRow(tu.KeyboardButton(ButtonBack)),
+	).WithResizeKeyboard()
 }
 
 func DraftKeyboard(draft Draft, now time.Time) *telego.InlineKeyboardMarkup {
@@ -47,17 +51,17 @@ func DraftKeyboard(draft Draft, now time.Time) *telego.InlineKeyboardMarkup {
 }
 
 func draftMainKeyboard(draft Draft) *telego.InlineKeyboardMarkup {
-	titleButtonText := "Название"
+	titleButtonText := ButtonDraftTitle
 	if draft.Title != "" {
-		titleButtonText = "Изменить название"
+		titleButtonText = ButtonDraftEditTitle
 	}
 
-	descriptionButtonText := "Описание"
+	descriptionButtonText := ButtonDraftDescription
 	if draft.Description != "" {
-		descriptionButtonText = "Изменить описание"
+		descriptionButtonText = ButtonDraftEditDescription
 	}
 
-	dateButtonText := "Дата"
+	dateButtonText := ButtonDraftDate
 	if draft.Repeat != RepeatNone {
 		dateButtonText = "Дата и время начала"
 	}
@@ -72,17 +76,66 @@ func draftMainKeyboard(draft Draft) *telego.InlineKeyboardMarkup {
 	return tu.InlineKeyboard(
 		tu.InlineKeyboardRow(tu.InlineKeyboardButton(dateButtonText).WithCallbackData(CallbackDraftDate)),
 		tu.InlineKeyboardRow(
-			tu.InlineKeyboardButton("Регулярное напоминание").WithCallbackData(CallbackDraftRepeat),
+			tu.InlineKeyboardButton(ButtonDraftRepeat).WithCallbackData(CallbackDraftRepeat),
 		),
 		tu.InlineKeyboardRow(
 			tu.InlineKeyboardButton(titleButtonText).WithCallbackData(CallbackDraftTitle),
 			tu.InlineKeyboardButton(descriptionButtonText).WithCallbackData(CallbackDraftDescription),
 		),
 		tu.InlineKeyboardRow(
-			tu.InlineKeyboardButton("Сохранить").WithCallbackData(CallbackDraftSave),
-			tu.InlineKeyboardButton("Отменить").WithCallbackData(CallbackDraftCancel),
+			tu.InlineKeyboardButton(ButtonDraftSave).WithCallbackData(CallbackDraftSave),
+			tu.InlineKeyboardButton(ButtonDraftCancel).WithCallbackData(CallbackDraftCancel),
 		),
 	)
+}
+
+func DraftReplyKeyboard(draft Draft, now time.Time) *telego.ReplyKeyboardMarkup {
+	switch draft.Screen {
+	case ScreenDate:
+		return tu.Keyboard(
+			tu.KeyboardRow(tu.KeyboardButton("Сегодня"), tu.KeyboardButton("Завтра")),
+			tu.KeyboardRow(tu.KeyboardButton("Выбрать дату")),
+			tu.KeyboardRow(tu.KeyboardButton(ButtonBack)),
+		).WithResizeKeyboard()
+	case ScreenTime:
+		return tu.Keyboard(
+			timePresetReplyRow(draft, now),
+			tu.KeyboardRow(tu.KeyboardButton(ButtonMinusHour), tu.KeyboardButton(ButtonPlusHour)),
+			tu.KeyboardRow(tu.KeyboardButton(ButtonMinusFiveMinutes), tu.KeyboardButton(ButtonPlusFiveMinutes)),
+			tu.KeyboardRow(tu.KeyboardButton(ButtonDone), tu.KeyboardButton(ButtonBack)),
+		).WithResizeKeyboard()
+	case ScreenRepeat:
+		return tu.Keyboard(
+			tu.KeyboardRow(tu.KeyboardButton(ButtonRepeatEveryDay), tu.KeyboardButton(ButtonRepeatWeekdays)),
+			tu.KeyboardRow(tu.KeyboardButton(ButtonRepeatCustomWeekdays), tu.KeyboardButton(ButtonRepeatInterval)),
+			tu.KeyboardRow(tu.KeyboardButton(ButtonBack)),
+		).WithResizeKeyboard()
+	default:
+		return tu.Keyboard(
+			tu.KeyboardRow(tu.KeyboardButton(ButtonDraftDate), tu.KeyboardButton(ButtonDraftRepeat)),
+			tu.KeyboardRow(tu.KeyboardButton(ButtonDraftTitle), tu.KeyboardButton(ButtonDraftDescription)),
+			tu.KeyboardRow(tu.KeyboardButton(ButtonDraftSave), tu.KeyboardButton(ButtonDraftCancel)),
+		).WithResizeKeyboard()
+	}
+}
+
+func timePresetReplyRow(draft Draft, now time.Time) []telego.KeyboardButton {
+	buttons := make([]telego.KeyboardButton, 0, 4)
+
+	for _, preset := range []struct {
+		hour   int
+		minute int
+	}{{hour: 9}, {hour: 12}, {hour: 18}, {hour: 21}} {
+		if isFutureDraftTime(draft, preset.hour, preset.minute, now) {
+			buttons = append(buttons, tu.KeyboardButton(fmt.Sprintf("%02d:%02d", preset.hour, preset.minute)))
+		}
+	}
+
+	if len(buttons) == 0 {
+		return tu.KeyboardRow(tu.KeyboardButton("Нет доступного времени"))
+	}
+
+	return buttons
 }
 
 func draftDateIsSet(draft Draft) bool {
@@ -95,13 +148,13 @@ func repeatKeyboard() *telego.InlineKeyboardMarkup {
 			tu.InlineKeyboardButton("Каждый день").WithCallbackData(RepeatCallback(RepeatEveryDay)),
 		),
 		tu.InlineKeyboardRow(
-			tu.InlineKeyboardButton("Свои дни недели").WithCallbackData(RepeatCallback(RepeatCustomWeekdays)),
+			tu.InlineKeyboardButton(ButtonRepeatWeekdays).WithCallbackData(RepeatCallback(RepeatWeekdays)),
 		),
 		tu.InlineKeyboardRow(
-			tu.InlineKeyboardButton("Интервал в днях").WithCallbackData(RepeatCallback(RepeatCustomInterval)),
+			tu.InlineKeyboardButton(ButtonRepeatCustomWeekdays).WithCallbackData(RepeatCallback(RepeatCustomWeekdays)),
 		),
 		tu.InlineKeyboardRow(
-			tu.InlineKeyboardButton("Без повторения").WithCallbackData(RepeatCallback(RepeatNone)),
+			tu.InlineKeyboardButton(ButtonRepeatInterval).WithCallbackData(RepeatCallback(RepeatCustomInterval)),
 		),
 		tu.InlineKeyboardRow(tu.InlineKeyboardButton("Назад").WithCallbackData(CallbackDraftBack)),
 	)
@@ -246,20 +299,16 @@ func timeKeyboard(draft Draft, now time.Time) *telego.InlineKeyboardMarkup {
 	)
 }
 
-func ReminderListKeyboard(reminders []database.ReminderView) *telego.InlineKeyboardMarkup {
-	rows := make([][]telego.InlineKeyboardButton, 0, len(reminders)+1)
+func ReminderListKeyboard(reminders []database.ReminderView) *telego.ReplyKeyboardMarkup {
+	rows := make([][]telego.KeyboardButton, 0, len(reminders)+2)
 	for _, reminder := range reminders {
-		rows = append(rows, tu.InlineKeyboardRow(
-			tu.InlineKeyboardButton(reminder.Title).
-				WithCallbackData(fmt.Sprintf("%s%d", CallbackViewPrefix, reminder.ID)),
-		))
+		rows = append(rows, tu.KeyboardRow(tu.KeyboardButton(ReminderButtonText(reminder))))
 	}
 
-	rows = append(rows, tu.InlineKeyboardRow(
-		tu.InlineKeyboardButton("Главное меню").WithCallbackData(CallbackMainMenu),
-	))
+	rows = append(rows, tu.KeyboardRow(tu.KeyboardButton(ButtonPreviousPage), tu.KeyboardButton(ButtonNextPage)))
+	rows = append(rows, tu.KeyboardRow(tu.KeyboardButton(ButtonBack)))
 
-	return tu.InlineKeyboard(rows...)
+	return tu.Keyboard(rows...).WithResizeKeyboard()
 }
 
 func ReminderDetailsKeyboard(reminder database.ReminderView) *telego.InlineKeyboardMarkup {
@@ -282,39 +331,63 @@ func ReminderCreatedKeyboard() *telego.InlineKeyboardMarkup {
 	)
 }
 
-func SettingsKeyboard() *telego.InlineKeyboardMarkup {
-	return tu.InlineKeyboard(
-		tu.InlineKeyboardRow(tu.InlineKeyboardButton("Язык: русский").WithCallbackData(CallbackSettingsLanguage)),
-		tu.InlineKeyboardRow(tu.InlineKeyboardButton("Часовой пояс").WithCallbackData(CallbackSettingsTimezone)),
-		tu.InlineKeyboardRow(
-			tu.InlineKeyboardButton("Настойчивые напоминания").WithCallbackData(CallbackSettingsIntrusive),
-		),
-		tu.InlineKeyboardRow(tu.InlineKeyboardButton("Главное меню").WithCallbackData(CallbackMainMenu)),
-	)
+func SettingsKeyboard() *telego.ReplyKeyboardMarkup {
+	return tu.Keyboard(
+		tu.KeyboardRow(tu.KeyboardButton(ButtonSettingsLanguage)),
+		tu.KeyboardRow(tu.KeyboardButton(ButtonSettingsTimezone)),
+		tu.KeyboardRow(tu.KeyboardButton(ButtonSettingsIntrusive)),
+		tu.KeyboardRow(tu.KeyboardButton(ButtonBack)),
+	).WithResizeKeyboard()
 }
 
-func TimezoneKeyboard(index int, now time.Time) *telego.InlineKeyboardMarkup {
+func TimezoneKeyboard(index int, now time.Time) *telego.ReplyKeyboardMarkup {
 	index = normalizeTimezoneIndex(index)
 	option := timezoneOptions[index]
 
-	return tu.InlineKeyboard(
-		tu.InlineKeyboardRow(
-			tu.InlineKeyboardButton("<").WithCallbackData(TimezonePrevCallback(index)),
-			tu.InlineKeyboardButton(TimezoneButtonText(option, now)).WithCallbackData(TimezoneSelectCallback(index)),
-			tu.InlineKeyboardButton(">").WithCallbackData(TimezoneNextCallback(index)),
+	return tu.Keyboard(
+		tu.KeyboardRow(
+			tu.KeyboardButton(ButtonPreviousPage),
+			tu.KeyboardButton(TimezoneButtonText(option, now)),
+			tu.KeyboardButton(ButtonNextPage),
 		),
-		tu.InlineKeyboardRow(tu.InlineKeyboardButton("Назад").WithCallbackData(CallbackSettings)),
-	)
+		tu.KeyboardRow(tu.KeyboardButton(ButtonBack)),
+	).WithResizeKeyboard()
 }
 
-func IntrusiveSettingsKeyboard() *telego.InlineKeyboardMarkup {
-	return tu.InlineKeyboard(
-		tu.InlineKeyboardRow(
-			tu.InlineKeyboardButton("Включить").WithCallbackData(CallbackSettingsIntrusiveOn),
-			tu.InlineKeyboardButton("Выключить").WithCallbackData(CallbackSettingsIntrusiveOff),
-		),
-		tu.InlineKeyboardRow(tu.InlineKeyboardButton("Назад").WithCallbackData(CallbackSettings)),
-	)
+func IntrusiveSettingsKeyboard(enabled bool) *telego.ReplyKeyboardMarkup {
+	toggleText := ButtonIntrusiveDisabled
+	if enabled {
+		toggleText = ButtonIntrusiveEnabled
+	}
+
+	return tu.Keyboard(
+		tu.KeyboardRow(tu.KeyboardButton(toggleText)),
+		tu.KeyboardRow(tu.KeyboardButton(ButtonIntrusiveInterval)),
+		tu.KeyboardRow(tu.KeyboardButton(ButtonBack)),
+	).WithResizeKeyboard()
+}
+
+func IntrusiveIntervalKeyboard(interval time.Duration) *telego.ReplyKeyboardMarkup {
+	rows := make([][]telego.KeyboardButton, 0, 4)
+
+	if interval > time.Minute {
+		rows = append(rows, tu.KeyboardRow(
+			tu.KeyboardButton(ButtonMinusHour),
+			tu.KeyboardButton(ButtonMinusFiveMinutes),
+		))
+	}
+
+	if interval < 2*time.Hour {
+		rows = append(rows, tu.KeyboardRow(tu.KeyboardButton(ButtonPlusFiveMinutes), tu.KeyboardButton(ButtonPlusHour)))
+	}
+
+	rows = append(rows, tu.KeyboardRow(tu.KeyboardButton(ButtonDone), tu.KeyboardButton(ButtonBack)))
+
+	return tu.Keyboard(rows...).WithResizeKeyboard()
+}
+
+func ReminderButtonText(reminder database.ReminderView) string {
+	return fmt.Sprintf("#%d %s", reminder.ID, reminder.Title)
 }
 
 func TimezoneIndex(timezone string) int {
@@ -329,6 +402,10 @@ func TimezoneIndex(timezone string) int {
 
 func TimezoneByIndex(index int) TimezoneOption {
 	return timezoneOptions[normalizeTimezoneIndex(index)]
+}
+
+func TimezoneIndexByShift(index int, shift int) int {
+	return normalizeTimezoneIndex(index + shift)
 }
 
 func TimezoneButtonText(option TimezoneOption, now time.Time) string {

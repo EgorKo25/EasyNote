@@ -11,10 +11,7 @@ import (
 )
 
 var ErrReminderTitleEmpty = errors.New("reminder title is empty")
-var ErrCustomReminderDatesEmpty = errors.New("custom reminder dates are empty")
 var ErrWeekdaysMaskEmpty = errors.New("weekdays mask is empty")
-var ErrIntrusiveIntervalOutOfRange = errors.New("intrusive reminder interval is out of range")
-var ErrUnknownTimezone = errors.New("unknown timezone")
 
 func NewReminderService(repository ReminderCommandRepository, planner ReminderCreationPlanner) *ReminderService {
 	return &ReminderService{repository: repository, ReminderCreationPlanner: planner}
@@ -48,17 +45,19 @@ type ReminderCreationPlanner interface {
 }
 
 type ReminderCommandRepository interface {
-	FindRemindersByChat(ctx context.Context, telegramChatID int64) ([]database.ReminderView, error)
-	FindReminderHistoryByChat(ctx context.Context, telegramChatID int64) ([]database.ReminderView, error)
-	CancelReminder(ctx context.Context, telegramChatID int64, reminderID int64) error
-	UserSettings(ctx context.Context, telegramChatID int64) (database.UserSettings, error)
-	UpdateUserTimezone(ctx context.Context, telegramChatID int64, timezone string) error
-	UpdateIntrusiveSettings(
+	FindRemindersByChat(
 		ctx context.Context,
 		telegramChatID int64,
-		enabled bool,
-		interval time.Duration,
-	) error
+		limit int,
+		offset int,
+	) ([]database.ReminderView, error)
+	FindReminderHistoryByChat(
+		ctx context.Context,
+		telegramChatID int64,
+		limit int,
+		offset int,
+	) ([]database.ReminderView, error)
+	CancelReminder(ctx context.Context, telegramChatID int64, reminderID int64) error
 }
 
 func (s *ReminderService) CreateReminder(
@@ -138,10 +137,6 @@ func (s *ReminderService) CreateCustomDatesReminder(
 	minute int,
 	location *time.Location,
 ) (database.ReminderView, error) {
-	if len(selectedDates) == 0 {
-		return database.ReminderView{}, fmt.Errorf("create custom dates reminder: %w", ErrCustomReminderDatesEmpty)
-	}
-
 	firstDate := earliestDate(selectedDates)
 	firstRemindAt := time.Date(firstDate.Year(), firstDate.Month(), firstDate.Day(), hour, minute, 0, 0, location)
 	rule := database.ReminderRule{Type: database.ReminderRuleTypeCustomDates}
@@ -149,70 +144,9 @@ func (s *ReminderService) CreateCustomDatesReminder(
 	return s.createRecurringReminder(ctx, telegramChatID, title, description, firstRemindAt, rule, selectedDates)
 }
 
-func (s *ReminderService) Reminders(ctx context.Context, telegramChatID int64) ([]database.ReminderView, error) {
-	reminders, err := s.repository.FindRemindersByChat(ctx, telegramChatID)
-	if err != nil {
-		return nil, fmt.Errorf("find reminders: %w", err)
-	}
-
-	return reminders, nil
-}
-
-func (s *ReminderService) ReminderHistory(ctx context.Context, telegramChatID int64) ([]database.ReminderView, error) {
-	reminders, err := s.repository.FindReminderHistoryByChat(ctx, telegramChatID)
-	if err != nil {
-		return nil, fmt.Errorf("find reminder history: %w", err)
-	}
-
-	return reminders, nil
-}
-
 func (s *ReminderService) DeleteReminder(ctx context.Context, telegramChatID int64, reminderID int64) error {
 	if err := s.repository.CancelReminder(ctx, telegramChatID, reminderID); err != nil {
 		return fmt.Errorf("delete reminder: %w", err)
-	}
-
-	return nil
-}
-
-func (s *ReminderService) UserSettings(ctx context.Context, telegramChatID int64) (database.UserSettings, error) {
-	settings, err := s.repository.UserSettings(ctx, telegramChatID)
-	if err != nil {
-		return database.UserSettings{}, fmt.Errorf("load user settings: %w", err)
-	}
-
-	return settings, nil
-}
-
-func (s *ReminderService) SetUserTimezone(ctx context.Context, telegramChatID int64, timezone string) error {
-	timezone = strings.TrimSpace(timezone)
-	if timezone == "" {
-		return fmt.Errorf("%w: %s", ErrUnknownTimezone, timezone)
-	}
-
-	if _, err := time.LoadLocation(timezone); err != nil {
-		return fmt.Errorf("%w: %s", ErrUnknownTimezone, timezone)
-	}
-
-	if err := s.repository.UpdateUserTimezone(ctx, telegramChatID, timezone); err != nil {
-		return fmt.Errorf("set user timezone: %w", err)
-	}
-
-	return nil
-}
-
-func (s *ReminderService) SetIntrusiveSettings(
-	ctx context.Context,
-	telegramChatID int64,
-	enabled bool,
-	interval time.Duration,
-) error {
-	if interval < 30*time.Minute || interval > 24*time.Hour {
-		return fmt.Errorf("set intrusive settings: %w", ErrIntrusiveIntervalOutOfRange)
-	}
-
-	if err := s.repository.UpdateIntrusiveSettings(ctx, telegramChatID, enabled, interval); err != nil {
-		return fmt.Errorf("set intrusive settings: %w", err)
 	}
 
 	return nil
