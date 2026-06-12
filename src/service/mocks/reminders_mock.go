@@ -181,18 +181,3 @@ func (mr *MockReminderCommandRepositoryMockRecorder) UpdateUserTimezone(ctx, tel
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateUserTimezone", reflect.TypeOf((*MockReminderCommandRepository)(nil).UpdateUserTimezone), ctx, telegramChatID, timezone)
 }
-
-// UserSettings mocks base method.
-func (m *MockReminderCommandRepository) UserSettings(ctx context.Context, telegramChatID int64) (database.UserSettings, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UserSettings", ctx, telegramChatID)
-	ret0, _ := ret[0].(database.UserSettings)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// UserSettings indicates an expected call of UserSettings.
-func (mr *MockReminderCommandRepositoryMockRecorder) UserSettings(ctx, telegramChatID any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UserSettings", reflect.TypeOf((*MockReminderCommandRepository)(nil).UserSettings), ctx, telegramChatID)
-}

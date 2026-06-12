@@ -1355,7 +1355,7 @@ func TestReminderBotRunsReplyMessageCommands(t *testing.T) {
 			name: "settings command loads user settings",
 			text: telegramui.ButtonSettings,
 			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderQueryRepository) {
-				service.EXPECT().
+				repository.EXPECT().
 					UserSettings(gomock.Any(), chatID).
 					Return(database.UserSettings{Timezone: "UTC"}, nil).
 					Times(2)
@@ -1488,11 +1488,11 @@ func TestReminderBotHandlesReplyNavigationState(t *testing.T) {
 			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderQueryRepository) {
 				gomock.InOrder(
 					service.EXPECT().SetUserTimezone(gomock.Any(), chatID, "Europe/Samara").Return(nil).Times(1),
-					service.EXPECT().
+					repository.EXPECT().
 						UserSettings(gomock.Any(), chatID).
 						Return(database.UserSettings{Timezone: "UTC"}, nil).
 						Times(1),
-					service.EXPECT().
+					repository.EXPECT().
 						UserSettings(gomock.Any(), chatID).
 						Return(database.UserSettings{Timezone: "UTC"}, nil).
 						Times(1),
@@ -1509,7 +1509,7 @@ func TestReminderBotHandlesReplyNavigationState(t *testing.T) {
 				return bot.handleDoneMessage(ctx, chatID)
 			},
 			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderQueryRepository) {
-				service.EXPECT().UserSettings(gomock.Any(), chatID).
+				repository.EXPECT().UserSettings(gomock.Any(), chatID).
 					Return(database.UserSettings{Timezone: "UTC", IntrusiveInterval: time.Minute}, nil).
 					Times(2)
 			},
@@ -1535,14 +1535,14 @@ func TestReminderBotHandlesReplyNavigationState(t *testing.T) {
 			},
 			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderQueryRepository) {
 				gomock.InOrder(
-					service.EXPECT().UserSettings(gomock.Any(), chatID).
+					repository.EXPECT().UserSettings(gomock.Any(), chatID).
 						Return(database.UserSettings{IntrusiveEnabled: true, IntrusiveInterval: 30 * time.Minute}, nil).
 						Times(1),
 					service.EXPECT().
 						SetIntrusiveSettings(gomock.Any(), chatID, true, 25*time.Minute).
 						Return(nil).
 						Times(1),
-					service.EXPECT().UserSettings(gomock.Any(), chatID).
+					repository.EXPECT().UserSettings(gomock.Any(), chatID).
 						Return(database.UserSettings{IntrusiveEnabled: true, IntrusiveInterval: 25 * time.Minute}, nil).
 						Times(1),
 				)
@@ -1558,10 +1558,10 @@ func TestReminderBotHandlesReplyNavigationState(t *testing.T) {
 			},
 			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderQueryRepository) {
 				gomock.InOrder(
-					service.EXPECT().UserSettings(gomock.Any(), chatID).
+					repository.EXPECT().UserSettings(gomock.Any(), chatID).
 						Return(database.UserSettings{IntrusiveEnabled: true, IntrusiveInterval: time.Minute}, nil).
 						Times(1),
-					service.EXPECT().UserSettings(gomock.Any(), chatID).
+					repository.EXPECT().UserSettings(gomock.Any(), chatID).
 						Return(database.UserSettings{IntrusiveEnabled: true, IntrusiveInterval: time.Minute}, nil).
 						Times(1),
 				)
@@ -1577,10 +1577,10 @@ func TestReminderBotHandlesReplyNavigationState(t *testing.T) {
 			},
 			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderQueryRepository) {
 				gomock.InOrder(
-					service.EXPECT().UserSettings(gomock.Any(), chatID).
+					repository.EXPECT().UserSettings(gomock.Any(), chatID).
 						Return(database.UserSettings{IntrusiveEnabled: true, IntrusiveInterval: 2 * time.Hour}, nil).
 						Times(1),
-					service.EXPECT().UserSettings(gomock.Any(), chatID).
+					repository.EXPECT().UserSettings(gomock.Any(), chatID).
 						Return(database.UserSettings{IntrusiveEnabled: true, IntrusiveInterval: 2 * time.Hour}, nil).
 						Times(1),
 				)
@@ -2108,7 +2108,7 @@ func TestReminderBotAppliesSettingsTextInput(t *testing.T) {
 			input: "45",
 			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderQueryRepository) {
 				gomock.InOrder(
-					service.EXPECT().UserSettings(gomock.Any(), chatID).Return(database.UserSettings{
+					repository.EXPECT().UserSettings(gomock.Any(), chatID).Return(database.UserSettings{
 						IntrusiveEnabled: true,
 					}, nil).Times(1),
 					service.EXPECT().
@@ -2130,7 +2130,7 @@ func TestReminderBotAppliesSettingsTextInput(t *testing.T) {
 			input: "120",
 			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderQueryRepository) {
 				gomock.InOrder(
-					service.EXPECT().UserSettings(gomock.Any(), chatID).Return(database.UserSettings{
+					repository.EXPECT().UserSettings(gomock.Any(), chatID).Return(database.UserSettings{
 						IntrusiveEnabled: false,
 					}, nil).Times(1),
 					service.EXPECT().
@@ -2583,7 +2583,7 @@ func TestReminderBotHandlesSettingsCallbacks(t *testing.T) {
 			data: telegramui.CallbackSettingsTimezone,
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderQueryRepository) {
 				gomock.InOrder(
-					service.EXPECT().UserSettings(gomock.Any(), chatID).
+					repository.EXPECT().UserSettings(gomock.Any(), chatID).
 						Return(database.UserSettings{Timezone: "Europe/Moscow"}, nil).
 						Times(1),
 					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -2631,10 +2631,10 @@ func TestReminderBotHandlesSettingsCallbacks(t *testing.T) {
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderQueryRepository) {
 				gomock.InOrder(
 					service.EXPECT().SetUserTimezone(gomock.Any(), chatID, "Europe/Moscow").Return(nil).Times(1),
-					service.EXPECT().UserSettings(gomock.Any(), chatID).
+					repository.EXPECT().UserSettings(gomock.Any(), chatID).
 						Return(database.UserSettings{Timezone: "Europe/Moscow"}, nil).
 						Times(1),
-					service.EXPECT().UserSettings(gomock.Any(), chatID).
+					repository.EXPECT().UserSettings(gomock.Any(), chatID).
 						Return(database.UserSettings{Timezone: "Europe/Moscow"}, nil).
 						Times(1),
 					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -2652,7 +2652,7 @@ func TestReminderBotHandlesSettingsCallbacks(t *testing.T) {
 			name: "timezone callback returns settings load error",
 			data: telegramui.CallbackSettingsTimezone,
 			before: func(_ *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderQueryRepository) {
-				service.EXPECT().UserSettings(gomock.Any(), chatID).
+				repository.EXPECT().UserSettings(gomock.Any(), chatID).
 					Return(database.UserSettings{}, errSettings).
 					Times(1)
 			},
@@ -2681,11 +2681,11 @@ func TestReminderBotHandlesSettingsCallbacks(t *testing.T) {
 			data: telegramui.CallbackSettingsIntrusive,
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderQueryRepository) {
 				gomock.InOrder(
-					service.EXPECT().UserSettings(gomock.Any(), chatID).Return(database.UserSettings{
+					repository.EXPECT().UserSettings(gomock.Any(), chatID).Return(database.UserSettings{
 						Timezone:          "Europe/Moscow",
 						IntrusiveInterval: 30 * time.Minute,
 					}, nil).Times(1),
-					service.EXPECT().UserSettings(gomock.Any(), chatID).Return(database.UserSettings{
+					repository.EXPECT().UserSettings(gomock.Any(), chatID).Return(database.UserSettings{
 						Timezone:          "Europe/Moscow",
 						IntrusiveInterval: 30 * time.Minute,
 					}, nil).Times(1),
@@ -2709,12 +2709,12 @@ func TestReminderBotHandlesSettingsCallbacks(t *testing.T) {
 						SetIntrusiveSettings(gomock.Any(), chatID, true, 30*time.Minute).
 						Return(nil).
 						Times(1),
-					service.EXPECT().UserSettings(gomock.Any(), chatID).Return(database.UserSettings{
+					repository.EXPECT().UserSettings(gomock.Any(), chatID).Return(database.UserSettings{
 						Timezone:          "Europe/Moscow",
 						IntrusiveEnabled:  true,
 						IntrusiveInterval: 30 * time.Minute,
 					}, nil).Times(1),
-					service.EXPECT().UserSettings(gomock.Any(), chatID).Return(database.UserSettings{
+					repository.EXPECT().UserSettings(gomock.Any(), chatID).Return(database.UserSettings{
 						Timezone:          "Europe/Moscow",
 						IntrusiveEnabled:  true,
 						IntrusiveInterval: 30 * time.Minute,
@@ -2859,7 +2859,7 @@ func TestReminderBotSendsListsAndSettingsScreens(t *testing.T) {
 			},
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderQueryRepository) {
 				gomock.InOrder(
-					service.EXPECT().
+					repository.EXPECT().
 						UserSettings(gomock.Any(), chatID).
 						Return(database.UserSettings{Timezone: "UTC"}, nil).
 						Times(1),
@@ -2880,14 +2880,14 @@ func TestReminderBotSendsListsAndSettingsScreens(t *testing.T) {
 			},
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderQueryRepository) {
 				gomock.InOrder(
-					service.EXPECT().
+					repository.EXPECT().
 						UserSettings(gomock.Any(), chatID).
 						Return(database.UserSettings{
 							Timezone:          "UTC",
 							IntrusiveInterval: 30 * time.Minute,
 						}, nil).
 						Times(1),
-					service.EXPECT().
+					repository.EXPECT().
 						UserSettings(gomock.Any(), chatID).
 						Return(database.UserSettings{
 							Timezone:          "UTC",
@@ -2921,7 +2921,7 @@ func TestReminderBotSendsListsAndSettingsScreens(t *testing.T) {
 				return bot.sendSettings(ctx, chatID)
 			},
 			before: func(_ *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderQueryRepository) {
-				service.EXPECT().UserSettings(gomock.Any(), chatID).Return(database.UserSettings{}, errSettings).
+				repository.EXPECT().UserSettings(gomock.Any(), chatID).Return(database.UserSettings{}, errSettings).
 					Times(1)
 			},
 			expected: struct {

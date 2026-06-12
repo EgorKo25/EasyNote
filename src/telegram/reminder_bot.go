@@ -128,12 +128,12 @@ type ReminderService interface {
 		status database.ReminderStatus,
 		sentAt *time.Time,
 	) error
-	UserSettings(ctx context.Context, telegramChatID int64) (database.UserSettings, error)
 	SetUserTimezone(ctx context.Context, telegramChatID int64, timezone string) error
 	SetIntrusiveSettings(ctx context.Context, telegramChatID int64, enabled bool, interval time.Duration) error
 }
 
 type ReminderQueryRepository interface {
+	UserSettings(ctx context.Context, telegramChatID int64) (database.UserSettings, error)
 	FindRemindersByChat(
 		ctx context.Context,
 		telegramChatID int64,
@@ -859,7 +859,7 @@ func (b *ReminderBot) sendSettings(ctx context.Context, chatID int64) error {
 		return err
 	}
 
-	settings, err := b.service.UserSettings(ctx, chatID)
+	settings, err := b.repository.UserSettings(ctx, chatID)
 	if err != nil {
 		return fmt.Errorf("load user settings: %w", err)
 	}
@@ -872,7 +872,7 @@ func (b *ReminderBot) editSettings(ctx context.Context, chatID int64, messageID 
 		return err
 	}
 
-	settings, err := b.service.UserSettings(ctx, chatID)
+	settings, err := b.repository.UserSettings(ctx, chatID)
 	if err != nil {
 		return fmt.Errorf("load user settings: %w", err)
 	}
@@ -891,7 +891,7 @@ func (b *ReminderBot) sendIntrusiveSettings(ctx context.Context, chatID int64) e
 		return err
 	}
 
-	settings, err := b.service.UserSettings(ctx, chatID)
+	settings, err := b.repository.UserSettings(ctx, chatID)
 	if err != nil {
 		return fmt.Errorf("load user settings: %w", err)
 	}
@@ -905,7 +905,7 @@ func (b *ReminderBot) sendIntrusiveSettings(ctx context.Context, chatID int64) e
 }
 
 func (b *ReminderBot) toggleIntrusiveSettings(ctx context.Context, chatID int64) error {
-	settings, err := b.service.UserSettings(ctx, chatID)
+	settings, err := b.repository.UserSettings(ctx, chatID)
 	if err != nil {
 		return fmt.Errorf("load user settings: %w", err)
 	}
@@ -925,7 +925,7 @@ func (b *ReminderBot) toggleIntrusiveSettings(ctx context.Context, chatID int64)
 func (b *ReminderBot) sendIntrusiveInterval(ctx context.Context, chatID int64) error {
 	b.setChatMenu(chatID, chatMenuIntrusiveInterval)
 
-	settings, err := b.service.UserSettings(ctx, chatID)
+	settings, err := b.repository.UserSettings(ctx, chatID)
 	if err != nil {
 		return fmt.Errorf("load user settings: %w", err)
 	}
@@ -939,7 +939,7 @@ func (b *ReminderBot) sendIntrusiveInterval(ctx context.Context, chatID int64) e
 }
 
 func (b *ReminderBot) shiftIntrusiveInterval(ctx context.Context, chatID int64, minutes int) error {
-	settings, err := b.service.UserSettings(ctx, chatID)
+	settings, err := b.repository.UserSettings(ctx, chatID)
 	if err != nil {
 		return fmt.Errorf("load user settings: %w", err)
 	}
@@ -960,7 +960,7 @@ func (b *ReminderBot) editTimezoneSettings(ctx context.Context, chatID int64, me
 	var index int
 
 	if data == telegramui.CallbackSettingsTimezone {
-		settings, err := b.service.UserSettings(ctx, chatID)
+		settings, err := b.repository.UserSettings(ctx, chatID)
 		if err != nil {
 			return fmt.Errorf("load user settings: %w", err)
 		}
@@ -986,7 +986,7 @@ func (b *ReminderBot) editTimezoneSettings(ctx context.Context, chatID int64, me
 func (b *ReminderBot) sendTimezoneSettings(ctx context.Context, chatID int64) error {
 	b.setChatMenu(chatID, chatMenuTimezone)
 
-	settings, err := b.service.UserSettings(ctx, chatID)
+	settings, err := b.repository.UserSettings(ctx, chatID)
 	if err != nil {
 		return fmt.Errorf("load user settings: %w", err)
 	}
@@ -1474,7 +1474,7 @@ func (b *ReminderBot) applyIntrusiveInterval(ctx context.Context, chatID int64, 
 		return true
 	}
 
-	settings, err := b.service.UserSettings(ctx, chatID)
+	settings, err := b.repository.UserSettings(ctx, chatID)
 	if err != nil {
 		b.setDraftNotice(chatID, "Не удалось загрузить настройки.")
 
@@ -2098,7 +2098,7 @@ func (b *ReminderBot) deleteMessage(ctx context.Context, chatID int64, messageID
 }
 
 func (b *ReminderBot) loadChatLocation(ctx context.Context, chatID int64) error {
-	settings, err := b.service.UserSettings(ctx, chatID)
+	settings, err := b.repository.UserSettings(ctx, chatID)
 	if err != nil {
 		return fmt.Errorf("load chat location settings: %w", err)
 	}
