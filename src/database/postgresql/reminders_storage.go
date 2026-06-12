@@ -78,7 +78,12 @@ func (d *Database) CreateReminder(
 	return reminder, nil
 }
 
-func (d *Database) FindRemindersByChat(ctx context.Context, telegramChatID int64) ([]database.ReminderView, error) {
+func (d *Database) FindRemindersByChat(
+	ctx context.Context,
+	telegramChatID int64,
+	limit int,
+	offset int,
+) ([]database.ReminderView, error) {
 	query := `
 		SELECT r.id, r.rule_id, n.title, n.description, r.remind_at, r.status, r.created_at
 		FROM reminders r
@@ -86,9 +91,10 @@ func (d *Database) FindRemindersByChat(ctx context.Context, telegramChatID int64
 		WHERE n.telegram_chat_id = $1
 			AND r.status = 'new'
 		ORDER BY r.remind_at, r.id
+		LIMIT $2 OFFSET $3
 	`
 
-	rows, err := d.pool.Query(ctx, query, telegramChatID)
+	rows, err := d.pool.Query(ctx, query, telegramChatID, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("find reminders by chat: %w", err)
 	}
@@ -104,6 +110,8 @@ func (d *Database) FindRemindersByChat(ctx context.Context, telegramChatID int64
 func (d *Database) FindReminderHistoryByChat(
 	ctx context.Context,
 	telegramChatID int64,
+	limit int,
+	offset int,
 ) ([]database.ReminderView, error) {
 	query := `
 		SELECT r.id, r.rule_id, n.title, n.description, r.remind_at, r.status, r.created_at
@@ -112,9 +120,10 @@ func (d *Database) FindReminderHistoryByChat(
 		WHERE n.telegram_chat_id = $1
 			AND r.status <> 'new'
 		ORDER BY r.remind_at DESC, r.id DESC
+		LIMIT $2 OFFSET $3
 	`
 
-	rows, err := d.pool.Query(ctx, query, telegramChatID)
+	rows, err := d.pool.Query(ctx, query, telegramChatID, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("find reminder history by chat: %w", err)
 	}

@@ -2,18 +2,21 @@ package ui
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/EgorKo25/EasyNote/src/database"
 )
 
 func MainMenuText() string {
-	return "Главное меню\n\nВыберите действие на клавиатуре ниже."
+	return " "
 }
 
 func RemindersText() string {
 	return "Напоминания\n\nВыберите список напоминаний."
+}
+
+func CreateText() string {
+	return "Создать\n\nВыберите тип."
 }
 
 func DraftText(draft Draft, location *time.Location) string {
@@ -72,7 +75,7 @@ func draftNextStep(draft Draft) string {
 	}
 
 	if draft.Screen == ScreenRepeat {
-		return "Выберите периодичность напоминания."
+		return "Выберите регулярность напоминания."
 	}
 
 	if draft.Screen == ScreenWeekdays {
@@ -104,25 +107,12 @@ func ReminderListText(reminders []database.ReminderView) string {
 	return "Список напоминаний\n\nВыберите напоминание из списка."
 }
 
-func ReminderHistoryText(reminders []database.ReminderView, location *time.Location) string {
+func ReminderHistoryText(reminders []database.ReminderView) string {
 	if len(reminders) == 0 {
 		return "Прошедших напоминаний пока нет."
 	}
 
-	var text strings.Builder
-	text.WriteString("Прошедшие напоминания")
-
-	for _, reminder := range reminders {
-		fmt.Fprintf(
-			&text,
-			"\n\n%s\n%s\nСтатус: %s",
-			reminder.RemindAt.In(location).Format("02.01.2006 15:04"),
-			reminder.Title,
-			ReminderStatusText(reminder.Status),
-		)
-	}
-
-	return text.String()
+	return "Прошедшие напоминания\n\nВыберите напоминание из списка."
 }
 
 func SettingsText(settings database.UserSettings) string {
@@ -136,10 +126,14 @@ func SettingsText(settings database.UserSettings) string {
 
 func IntrusiveSettingsText(settings database.UserSettings) string {
 	return fmt.Sprintf(
-		"Настойчивые напоминания\n\nСостояние: %s\nИнтервал: %s\n\nИнтервал можно задать сообщением в минутах от 30 до 1440.",
+		"Настойчивые напоминания\n\nСостояние: %s\nИнтервал: %s",
 		intrusiveEnabledText(settings.IntrusiveEnabled),
 		settings.IntrusiveInterval,
 	)
+}
+
+func IntrusiveIntervalText(interval time.Duration) string {
+	return fmt.Sprintf("Интервал настойчивых напоминаний\n\nТекущее значение: %s", interval)
 }
 
 func ReminderStatusText(status database.ReminderStatus) string {
@@ -170,21 +164,21 @@ func intrusiveEnabledText(enabled bool) string {
 func RepeatText(draft Draft) string {
 	switch draft.Repeat {
 	case RepeatEveryDay:
-		return "Повторяемость: каждый день\n"
+		return "Повторять: каждый день\n"
 	case RepeatEveryWeek:
-		return "Повторяемость: каждую неделю\n"
+		return "Повторять: каждую неделю\n"
 	case RepeatEveryTwoDays:
-		return "Повторяемость: каждые 2 дня\n"
+		return "Повторять: каждые 2 дня\n"
 	case RepeatWeekdays:
-		return "Повторяемость: по будням\n"
+		return "Повторять: по будням\n"
 	case RepeatCustomWeekdays:
-		return fmt.Sprintf("Повторяемость: выбрано дней недели: %d\n", SelectedWeekdayCount(draft.WeekdaysMask))
+		return fmt.Sprintf("Повторять: выбрано дней недели: %d\n", SelectedWeekdayCount(draft.WeekdaysMask))
 	case RepeatCustomDates:
-		return fmt.Sprintf("Повторяемость: выбрано дат: %d\n", len(draft.CustomDates))
+		return fmt.Sprintf("Повторять: выбрано дат: %d\n", len(draft.CustomDates))
 	case RepeatCustomInterval:
-		return fmt.Sprintf("Повторяемость: каждые %d дн.\n", draft.IntervalDays)
+		return fmt.Sprintf("Повторять: каждые %d дн.\n", draft.IntervalDays)
 	default:
-		return "Повторяемость: не задана\n"
+		return "Повторять: нет\n"
 	}
 }
 

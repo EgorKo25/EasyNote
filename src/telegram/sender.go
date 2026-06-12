@@ -11,6 +11,7 @@ import (
 	"github.com/EgorKo25/EasyNote/src/config"
 	"github.com/EgorKo25/EasyNote/src/database"
 	"github.com/EgorKo25/EasyNote/src/logger"
+	telegramui "github.com/EgorKo25/EasyNote/src/telegram/ui"
 	"github.com/mymmrac/telego"
 	tu "github.com/mymmrac/telego/telegoutil"
 )
@@ -73,9 +74,17 @@ func (s *Sender) SendReminder(ctx context.Context, reminder database.ScheduledRe
 		params.WithReplyMarkup(tu.InlineKeyboard(
 			tu.InlineKeyboardRow(
 				tu.InlineKeyboardButton("Готово").
-					WithCallbackData("reminder:done:"+strconv.FormatInt(reminder.ID, 10)),
+					WithCallbackData(telegramui.CallbackReminderDone+strconv.FormatInt(reminder.ID, 10)),
 				tu.InlineKeyboardButton("Отменить").
-					WithCallbackData("reminder:cancel_delivered:"+strconv.FormatInt(reminder.ID, 10)),
+					WithCallbackData(telegramui.CallbackReminderCancelDelivered+strconv.FormatInt(reminder.ID, 10)),
+			),
+			tu.InlineKeyboardRow(
+				tu.InlineKeyboardButton(telegramui.ButtonCreateReminder).
+					WithCallbackData(telegramui.CallbackCreateReminder),
+				tu.InlineKeyboardButton(telegramui.ButtonReminders).
+					WithCallbackData(telegramui.CallbackReminderList),
+				tu.InlineKeyboardButton(telegramui.ButtonSettings).
+					WithCallbackData(telegramui.CallbackSettings),
 			),
 		))
 	}

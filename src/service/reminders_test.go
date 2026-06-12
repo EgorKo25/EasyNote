@@ -15,11 +15,9 @@ import (
 
 var (
 	errCreateReminderRepository = errors.New("create reminder repository")
-	errFindRemindersRepository  = errors.New("find reminders repository")
 	errCancelReminderRepository = errors.New("cancel reminder repository")
 	errExpectedTitleEmpty       = errors.New("create reminder: reminder title is empty")
 	errExpectedCreateReminder   = errors.New("create reminder: create reminder repository")
-	errExpectedFindReminders    = errors.New("find reminders: find reminders repository")
 	errExpectedCancelReminder   = errors.New("delete reminder: cancel reminder repository")
 	errExpectedReminderNotFound = errors.New("delete reminder: reminder not found")
 )
@@ -601,20 +599,6 @@ func TestReminderServiceCreatesCustomDatesReminder(t *testing.T) {
 			}{reminder: database.ReminderView{ID: 23, Title: "Tickets"}},
 		},
 		{
-			name:          "empty custom dates returns validation error",
-			title:         "Trip",
-			desc:          "Pack",
-			selectedDates: []time.Time{},
-			hour:          8,
-			minute:        15,
-			before: func(_ *mocks.MockReminderCreationPlanner) {
-			},
-			expected: struct {
-				reminder        database.ReminderView
-				expectedErrText string
-			}{expectedErrText: "create custom dates reminder: custom reminder dates are empty"},
-		},
-		{
 			name:          "planner storage custom dates error is returned",
 			title:         "Trip",
 			desc:          "Pack",
@@ -664,123 +648,6 @@ func TestReminderServiceCreatesCustomDatesReminder(t *testing.T) {
 
 			require.NoError(t, err)
 			require.Equal(t, test.expected.reminder, reminder)
-		})
-	}
-}
-
-func TestReminderServiceLoadsReminders(t *testing.T) {
-	t.Parallel()
-
-	chatID := int64(100)
-
-	tests := []struct {
-		name     string
-		before   func(repository *mocks.MockReminderCommandRepository)
-		expected struct {
-			reminders   []database.ReminderView
-			expectedErr error
-		}
-	}{
-		{
-			name: "loads one reminder",
-			before: func(repository *mocks.MockReminderCommandRepository) {
-				repository.EXPECT().
-					FindRemindersByChat(gomock.Any(), chatID).
-					Return([]database.ReminderView{{ID: 1, Title: "Pay rent"}}, nil).
-					Times(1)
-			},
-			expected: struct {
-				reminders   []database.ReminderView
-				expectedErr error
-			}{reminders: []database.ReminderView{{ID: 1, Title: "Pay rent"}}},
-		},
-		{
-			name: "loads several reminders",
-			before: func(repository *mocks.MockReminderCommandRepository) {
-				repository.EXPECT().
-					FindRemindersByChat(gomock.Any(), chatID).
-					Return([]database.ReminderView{{ID: 1}, {ID: 2}}, nil).
-					Times(1)
-			},
-			expected: struct {
-				reminders   []database.ReminderView
-				expectedErr error
-			}{reminders: []database.ReminderView{{ID: 1}, {ID: 2}}},
-		},
-		{
-			name: "loads empty reminder list",
-			before: func(repository *mocks.MockReminderCommandRepository) {
-				repository.EXPECT().
-					FindRemindersByChat(gomock.Any(), chatID).
-					Return([]database.ReminderView{}, nil).
-					Times(1)
-			},
-			expected: struct {
-				reminders   []database.ReminderView
-				expectedErr error
-			}{reminders: []database.ReminderView{}},
-		},
-		{
-			name: "keeps repository reminder order",
-			before: func(repository *mocks.MockReminderCommandRepository) {
-				repository.EXPECT().
-					FindRemindersByChat(gomock.Any(), chatID).
-					Return([]database.ReminderView{{ID: 2}, {ID: 1}}, nil).
-					Times(1)
-			},
-			expected: struct {
-				reminders   []database.ReminderView
-				expectedErr error
-			}{reminders: []database.ReminderView{{ID: 2}, {ID: 1}}},
-		},
-		{
-			name: "repository find error is returned",
-			before: func(repository *mocks.MockReminderCommandRepository) {
-				repository.EXPECT().
-					FindRemindersByChat(gomock.Any(), chatID).
-					Return(nil, errFindRemindersRepository).
-					Times(1)
-			},
-			expected: struct {
-				reminders   []database.ReminderView
-				expectedErr error
-			}{expectedErr: errExpectedFindReminders},
-		},
-		{
-			name: "nil reminder list is returned explicitly",
-			before: func(repository *mocks.MockReminderCommandRepository) {
-				repository.EXPECT().
-					FindRemindersByChat(gomock.Any(), chatID).
-					Return(nil, nil).
-					Times(1)
-			},
-			expected: struct {
-				reminders   []database.ReminderView
-				expectedErr error
-			}{reminders: nil},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-
-			ctrl := gomock.NewController(t)
-			repository := mocks.NewMockReminderCommandRepository(ctrl)
-			test.before(repository)
-
-			reminderService := service.NewReminderService(repository, mocks.NewMockReminderCreationPlanner(ctrl))
-			reminders, err := reminderService.Reminders(context.Background(), chatID)
-
-			if test.expected.expectedErr != nil {
-				require.EqualError(t, err, test.expected.expectedErr.Error())
-				require.Equal(t, test.expected.reminders, reminders)
-
-				return
-			}
-
-			require.NoError(t, err)
-			require.Equal(t, test.expected.reminders, reminders)
 		})
 	}
 }
