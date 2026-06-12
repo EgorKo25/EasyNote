@@ -58,13 +58,6 @@ type ReminderCommandRepository interface {
 		offset int,
 	) ([]database.ReminderView, error)
 	CancelReminder(ctx context.Context, telegramChatID int64, reminderID int64) error
-	UpdateUserTimezone(ctx context.Context, telegramChatID int64, timezone string) error
-	UpdateIntrusiveSettings(
-		ctx context.Context,
-		telegramChatID int64,
-		enabled bool,
-		interval time.Duration,
-	) error
 }
 
 func (s *ReminderService) CreateReminder(
@@ -154,27 +147,6 @@ func (s *ReminderService) CreateCustomDatesReminder(
 func (s *ReminderService) DeleteReminder(ctx context.Context, telegramChatID int64, reminderID int64) error {
 	if err := s.repository.CancelReminder(ctx, telegramChatID, reminderID); err != nil {
 		return fmt.Errorf("delete reminder: %w", err)
-	}
-
-	return nil
-}
-
-func (s *ReminderService) SetUserTimezone(ctx context.Context, telegramChatID int64, timezone string) error {
-	if err := s.repository.UpdateUserTimezone(ctx, telegramChatID, timezone); err != nil {
-		return fmt.Errorf("set user timezone: %w", err)
-	}
-
-	return nil
-}
-
-func (s *ReminderService) SetIntrusiveSettings(
-	ctx context.Context,
-	telegramChatID int64,
-	enabled bool,
-	interval time.Duration,
-) error {
-	if err := s.repository.UpdateIntrusiveSettings(ctx, telegramChatID, enabled, interval); err != nil {
-		return fmt.Errorf("set intrusive settings: %w", err)
 	}
 
 	return nil

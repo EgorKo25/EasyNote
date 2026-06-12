@@ -153,31 +153,3 @@ func (mr *MockReminderCommandRepositoryMockRecorder) FindRemindersByChat(ctx, te
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindRemindersByChat", reflect.TypeOf((*MockReminderCommandRepository)(nil).FindRemindersByChat), ctx, telegramChatID, limit, offset)
 }
-
-// UpdateIntrusiveSettings mocks base method.
-func (m *MockReminderCommandRepository) UpdateIntrusiveSettings(ctx context.Context, telegramChatID int64, enabled bool, interval time.Duration) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateIntrusiveSettings", ctx, telegramChatID, enabled, interval)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// UpdateIntrusiveSettings indicates an expected call of UpdateIntrusiveSettings.
-func (mr *MockReminderCommandRepositoryMockRecorder) UpdateIntrusiveSettings(ctx, telegramChatID, enabled, interval any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateIntrusiveSettings", reflect.TypeOf((*MockReminderCommandRepository)(nil).UpdateIntrusiveSettings), ctx, telegramChatID, enabled, interval)
-}
-
-// UpdateUserTimezone mocks base method.
-func (m *MockReminderCommandRepository) UpdateUserTimezone(ctx context.Context, telegramChatID int64, timezone string) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateUserTimezone", ctx, telegramChatID, timezone)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// UpdateUserTimezone indicates an expected call of UpdateUserTimezone.
-func (mr *MockReminderCommandRepositoryMockRecorder) UpdateUserTimezone(ctx, telegramChatID, timezone any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateUserTimezone", reflect.TypeOf((*MockReminderCommandRepository)(nil).UpdateUserTimezone), ctx, telegramChatID, timezone)
-}

@@ -25,7 +25,7 @@ const draftPastTimeNotice = "Выбранное время уже прошло. 
 func NewReminderBot(
 	sender *Sender,
 	service ReminderService,
-	repository ReminderQueryRepository,
+	repository ReminderRepository,
 	cfg config.Telegram,
 ) *ReminderBot {
 	return &ReminderBot{
@@ -47,7 +47,7 @@ type ReminderBot struct {
 	bot        *telego.Bot
 	cfg        config.Telegram
 	service    ReminderService
-	repository ReminderQueryRepository
+	repository ReminderRepository
 	log        logger.Logger
 
 	mu             sync.Mutex
@@ -128,12 +128,17 @@ type ReminderService interface {
 		status database.ReminderStatus,
 		sentAt *time.Time,
 	) error
-	SetUserTimezone(ctx context.Context, telegramChatID int64, timezone string) error
-	SetIntrusiveSettings(ctx context.Context, telegramChatID int64, enabled bool, interval time.Duration) error
 }
 
-type ReminderQueryRepository interface {
+type ReminderRepository interface {
 	UserSettings(ctx context.Context, telegramChatID int64) (database.UserSettings, error)
+	UpdateUserTimezone(ctx context.Context, telegramChatID int64, timezone string) error
+	UpdateIntrusiveSettings(
+		ctx context.Context,
+		telegramChatID int64,
+		enabled bool,
+		interval time.Duration,
+	) error
 	FindRemindersByChat(
 		ctx context.Context,
 		telegramChatID int64,
@@ -553,13 +558,13 @@ func (b *ReminderBot) handleSettingsCallback(
 
 		return true, b.editIntrusiveSettings(ctx, chatID, messageID)
 	case telegramui.CallbackSettingsIntrusiveOn:
-		if err := b.service.SetIntrusiveSettings(ctx, chatID, true, 30*time.Minute); err != nil {
+		if err := b.repository.UpdateIntrusiveSettings(ctx, chatID, true, 30*time.Minute); err != nil {
 			return true, fmt.Errorf("enable intrusive reminders: %w", err)
 		}
 
 		return true, b.editIntrusiveSettings(ctx, chatID, messageID)
 	case telegramui.CallbackSettingsIntrusiveOff:
-		if err := b.service.SetIntrusiveSettings(ctx, chatID, false, 30*time.Minute); err != nil {
+		if err := b.repository.UpdateIntrusiveSettings(ctx, chatID, false, 30*time.Minute); err != nil {
 			return true, fmt.Errorf("disable intrusive reminders: %w", err)
 		}
 
@@ -910,7 +915,7 @@ func (b *ReminderBot) toggleIntrusiveSettings(ctx context.Context, chatID int64)
 		return fmt.Errorf("load user settings: %w", err)
 	}
 
-	if err = b.service.SetIntrusiveSettings(
+	if err = b.repository.UpdateIntrusiveSettings(
 		ctx,
 		chatID,
 		!settings.IntrusiveEnabled,
@@ -949,7 +954,7 @@ func (b *ReminderBot) shiftIntrusiveInterval(ctx context.Context, chatID int64, 
 		return b.sendIntrusiveInterval(ctx, chatID)
 	}
 
-	if err = b.service.SetIntrusiveSettings(ctx, chatID, settings.IntrusiveEnabled, interval); err != nil {
+	if err = b.repository.UpdateIntrusiveSettings(ctx, chatID, settings.IntrusiveEnabled, interval); err != nil {
 		return fmt.Errorf("set intrusive interval: %w", err)
 	}
 
@@ -1006,7 +1011,7 @@ func (b *ReminderBot) shiftTimezone(ctx context.Context, chatID int64, shift int
 
 func (b *ReminderBot) saveCurrentTimezone(ctx context.Context, chatID int64) error {
 	option := telegramui.TimezoneByIndex(b.timezoneIndex(chatID))
-	if err := b.service.SetUserTimezone(ctx, chatID, option.Timezone); err != nil {
+	if err := b.repository.UpdateUserTimezone(ctx, chatID, option.Timezone); err != nil {
 		return fmt.Errorf("set user timezone: %w", err)
 	}
 
@@ -1020,7 +1025,7 @@ func (b *ReminderBot) setTimezoneByCallback(ctx context.Context, chatID int64, m
 	}
 
 	option := telegramui.TimezoneByIndex(index)
-	if err = b.service.SetUserTimezone(ctx, chatID, option.Timezone); err != nil {
+	if err = b.repository.UpdateUserTimezone(ctx, chatID, option.Timezone); err != nil {
 		return fmt.Errorf("set user timezone: %w", err)
 	}
 
@@ -1481,7 +1486,7 @@ func (b *ReminderBot) applyIntrusiveInterval(ctx context.Context, chatID int64, 
 		return true
 	}
 
-	if err = b.service.SetIntrusiveSettings(
+	if err = b.repository.UpdateIntrusiveSettings(
 		ctx,
 		chatID,
 		settings.IntrusiveEnabled,
