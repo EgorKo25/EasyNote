@@ -336,6 +336,47 @@ func TestRunnerProcessesReadyReminders(t *testing.T) {
 			},
 		},
 		{
+			name: "intrusive reminder keeps one minute delivery interval",
+			cfg: config.Scheduler{
+				PollInterval:      pollInterval,
+				SendRetryInterval: retryInterval,
+				BatchLimit:        10,
+				SendRetryCount:    1,
+			},
+			before: func(
+				_ *gomock.Controller,
+				storage *mocks.MockStorage,
+				sender *mocks.MockSender,
+				_ *mocks.MockPlanner,
+				_ chan struct{},
+			) {
+				intrusiveReminder := firstReminder
+				intrusiveReminder.IntrusiveEnabled = true
+				intrusiveReminder.IntrusiveInterval = time.Minute
+				intrusiveReminder.RemindAt = baseTime
+
+				gomock.InOrder(
+					storage.EXPECT().
+						FindRemindersReadyToSend(gomock.Any(), baseTime, 10).
+						Return([]*database.ScheduledReminder{&intrusiveReminder}, nil).
+						Times(1),
+					sender.EXPECT().SendReminder(gomock.Any(), intrusiveReminder).Return(302, nil).Times(1),
+					storage.EXPECT().
+						MarkReminderDelivered(gomock.Any(), database.ReminderDelivery{
+							ReminderID:     intrusiveReminder.ID,
+							MessageID:      302,
+							NextSendAt:     baseTime.Add(time.Minute),
+							IntrusiveUntil: baseTime.Add(24 * time.Hour),
+						}).
+						Return(nil).
+						Times(1),
+				)
+			},
+			run: func(ctx context.Context, runner *Runner, _ *clock.Mock, _ chan struct{}) error {
+				return runner.sendDueReminders(ctx)
+			},
+		},
+		{
 			name: "expired intrusive reminder is completed as skipped",
 			cfg: config.Scheduler{
 				PollInterval:      pollInterval,

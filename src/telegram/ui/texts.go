@@ -3,10 +3,14 @@ package ui
 import (
 	"fmt"
 	"html"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/EgorKo25/EasyNote/src/database"
 )
+
+const draftTitleCenterWidth = 24
 
 func MainMenuText(stats database.ReminderStats) string {
 	return fmt.Sprintf(
@@ -59,11 +63,12 @@ func DraftText(draft Draft, location *time.Location) string {
 
 	return fmt.Sprintf(
 		"<i>Шаблон напоминания</i>\n\n"+
-			"⠀⠀⠀⠀⠀⠀⠀⠀<b>%s</b>\n\n"+
+			"%s<b>%s</b>\n\n"+
 			"Описание: %s\n\n"+
 			"%s\n\n"+
 			"Время начала напоминания: %s\n\n"+
 			"<i>%s</i>%s",
+		draftTitlePadding(title),
 		title,
 		description,
 		repeat,
@@ -71,6 +76,13 @@ func DraftText(draft Draft, location *time.Location) string {
 		draftNextStep(draft, location),
 		notice,
 	)
+}
+
+func draftTitlePadding(title string) string {
+	titleWidth := utf8.RuneCountInString(html.UnescapeString(title))
+	paddingWidth := max((draftTitleCenterWidth-titleWidth)/2, 0)
+
+	return strings.Repeat("⠀", paddingWidth)
 }
 
 func draftNextStep(draft Draft, location *time.Location) string {

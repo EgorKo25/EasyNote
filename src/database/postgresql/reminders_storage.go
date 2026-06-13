@@ -141,7 +141,7 @@ func (d *Database) ReminderStatsByChat(ctx context.Context, telegramChatID int64
 		SELECT
 			count(*) FILTER (WHERE r.status = 'completed') AS completed,
 			count(*) FILTER (WHERE r.status = 'new') AS pending,
-			count(*) FILTER (WHERE r.status IN ('skipped', 'failed')) AS skipped
+			count(*) FILTER (WHERE r.status IN ('canceled', 'skipped', 'failed')) AS skipped
 		FROM reminders r
 		JOIN notes n ON n.id = r.note_id
 		WHERE n.telegram_chat_id = $1

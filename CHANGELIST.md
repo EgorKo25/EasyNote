@@ -4,9 +4,9 @@ version: 1.3.2
 
 ### What was done
 
-The Telegram main menu message was restored because Telegram cannot attach reply and inline keyboards to one message. The menu now shows completed, pending, and skipped task counters in one formatted block.
+The Telegram main menu message was restored because Telegram cannot attach reply and inline keyboards to one message. The menu now shows completed, pending, and missed task counters in one formatted block. Missed tasks include canceled, skipped, and failed reminders.
 
-The main menu stats block no longer uses a Markdown code block; it is rendered with Telegram HTML formatting and counts both `skipped` and `failed` reminders as missed tasks.
+The main menu stats block no longer uses a Markdown code block; it is rendered with Telegram HTML formatting and counts `canceled`, `skipped`, and `failed` reminders as missed tasks.
 
 Reminder delivery now refreshes the reply main keyboard through a temporary main-menu message, deletes that temporary message, and then sends the reminder itself with inline `Готово` and `Отменить` actions only.
 
@@ -16,7 +16,9 @@ Reminder creation text was reorganized around title, description, repeat state, 
 
 The reminder draft now explicitly marks the screen as a template, centers the title, separates description, repeat state, and start time with blank lines, shows default description copy, and keeps start time on one line.
 
-The `Название` and `Описание` draft buttons now switch the message into input-waiting mode by editing the existing message text, avoiding a delete/send blink. Draft prompts now only ask for the missing required fields: title, time, or both.
+The `Название` and `Описание` draft buttons now switch the message into input-waiting mode by editing the existing message text, avoiding a delete/send blink. While the bot waits for input, the buttons show `Введите название` / `Введите описание`; after input they show `Изменить название` / `Изменить описание`.
+
+Active reminders opened from the reply-keyboard list now show the inline reminder details keyboard again, including the `Удалить` action.
 
 Delivered reminder actions now remove the notification message after `Готово` or `Отменить`.
 
@@ -25,6 +27,8 @@ Intrusive reminder settings now use an inline `Включено` / `Выключ
 Intrusive reminder settings now edit the existing settings message after manual input instead of deleting and sending a new message. Interval values are rendered as user-facing text, for example `каждые 30 минут` or `раз в 1 час 20 минут`.
 
 Timezone reply-keyboard arrows are handled in the timezone context before reminder-list pagination, so they no longer open active reminders.
+
+Settings now have an explicit `Сохранить` button that returns to the main menu. The timezone list was expanded with worldwide cities, and `Калининград` is shown before `Москва`.
 
 The recurrence menu can now reset an already selected repeat mode with `Не повторять`.
 
