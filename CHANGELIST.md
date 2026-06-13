@@ -12,13 +12,13 @@ Reminder delivery now refreshes the reply main keyboard through a temporary main
 
 Reminder creation returned to inline keyboards because the previous reply-keyboard editor made field editing and time selection harder to use. Filled draft fields still switch to `Изменить ...`, field buttons wait for user input again, and user input messages are deleted after handling.
 
-Reminder creation text was reorganized around title, description, repeat state, and selected date. Service prompts are rendered in italic.
+Reminder creation text was reorganized around centered title, description text, start date, and repeat state. Service prompts are rendered in italic.
 
-The reminder draft now explicitly marks the screen as a template, centers the title, separates description, repeat state, and start time with blank lines, shows default description copy, and keeps start time on one line.
+The reminder draft no longer shows the extra template label. It centers the title with a minimum left padding, removes the `Описание:` label, shows the default description text `Здесь может быть описание вашей задачи. Описание не задано.`, keeps start time on one line, and renders `Повторять:` after the start time.
 
 The `Название` and `Описание` draft buttons now switch the message into input-waiting mode by editing the existing message text, avoiding a delete/send blink. While the bot waits for input, the buttons show `Введите название` / `Введите описание`; after input they show `Изменить название` / `Изменить описание`.
 
-Active reminders opened from the reply-keyboard list now show the inline reminder details keyboard again, including the `Удалить` action.
+Active reminders opened from the reply-keyboard list now show the inline reminder details keyboard again, including the `Удалить` action. Reminder list buttons no longer expose internal reminder IDs.
 
 Delivered reminder actions now remove the notification message after `Готово` or `Отменить`.
 
@@ -26,9 +26,11 @@ Intrusive reminder settings now use an inline `Включено` / `Выключ
 
 Intrusive reminder settings now edit the existing settings message after manual input instead of deleting and sending a new message. Interval values are rendered as user-facing text, for example `каждые 30 минут` or `раз в 1 час 20 минут`.
 
+The database interval constraint was relaxed to 1-120 minutes, so values below 30 minutes can be persisted and used by the scheduler.
+
 Timezone reply-keyboard arrows are handled in the timezone context before reminder-list pagination, so they no longer open active reminders.
 
-Settings now have an explicit `Сохранить` button that returns to the main menu. The timezone list was expanded with worldwide cities, and `Калининград` is shown before `Москва`.
+Settings now have an explicit `Сохранить` button that returns to the main menu. Timezone selection now contains 24 unique UTC hour offsets; `Калининград` is used for UTC+2, `Москва` is used for UTC+3, and the default timezone is Moscow.
 
 The recurrence menu can now reset an already selected repeat mode with `Не повторять`.
 
@@ -44,6 +46,8 @@ Manual CI deployment from a pull request branch can now deploy an image tagged a
 - `.github/workflows/ci.yml`
 - `README.md`
 - `README_RU.md`
+- `migrations/00004_add_user_settings_and_intrusive_reminders.go`
+- `migrations/00005_relax_intrusive_interval_and_default_timezone.go`
 - `src/database/postgresql/reminders_storage.go`
 - `src/database/types.go`
 - `src/telegram/reminder_bot.go`

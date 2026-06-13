@@ -508,11 +508,10 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 			expected: struct {
 				expectedText string
 			}{
-				expectedText: "<i>Шаблон напоминания</i>\n\n" +
-					"⠀⠀⠀⠀⠀⠀⠀⠀<b>Pay rent</b>\n\n" +
-					"Описание: Before lunch\n\n" +
-					"Повторять: нет\n\n" +
+				expectedText: "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀<b>Pay rent</b>\n\n" +
+					"Before lunch\n\n" +
 					"Время начала напоминания: 02.06.2026, Вт 09:30\n\n" +
+					"Повторять: нет\n\n" +
 					"<i>Проверьте шаблон и сохраните напоминание.</i>",
 			},
 		},
@@ -532,11 +531,10 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 			expected: struct {
 				expectedText string
 			}{
-				expectedText: "<i>Шаблон напоминания</i>\n\n" +
-					"⠀⠀⠀⠀⠀⠀⠀⠀<b>Pay rent</b>\n\n" +
-					"Описание: Before lunch\n\n" +
+				expectedText: "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀<b>Pay rent</b>\n\n" +
+					"Before lunch\n\n" +
+					"Время начала напоминания: 02.06.2026, Вт 00:00\n\n" +
 					"Повторять: выбрано дат: 2\n\n" +
-					"Время начала напоминания: Сегодня\n\n" +
 					"<i>Выберите дату и введите время напоминания.</i>",
 			},
 		},
@@ -557,11 +555,10 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 			expected: struct {
 				expectedText string
 			}{
-				expectedText: "<i>Шаблон напоминания</i>\n\n" +
-					"⠀⠀⠀⠀⠀⠀⠀⠀<b>Название</b>\n\n" +
-					"Описание: Здесь может быть описание вашего напоминания.\n\n" +
+				expectedText: "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀<b>Название</b>\n\n" +
+					"Здесь может быть описание вашей задачи. Описание не задано.\n\n" +
+					"Время начала напоминания: Дата и время не заданы\n\n" +
 					"Повторять: нет\n\n" +
-					"Время начала напоминания: Сегодня\n\n" +
 					"<i>Введите название и время напоминания.</i>",
 			},
 		},
@@ -701,7 +698,7 @@ func TestReminderUIBuildsExpectedKeyboards(t *testing.T) {
 			expected: struct {
 				rowCount        int
 				firstButtonText string
-			}{rowCount: 4, firstButtonText: "#1 Pay rent"},
+			}{rowCount: 4, firstButtonText: "Pay rent"},
 		},
 	}
 
@@ -1427,7 +1424,7 @@ func TestReminderBotRunsReplyMessageCommands(t *testing.T) {
 			text: telegramui.ButtonSettingsSave,
 			botState: func(bot *ReminderBot) {
 				bot.setChatMenu(chatID, chatMenuTimezone)
-				bot.setTimezoneIndex(chatID, 1)
+				bot.setTimezoneIndex(chatID, 14)
 			},
 			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
@@ -1473,7 +1470,7 @@ func TestReminderBotRunsReplyMessageCommands(t *testing.T) {
 			}{handled: false},
 		},
 		{
-			name: "malformed reminder button returns parse error",
+			name: "legacy id reminder button is not handled",
 			text: "#bad",
 			before: func(_ *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 			},
@@ -1481,7 +1478,7 @@ func TestReminderBotRunsReplyMessageCommands(t *testing.T) {
 				handled         bool
 				expectedErrText string
 				draftExists     bool
-			}{handled: true, expectedErrText: `parse reminder id: strconv.ParseInt: parsing "bad": invalid syntax`},
+			}{handled: false},
 		},
 	}
 
@@ -1569,7 +1566,7 @@ func TestReminderBotHandlesReplyNavigationState(t *testing.T) {
 			},
 			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
-					repository.EXPECT().UpdateUserTimezone(gomock.Any(), chatID, "Europe/Samara").Return(nil).Times(1),
+					repository.EXPECT().UpdateUserTimezone(gomock.Any(), chatID, "Europe/Moscow").Return(nil).Times(1),
 					repository.EXPECT().
 						UserSettings(gomock.Any(), chatID).
 						Return(database.UserSettings{Timezone: "UTC"}, nil).
@@ -1582,7 +1579,7 @@ func TestReminderBotHandlesReplyNavigationState(t *testing.T) {
 			},
 			state: func(bot *ReminderBot) {
 				bot.menuByChat[chatID] = chatMenuTimezone
-				bot.timezoneByChat[chatID] = 2
+				bot.timezoneByChat[chatID] = 14
 			},
 		},
 		{
@@ -1611,6 +1608,7 @@ func TestReminderBotHandlesReplyNavigationState(t *testing.T) {
 					Times(1)
 			},
 			state: func(bot *ReminderBot) {
+				bot.menuByChat[chatID] = chatMenuReminderList
 				bot.listByChat[chatID] = reminderListState{kind: reminderListActive}
 			},
 			expected: struct {
@@ -1633,6 +1631,7 @@ func TestReminderBotHandlesReplyNavigationState(t *testing.T) {
 					Times(1)
 			},
 			state: func(bot *ReminderBot) {
+				bot.menuByChat[chatID] = chatMenuReminderList
 				bot.listByChat[chatID] = reminderListState{kind: reminderListHistory, offset: 2}
 			},
 		},
@@ -1717,19 +1716,15 @@ func TestReminderBotHandlesReplyNavigationState(t *testing.T) {
 			},
 		},
 		{
-			name: "malformed reply reminder button returns parse error",
+			name: "legacy id reply reminder button is ignored outside reminder list",
 			action: func(ctx context.Context, bot *ReminderBot) error {
 				handled, err := bot.handleSelectedReplyMessage(ctx, chatID, "#bad")
-				require.True(t, handled)
+				require.False(t, handled)
 
 				return err
 			},
 			before: func(_ *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 			},
-			expected: struct {
-				expectedErrText string
-				apiBodyContains []string
-			}{expectedErrText: `parse reminder id: strconv.ParseInt: parsing "bad": invalid syntax`},
 		},
 		{
 			name: "unknown selected reply message is ignored",
@@ -2869,18 +2864,18 @@ func TestReminderBotHandlesSettingsCallbacks(t *testing.T) {
 		},
 		{
 			name: "timezone select callback saves timezone",
-			data: telegramui.TimezoneSelectCallback(0),
+			data: telegramui.TimezoneSelectCallback(14),
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
 					repository.EXPECT().
-						UpdateUserTimezone(gomock.Any(), chatID, "Europe/Kaliningrad").
+						UpdateUserTimezone(gomock.Any(), chatID, "Europe/Moscow").
 						Return(nil).
 						Times(1),
 					repository.EXPECT().UserSettings(gomock.Any(), chatID).
-						Return(database.UserSettings{Timezone: "Europe/Kaliningrad"}, nil).
+						Return(database.UserSettings{Timezone: "Europe/Moscow"}, nil).
 						Times(1),
 					repository.EXPECT().UserSettings(gomock.Any(), chatID).
-						Return(database.UserSettings{Timezone: "Europe/Kaliningrad"}, nil).
+						Return(database.UserSettings{Timezone: "Europe/Moscow"}, nil).
 						Times(1),
 					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 						Return(testTelegramResponse(t, telego.Message{MessageID: messageID}), nil).
@@ -2909,9 +2904,9 @@ func TestReminderBotHandlesSettingsCallbacks(t *testing.T) {
 		},
 		{
 			name: "timezone select callback returns service error",
-			data: telegramui.TimezoneSelectCallback(0),
+			data: telegramui.TimezoneSelectCallback(14),
 			before: func(_ *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
-				repository.EXPECT().UpdateUserTimezone(gomock.Any(), chatID, "Europe/Kaliningrad").
+				repository.EXPECT().UpdateUserTimezone(gomock.Any(), chatID, "Europe/Moscow").
 					Return(errTimezoneCity).
 					Times(1)
 			},

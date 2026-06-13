@@ -1192,7 +1192,7 @@ func (b *ReminderBot) handleSelectedReplyMessage(ctx context.Context, chatID int
 		return false, nil
 	}
 
-	if strings.HasPrefix(text, "#") {
+	if b.chatMenu(chatID) == chatMenuReminderList {
 		return true, b.viewReminderByReply(ctx, chatID, text)
 	}
 
@@ -1222,29 +1222,15 @@ func (b *ReminderBot) applyDraftTimeTextByMessage(chatID int64, text string) boo
 }
 
 func (b *ReminderBot) viewReminderByReply(ctx context.Context, chatID int64, text string) error {
-	idText, _, _ := strings.Cut(strings.TrimPrefix(text, "#"), " ")
-
-	reminderID, err := strconv.ParseInt(idText, 10, 64)
-	if err != nil {
-		return fmt.Errorf("parse reminder id: %w", err)
-	}
-
 	list := b.reminderListState(chatID)
 
-	var reminders []database.ReminderView
-
-	if list.kind == reminderListHistory {
-		reminders, err = b.repository.FindReminderHistoryByChat(ctx, chatID, reminderPageSize, list.offset)
-	} else {
-		reminders, err = b.repository.FindRemindersByChat(ctx, chatID, reminderPageSize, list.offset)
-	}
-
+	reminders, err := b.loadReminderPage(ctx, chatID, list)
 	if err != nil {
 		return fmt.Errorf("load reminders: %w", err)
 	}
 
 	for _, reminder := range reminders {
-		if reminder.ID == reminderID {
+		if telegramui.ReminderButtonText(reminder) == text {
 			return b.replaceUI(
 				ctx,
 				chatID,
@@ -1255,6 +1241,28 @@ func (b *ReminderBot) viewReminderByReply(ctx context.Context, chatID int64, tex
 	}
 
 	return b.sendShiftedReminderPage(ctx, chatID, 0)
+}
+
+func (b *ReminderBot) loadReminderPage(
+	ctx context.Context,
+	chatID int64,
+	list reminderListState,
+) ([]database.ReminderView, error) {
+	if list.kind == reminderListHistory {
+		reminders, err := b.repository.FindReminderHistoryByChat(ctx, chatID, reminderPageSize, list.offset)
+		if err != nil {
+			return nil, fmt.Errorf("load reminder history page: %w", err)
+		}
+
+		return reminders, nil
+	}
+
+	reminders, err := b.repository.FindRemindersByChat(ctx, chatID, reminderPageSize, list.offset)
+	if err != nil {
+		return nil, fmt.Errorf("load active reminder page: %w", err)
+	}
+
+	return reminders, nil
 }
 
 func (b *ReminderBot) saveDraft(ctx context.Context, chatID int64, messageID int) error {
@@ -1386,7 +1394,7 @@ func (b *ReminderBot) deleteReminder(ctx context.Context, chatID int64, messageI
 	return b.replaceUI(
 		ctx,
 		chatID,
-		"<i>Напоминание удалено.</i>\n\n"+telegramui.ReminderListText(reminders),
+		"<i>Напоминание удалено.</i>\n\n\n"+telegramui.ReminderListText(reminders),
 		telegramui.ReminderListKeyboard(reminders),
 	)
 }

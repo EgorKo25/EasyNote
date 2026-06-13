@@ -17,13 +17,13 @@ func upAddUserSettingsAndIntrusiveReminders(ctx context.Context, transaction *sq
 		CREATE TABLE user_settings (
 			telegram_chat_id BIGINT PRIMARY KEY,
 			language TEXT NOT NULL DEFAULT 'ru',
-			timezone TEXT NOT NULL DEFAULT 'Local',
+			timezone TEXT NOT NULL DEFAULT 'Europe/Moscow',
 			intrusive_enabled BOOLEAN NOT NULL DEFAULT false,
 			intrusive_interval_minutes INT NOT NULL DEFAULT 30,
 			updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 			CONSTRAINT user_settings_language_check CHECK (language IN ('ru')),
 			CONSTRAINT user_settings_intrusive_interval_check CHECK (
-				intrusive_interval_minutes BETWEEN 30 AND 1440
+				intrusive_interval_minutes BETWEEN 1 AND 120
 			)
 		);
 
