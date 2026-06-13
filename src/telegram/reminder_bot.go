@@ -361,11 +361,11 @@ func (b *ReminderBot) runDraftFieldMessageCommand(ctx context.Context, chatID in
 	case telegramui.ButtonDraftTitle, telegramui.ButtonDraftEditTitle:
 		b.setDraftWaitingFor(chatID, telegramui.FieldTitle)
 
-		return b.replaceDraft(ctx, chatID), true
+		return b.editDraftText(ctx, chatID), true
 	case telegramui.ButtonDraftDescription, telegramui.ButtonDraftEditDescription:
 		b.setDraftWaitingFor(chatID, telegramui.FieldDescription)
 
-		return b.replaceDraft(ctx, chatID), true
+		return b.editDraftText(ctx, chatID), true
 	case telegramui.ButtonDraftDate, "Изменить дату":
 		b.setDraftScreen(chatID, telegramui.ScreenDate)
 
@@ -793,6 +793,16 @@ func (b *ReminderBot) editDraft(ctx context.Context, chatID int64, messageID int
 		messageID,
 		telegramui.DraftText(uiDraft(draft), b.location(chatID)),
 		telegramui.DraftKeyboard(uiDraft(draft), b.now(chatID)),
+	)
+}
+
+func (b *ReminderBot) editDraftText(ctx context.Context, chatID int64) error {
+	return b.editUI(
+		ctx,
+		chatID,
+		b.currentUIMessageID(chatID),
+		telegramui.DraftText(uiDraft(b.draft(chatID)), b.location(chatID)),
+		nil,
 	)
 }
 

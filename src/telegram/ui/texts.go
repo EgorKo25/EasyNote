@@ -10,10 +10,10 @@ import (
 
 func MainMenuText(stats database.ReminderStats) string {
 	return fmt.Sprintf(
-		"        <b>Главное меню</b>\n\n"+
-			"✅ Выполнено: %d\n"+
-			"⏳ Ожидает: %d\n"+
-			"❗ Пропущено: %d",
+		"⠀⠀⠀⠀<b>Главное меню</b>\n\n"+
+			"✅ Задачи выполнены: %d\n"+
+			"⏳ Задачи ожидают выполнения: %d\n"+
+			"❗ Задачи пропущены: %d",
 		stats.Completed,
 		stats.Pending,
 		stats.Skipped,
@@ -29,7 +29,7 @@ func CreateText() string {
 }
 
 func DraftText(draft Draft, location *time.Location) string {
-	dateText, title, description := "Сегодня", emptyFieldText, emptyFieldText
+	dateText, title, description := "Сегодня", "Название", emptyFieldText
 	repeat := RepeatText(draft)
 
 	if !draft.RemindAt(location).IsZero() {
@@ -58,7 +58,7 @@ func DraftText(draft Draft, location *time.Location) string {
 	}
 
 	return fmt.Sprintf(
-		"        <b>%s</b>\n\n%s\n%s\n\n%s\n\n<i>%s</i>%s",
+		"⠀⠀⠀⠀<b>%s</b>\n\nОписание: %s\n%s\n\n⠀⠀⠀⠀%s\n\n<i>%s</i>%s",
 		title,
 		description,
 		repeat,

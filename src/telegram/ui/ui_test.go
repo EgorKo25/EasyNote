@@ -34,7 +34,12 @@ func TestTextRendering(t *testing.T) {
 			},
 			expected: struct {
 				text string
-			}{text: "        <b>Главное меню</b>\n\n✅ Выполнено: 3\n⏳ Ожидает: 2\n❗ Пропущено: 1"},
+			}{
+				text: "⠀⠀⠀⠀<b>Главное меню</b>\n\n" +
+					"✅ Задачи выполнены: 3\n" +
+					"⏳ Задачи ожидают выполнения: 2\n" +
+					"❗ Задачи пропущены: 1",
+			},
 		},
 		{
 			name: "filled draft text shows reminder fields",
@@ -50,8 +55,8 @@ func TestTextRendering(t *testing.T) {
 			expected: struct {
 				text string
 			}{
-				text: "        <b>Pay rent</b>\n\nBefore lunch\nПовторять: нет\n\n" +
-					"02.06.2026, Вт 09:30\n\n<i>Выберите дату и время кнопкой ниже.</i>",
+				text: "⠀⠀⠀⠀<b>Pay rent</b>\n\nОписание: Before lunch\nПовторять: нет\n\n" +
+					"⠀⠀⠀⠀02.06.2026, Вт 09:30\n\n<i>Выберите дату и время кнопкой ниже.</i>",
 			},
 		},
 		{
@@ -92,8 +97,8 @@ func TestTextRendering(t *testing.T) {
 			expected: struct {
 				text string
 			}{
-				text: "        <b>не задано</b>\n\nне задано\nПовторять: нет\n\n" +
-					"Сегодня\n\n<i>Введите название напоминания сообщением.</i>",
+				text: "⠀⠀⠀⠀<b>Название</b>\n\nОписание: не задано\nПовторять: нет\n\n" +
+					"⠀⠀⠀⠀Сегодня\n\n<i>Введите название напоминания сообщением.</i>",
 			},
 		},
 	}
