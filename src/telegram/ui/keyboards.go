@@ -111,9 +111,24 @@ func DraftReplyKeyboard(draft Draft, now time.Time) *telego.ReplyKeyboardMarkup 
 			tu.KeyboardRow(tu.KeyboardButton(ButtonBack)),
 		).WithResizeKeyboard()
 	default:
+		titleButtonText := ButtonDraftTitle
+		if draft.Title != "" {
+			titleButtonText = ButtonDraftEditTitle
+		}
+
+		descriptionButtonText := ButtonDraftDescription
+		if draft.Description != "" {
+			descriptionButtonText = ButtonDraftEditDescription
+		}
+
+		dateButtonText := ButtonDraftDate
+		if draftDateIsSet(draft) {
+			dateButtonText = "Изменить дату"
+		}
+
 		return tu.Keyboard(
-			tu.KeyboardRow(tu.KeyboardButton(ButtonDraftDate), tu.KeyboardButton(ButtonDraftRepeat)),
-			tu.KeyboardRow(tu.KeyboardButton(ButtonDraftTitle), tu.KeyboardButton(ButtonDraftDescription)),
+			tu.KeyboardRow(tu.KeyboardButton(dateButtonText), tu.KeyboardButton(ButtonDraftRepeat)),
+			tu.KeyboardRow(tu.KeyboardButton(titleButtonText), tu.KeyboardButton(descriptionButtonText)),
 			tu.KeyboardRow(tu.KeyboardButton(ButtonDraftSave), tu.KeyboardButton(ButtonDraftCancel)),
 		).WithResizeKeyboard()
 	}
@@ -381,6 +396,7 @@ func IntrusiveIntervalKeyboard(interval time.Duration) *telego.ReplyKeyboardMark
 		rows = append(rows, tu.KeyboardRow(tu.KeyboardButton(ButtonPlusFiveMinutes), tu.KeyboardButton(ButtonPlusHour)))
 	}
 
+	rows = append(rows, tu.KeyboardRow(tu.KeyboardButton(ButtonIntrusiveManual)))
 	rows = append(rows, tu.KeyboardRow(tu.KeyboardButton(ButtonDone), tu.KeyboardButton(ButtonBack)))
 
 	return tu.Keyboard(rows...).WithResizeKeyboard()

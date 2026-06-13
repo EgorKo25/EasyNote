@@ -1,4 +1,62 @@
-version: 1.3.0
+version: 1.3.2
+
+## v1.3.2 - Telegram UI recovery and PR deployment
+
+### What was done
+
+The Telegram main menu message was restored because Telegram cannot attach reply and inline keyboards to one message. The menu now shows completed, pending, and skipped task counters in one formatted block.
+
+Reminder delivery now refreshes the reply main keyboard through a temporary main-menu message, deletes that temporary message, and then sends the reminder itself with inline `Готово` and `Отменить` actions only.
+
+Reminder creation was fixed after the reply-keyboard migration: filled draft fields switch to `Изменить ...`, field buttons wait for user input again, and user input messages are deleted after handling.
+
+Delivered reminder actions now remove the notification message after `Готово` or `Отменить`.
+
+Intrusive reminder interval settings support manual minute input from 1 to 120 minutes, and the interval keyboard no longer sends the user into the regular reminder editor on invalid input.
+
+Manual CI deployment from a pull request branch can now deploy an image tagged as `X.Y.Z.<short_sha>`.
+
+### API changes
+
+- added `ReminderStatsByChat` storage/repository method for main-menu counters;
+- added the manual `workflow_dispatch.deploy_from_pr` CI input.
+
+### Affected files
+
+- `.github/workflows/ci.yml`
+- `README.md`
+- `README_RU.md`
+- `src/database/postgresql/reminders_storage.go`
+- `src/database/types.go`
+- `src/telegram/reminder_bot.go`
+- `src/telegram/sender.go`
+- `src/telegram/ui`
+
+## v1.3.1 - Reply keyboard reminder navigation
+
+### What was done
+
+Active and past reminder lists moved to reply keyboards with two reminders per page and previous/next navigation buttons.
+
+Reminder list pagination is performed at the database query level through limit and offset instead of loading a larger set into UI code.
+
+Reminder creation, settings, timezone, regularity, and intrusive reminder menus moved from inline keyboards to reply keyboards where Telegram supports that interaction.
+
+The recurrence draft wording was updated: `Регулярность` became `Настроить регулярность`, `Повторяемость` became `Повторять`, and the empty value is shown as `нет`.
+
+The recurrence menu replaced `Без повторений` with `По будням`, and intrusive reminder settings now use a single state button with `Включено` / `Выключено`.
+
+### API changes
+
+Reminder list repository methods now accept database-level pagination parameters.
+
+### Affected files
+
+- `src/database/postgresql/reminders_storage.go`
+- `src/database/types.go`
+- `src/service/reminders.go`
+- `src/telegram/reminder_bot.go`
+- `src/telegram/ui`
 
 ## v1.3.0 - Reminder settings and persistent delivery
 

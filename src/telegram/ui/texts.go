@@ -7,8 +7,18 @@ import (
 	"github.com/EgorKo25/EasyNote/src/database"
 )
 
-func MainMenuText() string {
-	return "Главное меню\n\nВыберите действие на клавиатуре."
+func MainMenuText(stats database.ReminderStats) string {
+	return fmt.Sprintf(
+		"*Главное меню*\n\n"+
+			"```\n"+
+			"✓ Задач выполнено:          %d\n"+
+			"• Задач ожидает выполнения: %d\n"+
+			"❗ Задач пропущено:          %d\n"+
+			"```",
+		stats.Completed,
+		stats.Pending,
+		stats.Skipped,
+	)
 }
 
 func RemindersText() string {

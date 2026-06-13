@@ -28,6 +28,7 @@ const (
 	ButtonSettingsTimezone     = "Часовой пояс"
 	ButtonSettingsIntrusive    = "Настойчивые напоминания"
 	ButtonIntrusiveInterval    = "Интервал"
+	ButtonIntrusiveManual      = "Задать вручную"
 	ButtonIntrusiveEnabled     = "Включено"
 	ButtonIntrusiveDisabled    = "Выключено"
 	ButtonMinusHour            = "-1ч"

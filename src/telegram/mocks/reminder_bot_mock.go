@@ -184,6 +184,21 @@ func (mr *MockReminderRepositoryMockRecorder) FindRemindersByChat(ctx, telegramC
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindRemindersByChat", reflect.TypeOf((*MockReminderRepository)(nil).FindRemindersByChat), ctx, telegramChatID, limit, offset)
 }
 
+// ReminderStatsByChat mocks base method.
+func (m *MockReminderRepository) ReminderStatsByChat(ctx context.Context, telegramChatID int64) (database.ReminderStats, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReminderStatsByChat", ctx, telegramChatID)
+	ret0, _ := ret[0].(database.ReminderStats)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReminderStatsByChat indicates an expected call of ReminderStatsByChat.
+func (mr *MockReminderRepositoryMockRecorder) ReminderStatsByChat(ctx, telegramChatID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReminderStatsByChat", reflect.TypeOf((*MockReminderRepository)(nil).ReminderStatsByChat), ctx, telegramChatID)
+}
+
 // UpdateIntrusiveSettings mocks base method.
 func (m *MockReminderRepository) UpdateIntrusiveSettings(ctx context.Context, telegramChatID int64, enabled bool, interval time.Duration) error {
 	m.ctrl.T.Helper()
