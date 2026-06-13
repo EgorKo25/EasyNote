@@ -115,7 +115,13 @@ scheduler:
 
 The main menu is a reply-keyboard message with a compact formatted stats block for completed, pending, and missed tasks. Missed tasks include both skipped and failed reminders.
 
-Reminder draft buttons now reflect filled fields and expose direct edit actions for description and date. The draft screen is marked as a template, shows default description copy, labels the reminder start date, and service prompts are shown in italic.
+Reminder creation uses inline keyboards again. Draft buttons reflect filled fields and expose direct edit actions for title, description, date, repeat settings, saving, and canceling.
+
+The draft screen is marked as a template, centers the title, separates description, repeat state, and start time with blank lines, keeps the start time on one line, and shows service prompts in italic. The prompt only asks for missing required fields: title, time, or both.
+
+Reminder time is entered as text while the time screen is open, in `HH:MM` format.
+
+Intrusive reminder settings use an inline `Включено` / `Выключено` toggle and edit the existing settings message after manual interval input. Intervals can be entered as plain minutes or Go duration values such as `1m` and `1h30m`, and are displayed as user-facing text such as `каждые 30 минут` or `раз в 1 час 20 минут`.
 
 Reminder notifications keep the main reply keyboard available by briefly sending and deleting a main-menu message before the inline reminder notification. The notification itself uses only inline `Готово` and `Отменить` actions and is deleted after either action.
 
@@ -211,8 +217,8 @@ For a manual deployment from a pull request branch, run the same workflow manual
 <ul>
   <li>The main menu message was restored with formatted completed, pending, and missed task counters; missed includes skipped and failed reminders.</li>
   <li>Reminder notifications refresh the reply keyboard through a temporary main-menu message and keep inline actions on the notification itself.</li>
-  <li>Reminder draft buttons switch to "Изменить ..." after values are entered, service prompts use italic text, and repeat can be reset with "Не повторять".</li>
-  <li>Intrusive reminder interval settings support manual input from 1 to 120 minutes and friendlier minute-level step buttons.</li>
+  <li>Reminder creation returned to inline keyboards; draft prompts ask only for missing title/time fields and reminder time is typed as HH:MM.</li>
+  <li>Intrusive reminder settings use an inline toggle, edit the existing message after manual input, and accept minute or duration values such as 1m and 1h30m.</li>
   <li>Manual PR deployment can publish and deploy an image tagged as X.Y.Z.&lt;short_sha&gt;.</li>
 </ul>
 

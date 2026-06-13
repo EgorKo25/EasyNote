@@ -56,21 +56,11 @@ func draftMainKeyboard(draft Draft) *telego.InlineKeyboardMarkup {
 		titleButtonText = ButtonDraftEditTitle
 	}
 
-	descriptionButtonText := ButtonDraftDescription
-	if draft.Description != "" {
-		descriptionButtonText = ButtonDraftEditDescription
-	}
+	descriptionButtonText := ButtonDraftEditDescription
 
-	dateButtonText := ButtonDraftDate
+	dateButtonText := "Изменить дату"
 	if draft.Repeat != RepeatNone {
-		dateButtonText = "Дата и время начала"
-	}
-
-	if draftDateIsSet(draft) {
-		dateButtonText = "Изменить дату"
-		if draft.Repeat != RepeatNone {
-			dateButtonText = "Изменить дату и время начала"
-		}
+		dateButtonText = "Изменить дату и время начала"
 	}
 
 	return tu.InlineKeyboard(
@@ -146,10 +136,6 @@ func timePresetReplyRow(draft Draft, now time.Time) []telego.KeyboardButton {
 	}
 
 	return buttons
-}
-
-func draftDateIsSet(draft Draft) bool {
-	return !draft.Date.IsZero() || len(draft.CustomDates) > 0
 }
 
 func repeatKeyboard() *telego.InlineKeyboardMarkup {
@@ -266,42 +252,7 @@ func dateKeyboard(draft Draft, now time.Time) *telego.InlineKeyboardMarkup {
 }
 
 func timeKeyboard(draft Draft, now time.Time) *telego.InlineKeyboardMarkup {
-	presetButtons := make([]telego.InlineKeyboardButton, 0, 4)
-
-	for _, preset := range []struct {
-		hour   int
-		minute int
-	}{
-		{hour: 9},
-		{hour: 12},
-		{hour: 18},
-		{hour: 21},
-	} {
-		if isFutureDraftTime(draft, preset.hour, preset.minute, now) {
-			presetButtons = append(presetButtons,
-				tu.InlineKeyboardButton(fmt.Sprintf("%02d:%02d", preset.hour, preset.minute)).
-					WithCallbackData(TimeSetCallback(preset.hour, preset.minute)),
-			)
-		}
-	}
-
-	if len(presetButtons) == 0 {
-		presetButtons = append(presetButtons,
-			tu.InlineKeyboardButton("Нет доступного времени").WithCallbackData(CallbackNoop),
-		)
-	}
-
 	return tu.InlineKeyboard(
-		presetButtons,
-		tu.InlineKeyboardRow(
-			tu.InlineKeyboardButton("-1ч").WithCallbackData(TimeShiftCallback(-60)),
-			tu.InlineKeyboardButton(draft.SelectedTimeText()).WithCallbackData(CallbackNoop),
-			tu.InlineKeyboardButton("+1ч").WithCallbackData(TimeShiftCallback(60)),
-		),
-		tu.InlineKeyboardRow(
-			tu.InlineKeyboardButton("-5м").WithCallbackData(TimeShiftCallback(-5)),
-			tu.InlineKeyboardButton("+5м").WithCallbackData(TimeShiftCallback(5)),
-		),
 		tu.InlineKeyboardRow(
 			tu.InlineKeyboardButton("День").WithCallbackData(CallbackDraftDate),
 			tu.InlineKeyboardButton("Готово").WithCallbackData(CallbackDraftTimeDone),
@@ -364,16 +315,18 @@ func TimezoneKeyboard(index int, now time.Time) *telego.ReplyKeyboardMarkup {
 	).WithResizeKeyboard()
 }
 
-func IntrusiveSettingsKeyboard(enabled bool) *telego.ReplyKeyboardMarkup {
+func IntrusiveSettingsKeyboard(enabled bool) *telego.InlineKeyboardMarkup {
 	toggleText := ButtonIntrusiveDisabled
+	callback := CallbackSettingsIntrusiveOn
+
 	if enabled {
 		toggleText = ButtonIntrusiveEnabled
+		callback = CallbackSettingsIntrusiveOff
 	}
 
-	return tu.Keyboard(
-		tu.KeyboardRow(tu.KeyboardButton(toggleText)),
-		tu.KeyboardRow(tu.KeyboardButton(ButtonBack)),
-	).WithResizeKeyboard()
+	return tu.InlineKeyboard(
+		tu.InlineKeyboardRow(tu.InlineKeyboardButton(toggleText).WithCallbackData(callback)),
+	)
 }
 
 func ReminderButtonText(reminder database.ReminderView) string {
