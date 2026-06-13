@@ -23,6 +23,7 @@ const (
 	ButtonRepeatWeekdays       = "По будням"
 	ButtonRepeatCustomWeekdays = "Свои дни недели"
 	ButtonRepeatInterval       = "Интервал в днях"
+	ButtonRepeatNone           = "Не повторять"
 	ButtonDone                 = "Готово"
 	ButtonSettingsLanguage     = "Язык: русский"
 	ButtonSettingsTimezone     = "Часовой пояс"
@@ -35,6 +36,10 @@ const (
 	ButtonPlusHour             = "+1ч"
 	ButtonMinusFiveMinutes     = "-5м"
 	ButtonPlusFiveMinutes      = "+5м"
+	ButtonMinusMinute          = "-1 мин"
+	ButtonPlusMinute           = "+1 мин"
+	ButtonMinusFifteenMinutes  = "-15 мин"
+	ButtonPlusFifteenMinutes   = "+15 мин"
 )
 
 const (

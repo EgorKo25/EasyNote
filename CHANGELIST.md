@@ -6,13 +6,21 @@ version: 1.3.2
 
 The Telegram main menu message was restored because Telegram cannot attach reply and inline keyboards to one message. The menu now shows completed, pending, and skipped task counters in one formatted block.
 
+The main menu stats block no longer uses a Markdown code block; it is rendered with Telegram HTML formatting and counts both `skipped` and `failed` reminders as missed tasks.
+
 Reminder delivery now refreshes the reply main keyboard through a temporary main-menu message, deletes that temporary message, and then sends the reminder itself with inline `Готово` and `Отменить` actions only.
 
 Reminder creation was fixed after the reply-keyboard migration: filled draft fields switch to `Изменить ...`, field buttons wait for user input again, and user input messages are deleted after handling.
 
+Reminder creation text was reorganized around title, description, repeat state, and selected date. Service prompts are rendered in italic.
+
 Delivered reminder actions now remove the notification message after `Готово` or `Отменить`.
 
-Intrusive reminder interval settings support manual minute input from 1 to 120 minutes, and the interval keyboard no longer sends the user into the regular reminder editor on invalid input.
+Intrusive reminder interval settings support manual minute input from 1 to 120 minutes, minute-level decrement below 30 minutes, and friendlier interval step buttons.
+
+Timezone reply-keyboard arrows are handled in the timezone context before reminder-list pagination, so they no longer open active reminders.
+
+The recurrence menu can now reset an already selected repeat mode with `Не повторять`.
 
 Manual CI deployment from a pull request branch can now deploy an image tagged as `X.Y.Z.<short_sha>`.
 

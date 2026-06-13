@@ -488,7 +488,7 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 			expected: struct {
 				expectedText string
 			}{
-				expectedText: "*Главное меню*\n\n```\n✓ Задач выполнено:          3\n• Задач ожидает выполнения: 2\n❗ Задач пропущено:          1\n```",
+				expectedText: "        <b>Главное меню</b>\n\n✅ Выполнено: 3\n⏳ Ожидает: 2\n❗ Пропущено: 1",
 			},
 		},
 		{
@@ -505,12 +505,11 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 			expected: struct {
 				expectedText string
 			}{
-				expectedText: "Создание напоминания\n\n" +
-					"Дата и время: 02.06.2026 09:30\n" +
-					"Название: Pay rent\n" +
-					"Описание: Before lunch\n" +
+				expectedText: "        <b>Pay rent</b>\n\n" +
+					"Before lunch\n" +
 					"Повторять: нет\n\n" +
-					"Выберите дату и время кнопкой ниже.",
+					"02.06.2026, Вт 09:30\n\n" +
+					"<i>Выберите дату и время кнопкой ниже.</i>",
 			},
 		},
 		{
@@ -529,12 +528,11 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 			expected: struct {
 				expectedText string
 			}{
-				expectedText: "Создание напоминания\n\n" +
-					"Дата и время: не задано\n" +
-					"Название: Pay rent\n" +
-					"Описание: Before lunch\n" +
+				expectedText: "        <b>Pay rent</b>\n\n" +
+					"Before lunch\n" +
 					"Повторять: выбрано дат: 2\n\n" +
-					"Выберите дату и время кнопкой ниже.",
+					"Сегодня\n\n" +
+					"<i>Выберите дату и время кнопкой ниже.</i>",
 			},
 		},
 		{
@@ -544,7 +542,7 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 			},
 			expected: struct {
 				expectedText string
-			}{expectedText: "02.06.2026 09:30\nPay rent\nBefore lunch"},
+			}{expectedText: "02.06.2026 09:30\n<b>Pay rent</b>\nBefore lunch"},
 		},
 		{
 			name: "empty draft text shows missing fields and empty repeat",
@@ -554,12 +552,11 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 			expected: struct {
 				expectedText string
 			}{
-				expectedText: "Создание напоминания\n\n" +
-					"Дата и время: не задано\n" +
-					"Название: не задано\n" +
-					"Описание: не задано\n" +
+				expectedText: "        <b>не задано</b>\n\n" +
+					"не задано\n" +
 					"Повторять: нет\n\n" +
-					"Выберите дату и время кнопкой ниже.",
+					"Сегодня\n\n" +
+					"<i>Выберите дату и время кнопкой ниже.</i>",
 			},
 		},
 		{
@@ -570,8 +567,7 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 			expected: struct {
 				expectedText string
 			}{
-				expectedText: "Активных напоминаний пока нет.\n\n" +
-					"Создайте первое напоминание на основной клавиатуре.",
+				expectedText: "<b>Активные напоминания</b>\n\n<i>Активных напоминаний пока нет.</i>",
 			},
 		},
 	}
@@ -1813,6 +1809,111 @@ func TestReminderBotHandlesReplyNavigationState(t *testing.T) {
 			}
 
 			require.NoError(t, err)
+		})
+	}
+}
+
+func TestReplyShiftMinutes(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		text     string
+		expected struct {
+			minutes int
+			handled bool
+		}
+	}{
+		{
+			name: "minus hour button shifts back sixty minutes",
+			text: telegramui.ButtonMinusHour,
+			expected: struct {
+				minutes int
+				handled bool
+			}{minutes: -60, handled: true},
+		},
+		{
+			name: "plus hour button shifts forward sixty minutes",
+			text: telegramui.ButtonPlusHour,
+			expected: struct {
+				minutes int
+				handled bool
+			}{minutes: 60, handled: true},
+		},
+		{
+			name: "minus five minutes button shifts back five minutes",
+			text: telegramui.ButtonMinusFiveMinutes,
+			expected: struct {
+				minutes int
+				handled bool
+			}{minutes: -5, handled: true},
+		},
+		{
+			name: "plus five minutes button shifts forward five minutes",
+			text: telegramui.ButtonPlusFiveMinutes,
+			expected: struct {
+				minutes int
+				handled bool
+			}{minutes: 5, handled: true},
+		},
+		{
+			name: "minus fifteen minutes button shifts back fifteen minutes",
+			text: telegramui.ButtonMinusFifteenMinutes,
+			expected: struct {
+				minutes int
+				handled bool
+			}{minutes: -15, handled: true},
+		},
+		{
+			name: "minus one minute button shifts back one minute",
+			text: telegramui.ButtonMinusMinute,
+			expected: struct {
+				minutes int
+				handled bool
+			}{minutes: -1, handled: true},
+		},
+		{
+			name: "plus one minute button shifts forward one minute",
+			text: telegramui.ButtonPlusMinute,
+			expected: struct {
+				minutes int
+				handled bool
+			}{minutes: 1, handled: true},
+		},
+		{
+			name: "plus fifteen minutes button shifts forward fifteen minutes",
+			text: telegramui.ButtonPlusFifteenMinutes,
+			expected: struct {
+				minutes int
+				handled bool
+			}{minutes: 15, handled: true},
+		},
+		{
+			name: "done button is not a shift",
+			text: telegramui.ButtonDone,
+			expected: struct {
+				minutes int
+				handled bool
+			}{},
+		},
+		{
+			name: "unknown text is not a shift",
+			text: "unknown",
+			expected: struct {
+				minutes int
+				handled bool
+			}{},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			minutes, handled := replyShiftMinutes(test.text)
+
+			require.Equal(t, test.expected.minutes, minutes)
+			require.Equal(t, test.expected.handled, handled)
 		})
 	}
 }

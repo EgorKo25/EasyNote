@@ -113,9 +113,9 @@ scheduler:
 
 ### Telegram UI
 
-The main menu is a reply-keyboard message with a compact stats block for completed, pending, and skipped tasks.
+The main menu is a reply-keyboard message with a compact formatted stats block for completed, pending, and missed tasks. Missed tasks include both skipped and failed reminders.
 
-Reminder draft buttons now reflect filled fields: `Название`, `Описание`, and `Дата` become `Изменить ...` after input. Recurring reminder drafts use `Дата и время начала` / `Изменить дату и время начала` so the user sees that the value starts the recurring schedule.
+Reminder draft buttons now reflect filled fields: `Название`, `Описание`, and `Дата` become `Изменить ...` after input. Recurring reminder drafts can be reset with `Не повторять`, and service prompts are shown in italic.
 
 Reminder notifications keep the main reply keyboard available by briefly sending and deleting a main-menu message before the inline reminder notification. The notification itself uses only inline `Готово` and `Отменить` actions and is deleted after either action.
 
@@ -209,10 +209,10 @@ For a manual deployment from a pull request branch, run the same workflow manual
 
 <h2>v1.3.2 - Telegram UI recovery and PR deployment</h2>
 <ul>
-  <li>The main menu message was restored with completed, pending, and skipped task counters.</li>
+  <li>The main menu message was restored with formatted completed, pending, and missed task counters; missed includes skipped and failed reminders.</li>
   <li>Reminder notifications refresh the reply keyboard through a temporary main-menu message and keep inline actions on the notification itself.</li>
-  <li>Reminder draft buttons switch to "Изменить ..." after values are entered, and handled user input is deleted from chat.</li>
-  <li>Intrusive reminder interval settings support manual input from 1 to 120 minutes.</li>
+  <li>Reminder draft buttons switch to "Изменить ..." after values are entered, service prompts use italic text, and repeat can be reset with "Не повторять".</li>
+  <li>Intrusive reminder interval settings support manual input from 1 to 120 minutes and friendlier minute-level step buttons.</li>
   <li>Manual PR deployment can publish and deploy an image tagged as X.Y.Z.&lt;short_sha&gt;.</li>
 </ul>
 

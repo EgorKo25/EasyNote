@@ -108,7 +108,7 @@ func DraftReplyKeyboard(draft Draft, now time.Time) *telego.ReplyKeyboardMarkup 
 		return tu.Keyboard(
 			tu.KeyboardRow(tu.KeyboardButton(ButtonRepeatEveryDay), tu.KeyboardButton(ButtonRepeatWeekdays)),
 			tu.KeyboardRow(tu.KeyboardButton(ButtonRepeatCustomWeekdays), tu.KeyboardButton(ButtonRepeatInterval)),
-			tu.KeyboardRow(tu.KeyboardButton(ButtonBack)),
+			tu.KeyboardRow(tu.KeyboardButton(ButtonRepeatNone)),
 		).WithResizeKeyboard()
 	default:
 		titleButtonText := ButtonDraftTitle
@@ -129,7 +129,8 @@ func DraftReplyKeyboard(draft Draft, now time.Time) *telego.ReplyKeyboardMarkup 
 		return tu.Keyboard(
 			tu.KeyboardRow(tu.KeyboardButton(dateButtonText), tu.KeyboardButton(ButtonDraftRepeat)),
 			tu.KeyboardRow(tu.KeyboardButton(titleButtonText), tu.KeyboardButton(descriptionButtonText)),
-			tu.KeyboardRow(tu.KeyboardButton(ButtonDraftSave), tu.KeyboardButton(ButtonDraftCancel)),
+			tu.KeyboardRow(tu.KeyboardButton(ButtonDraftSave)),
+			tu.KeyboardRow(tu.KeyboardButton(ButtonDraftCancel)),
 		).WithResizeKeyboard()
 	}
 }
@@ -171,7 +172,7 @@ func repeatKeyboard() *telego.InlineKeyboardMarkup {
 		tu.InlineKeyboardRow(
 			tu.InlineKeyboardButton(ButtonRepeatInterval).WithCallbackData(RepeatCallback(RepeatCustomInterval)),
 		),
-		tu.InlineKeyboardRow(tu.InlineKeyboardButton("Назад").WithCallbackData(CallbackDraftBack)),
+		tu.InlineKeyboardRow(tu.InlineKeyboardButton(ButtonRepeatNone).WithCallbackData(RepeatCallback(RepeatNone))),
 	)
 }
 
@@ -385,15 +386,39 @@ func IntrusiveSettingsKeyboard(enabled bool) *telego.ReplyKeyboardMarkup {
 func IntrusiveIntervalKeyboard(interval time.Duration) *telego.ReplyKeyboardMarkup {
 	rows := make([][]telego.KeyboardButton, 0, 4)
 
-	if interval > time.Minute {
-		rows = append(rows, tu.KeyboardRow(
-			tu.KeyboardButton(ButtonMinusHour),
-			tu.KeyboardButton(ButtonMinusFiveMinutes),
-		))
+	minusButtons := make([]telego.KeyboardButton, 0, 3)
+
+	if interval > 15*time.Minute {
+		minusButtons = append(minusButtons, tu.KeyboardButton(ButtonMinusFifteenMinutes))
 	}
 
+	if interval > 5*time.Minute {
+		minusButtons = append(minusButtons, tu.KeyboardButton(ButtonMinusFiveMinutes))
+	}
+
+	if interval > time.Minute {
+		minusButtons = append(minusButtons, tu.KeyboardButton(ButtonMinusMinute))
+	}
+
+	if len(minusButtons) > 0 {
+		rows = append(rows, minusButtons)
+	}
+
+	plusButtons := make([]telego.KeyboardButton, 0, 3)
 	if interval < 2*time.Hour {
-		rows = append(rows, tu.KeyboardRow(tu.KeyboardButton(ButtonPlusFiveMinutes), tu.KeyboardButton(ButtonPlusHour)))
+		plusButtons = append(plusButtons, tu.KeyboardButton(ButtonPlusMinute))
+	}
+
+	if interval <= 115*time.Minute {
+		plusButtons = append(plusButtons, tu.KeyboardButton(ButtonPlusFiveMinutes))
+	}
+
+	if interval <= 105*time.Minute {
+		plusButtons = append(plusButtons, tu.KeyboardButton(ButtonPlusFifteenMinutes))
+	}
+
+	if len(plusButtons) > 0 {
+		rows = append(rows, plusButtons)
 	}
 
 	rows = append(rows, tu.KeyboardRow(tu.KeyboardButton(ButtonIntrusiveManual)))
