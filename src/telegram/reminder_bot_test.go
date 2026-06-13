@@ -488,7 +488,10 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 			expected: struct {
 				expectedText string
 			}{
-				expectedText: "        <b>Главное меню</b>\n\n✅ Выполнено: 3\n⏳ Ожидает: 2\n❗ Пропущено: 1",
+				expectedText: "⠀⠀⠀⠀<b>Главное меню</b>\n\n" +
+					"✅ Задачи выполнены: 3\n" +
+					"⏳ Задачи ожидают выполнения: 2\n" +
+					"❗ Задачи пропущены: 1",
 			},
 		},
 		{
@@ -505,10 +508,10 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 			expected: struct {
 				expectedText string
 			}{
-				expectedText: "        <b>Pay rent</b>\n\n" +
-					"Before lunch\n" +
+				expectedText: "⠀⠀⠀⠀<b>Pay rent</b>\n\n" +
+					"Описание: Before lunch\n" +
 					"Повторять: нет\n\n" +
-					"02.06.2026, Вт 09:30\n\n" +
+					"⠀⠀⠀⠀02.06.2026, Вт 09:30\n\n" +
 					"<i>Выберите дату и время кнопкой ниже.</i>",
 			},
 		},
@@ -528,10 +531,10 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 			expected: struct {
 				expectedText string
 			}{
-				expectedText: "        <b>Pay rent</b>\n\n" +
-					"Before lunch\n" +
+				expectedText: "⠀⠀⠀⠀<b>Pay rent</b>\n\n" +
+					"Описание: Before lunch\n" +
 					"Повторять: выбрано дат: 2\n\n" +
-					"Сегодня\n\n" +
+					"⠀⠀⠀⠀Сегодня\n\n" +
 					"<i>Выберите дату и время кнопкой ниже.</i>",
 			},
 		},
@@ -552,10 +555,10 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 			expected: struct {
 				expectedText string
 			}{
-				expectedText: "        <b>не задано</b>\n\n" +
-					"не задано\n" +
+				expectedText: "⠀⠀⠀⠀<b>Название</b>\n\n" +
+					"Описание: не задано\n" +
 					"Повторять: нет\n\n" +
-					"Сегодня\n\n" +
+					"⠀⠀⠀⠀Сегодня\n\n" +
 					"<i>Выберите дату и время кнопкой ниже.</i>",
 			},
 		},

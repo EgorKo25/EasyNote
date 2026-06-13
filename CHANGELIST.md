@@ -14,6 +14,8 @@ Reminder creation was fixed after the reply-keyboard migration: filled draft fie
 
 Reminder creation text was reorganized around title, description, repeat state, and selected date. Service prompts are rendered in italic.
 
+The `Название` and `Описание` draft buttons now switch the message into input-waiting mode by editing the existing message text, avoiding a delete/send blink when the reply keyboard does not need to change.
+
 Delivered reminder actions now remove the notification message after `Готово` or `Отменить`.
 
 Intrusive reminder interval settings support manual minute input from 1 to 120 minutes, minute-level decrement below 30 minutes, and friendlier interval step buttons.
