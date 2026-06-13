@@ -34,14 +34,7 @@ func TestTextRendering(t *testing.T) {
 			},
 			expected: struct {
 				text string
-			}{
-				text: "*Главное меню*\n\n" +
-					"```\n" +
-					"✓ Задач выполнено:          3\n" +
-					"• Задач ожидает выполнения: 2\n" +
-					"❗ Задач пропущено:          1\n" +
-					"```",
-			},
+			}{text: "        <b>Главное меню</b>\n\n✅ Выполнено: 3\n⏳ Ожидает: 2\n❗ Пропущено: 1"},
 		},
 		{
 			name: "filled draft text shows reminder fields",
@@ -57,9 +50,8 @@ func TestTextRendering(t *testing.T) {
 			expected: struct {
 				text string
 			}{
-				text: "Создание напоминания\n\nДата и время: 02.06.2026 09:30\n" +
-					"Название: Pay rent\nОписание: Before lunch\n" +
-					"Повторять: нет\n\nВыберите дату и время кнопкой ниже.",
+				text: "        <b>Pay rent</b>\n\nBefore lunch\nПовторять: нет\n\n" +
+					"02.06.2026, Вт 09:30\n\n<i>Выберите дату и время кнопкой ниже.</i>",
 			},
 		},
 		{
@@ -72,7 +64,7 @@ func TestTextRendering(t *testing.T) {
 			},
 			expected: struct {
 				text string
-			}{text: "Повторять: выбрано дней недели: 3\n"},
+			}{text: "Повторять: выбрано дней недели: 3"},
 		},
 		{
 			name: "reminder view text includes formatted time",
@@ -81,7 +73,7 @@ func TestTextRendering(t *testing.T) {
 			},
 			expected: struct {
 				text string
-			}{text: "02.06.2026 09:30\nPay rent\nBefore lunch"},
+			}{text: "02.06.2026 09:30\n<b>Pay rent</b>\nBefore lunch"},
 		},
 		{
 			name: "empty reminder list text explains empty state",
@@ -90,7 +82,7 @@ func TestTextRendering(t *testing.T) {
 			},
 			expected: struct {
 				text string
-			}{text: "Активных напоминаний пока нет.\n\nСоздайте первое напоминание на основной клавиатуре."},
+			}{text: "<b>Активные напоминания</b>\n\n<i>Активных напоминаний пока нет.</i>"},
 		},
 		{
 			name: "telegramui.Draft waiting for title changes next step",
@@ -100,8 +92,8 @@ func TestTextRendering(t *testing.T) {
 			expected: struct {
 				text string
 			}{
-				text: "Создание напоминания\n\nДата и время: не задано\nНазвание: не задано\n" +
-					"Описание: не задано\nПовторять: нет\n\nВведите название напоминания сообщением.",
+				text: "        <b>не задано</b>\n\nне задано\nПовторять: нет\n\n" +
+					"Сегодня\n\n<i>Введите название напоминания сообщением.</i>",
 			},
 		},
 	}
@@ -425,7 +417,7 @@ func TestSettingsHistoryAndStatusTexts(t *testing.T) {
 			action: telegramui.RemindersText,
 			expected: struct {
 				text string
-			}{text: "Напоминания\n\nВыберите список напоминаний."},
+			}{text: "<b>Напоминания</b>\n\n<i>Выберите список напоминаний.</i>"},
 		},
 		{
 			name: "history text renders completed reminder",
@@ -438,7 +430,7 @@ func TestSettingsHistoryAndStatusTexts(t *testing.T) {
 			},
 			expected: struct {
 				text string
-			}{text: "Прошедшие напоминания\n\nВыберите напоминание из списка."},
+			}{text: "<b>Прошедшие напоминания</b>\n\n<i>Выберите напоминание из списка.</i>"},
 		},
 		{
 			name: "settings text renders enabled intrusive settings",
@@ -452,7 +444,7 @@ func TestSettingsHistoryAndStatusTexts(t *testing.T) {
 			expected: struct {
 				text string
 			}{
-				text: "Настройки\n\nЯзык: русский\nЧасовой пояс: Europe/Moscow\n" +
+				text: "<b>Настройки</b>\n\nЯзык: русский\nЧасовой пояс: Europe/Moscow\n" +
 					"Настойчивые напоминания: включены\nИнтервал: 45m0s",
 			},
 		},
@@ -466,7 +458,7 @@ func TestSettingsHistoryAndStatusTexts(t *testing.T) {
 			},
 			expected: struct {
 				text string
-			}{text: "Настойчивые напоминания\n\nСостояние: выключены\nИнтервал: 30m0s"},
+			}{text: "<b>Настойчивые напоминания</b>\n\nСостояние: выключены\nИнтервал: 30m0s"},
 		},
 		{
 			name: "failed status text is localized",
@@ -496,7 +488,7 @@ func TestSettingsHistoryAndStatusTexts(t *testing.T) {
 			},
 			expected: struct {
 				text string
-			}{text: "Повторять: каждые 5 дн.\n"},
+			}{text: "Повторять: каждые 5 дн."},
 		},
 		{
 			name: "custom dates repeat text renders selected count",
@@ -508,7 +500,7 @@ func TestSettingsHistoryAndStatusTexts(t *testing.T) {
 			},
 			expected: struct {
 				text string
-			}{text: "Повторять: выбрано дат: 1\n"},
+			}{text: "Повторять: выбрано дат: 1"},
 		},
 	}
 

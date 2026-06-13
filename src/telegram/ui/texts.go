@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"html"
 	"time"
 
 	"github.com/EgorKo25/EasyNote/src/database"
@@ -9,12 +10,10 @@ import (
 
 func MainMenuText(stats database.ReminderStats) string {
 	return fmt.Sprintf(
-		"*Главное меню*\n\n"+
-			"```\n"+
-			"✓ Задач выполнено:          %d\n"+
-			"• Задач ожидает выполнения: %d\n"+
-			"❗ Задач пропущено:          %d\n"+
-			"```",
+		"        <b>Главное меню</b>\n\n"+
+			"✅ Выполнено: %d\n"+
+			"⏳ Ожидает: %d\n"+
+			"❗ Пропущено: %d",
 		stats.Completed,
 		stats.Pending,
 		stats.Skipped,
@@ -22,42 +21,48 @@ func MainMenuText(stats database.ReminderStats) string {
 }
 
 func RemindersText() string {
-	return "Напоминания\n\nВыберите список напоминаний."
+	return "<b>Напоминания</b>\n\n<i>Выберите список напоминаний.</i>"
 }
 
 func CreateText() string {
-	return "Создать\n\nВыберите тип."
+	return "<b>Создать</b>\n\n<i>Выберите тип.</i>"
 }
 
 func DraftText(draft Draft, location *time.Location) string {
-	remindAt, title, description := emptyFieldText, emptyFieldText, emptyFieldText
+	dateText, title, description := "Сегодня", emptyFieldText, emptyFieldText
 	repeat := RepeatText(draft)
 
 	if !draft.RemindAt(location).IsZero() {
-		remindAt = draft.RemindAt(location).In(location).Format("02.01.2006 15:04")
+		remindAt := draft.RemindAt(location).In(location)
+		dateText = fmt.Sprintf(
+			"%s, %s %s",
+			remindAt.Format("02.01.2006"),
+			weekdayText(remindAt),
+			remindAt.Format("15:04"),
+		)
 	}
 
 	if draft.Title != "" {
-		title = draft.Title
+		title = html.EscapeString(draft.Title)
 	}
 
 	if draft.Description != "" {
-		description = draft.Description
+		description = html.EscapeString(draft.Description)
 	}
 
 	nextStep := draftNextStep(draft)
 
 	notice := ""
 	if draft.Notice != "" {
-		notice = "\n\n" + draft.Notice
+		notice = "\n\n<i>" + html.EscapeString(draft.Notice) + "</i>"
 	}
 
 	return fmt.Sprintf(
-		"Создание напоминания\n\nДата и время: %s\nНазвание: %s\nОписание: %s\n%s\n%s%s",
-		remindAt,
+		"        <b>%s</b>\n\n%s\n%s\n\n%s\n\n<i>%s</i>%s",
 		title,
 		description,
 		repeat,
+		dateText,
 		nextStep,
 		notice,
 	)
@@ -98,37 +103,37 @@ func draftNextStep(draft Draft) string {
 func ReminderViewText(reminder database.ReminderView, location *time.Location) string {
 	description := "Без описания"
 	if reminder.Description != "" {
-		description = reminder.Description
+		description = html.EscapeString(reminder.Description)
 	}
 
 	return fmt.Sprintf(
-		"%s\n%s\n%s",
+		"%s\n<b>%s</b>\n%s",
 		reminder.RemindAt.In(location).Format("02.01.2006 15:04"),
-		reminder.Title,
+		html.EscapeString(reminder.Title),
 		description,
 	)
 }
 
 func ReminderListText(reminders []database.ReminderView) string {
 	if len(reminders) == 0 {
-		return "Активных напоминаний пока нет.\n\nСоздайте первое напоминание на основной клавиатуре."
+		return "<b>Активные напоминания</b>\n\n<i>Активных напоминаний пока нет.</i>"
 	}
 
-	return "Список напоминаний\n\nВыберите напоминание из списка."
+	return "<b>Список напоминаний</b>\n\n<i>Выберите напоминание из списка.</i>"
 }
 
 func ReminderHistoryText(reminders []database.ReminderView) string {
 	if len(reminders) == 0 {
-		return "Прошедших напоминаний пока нет."
+		return "<b>Прошедшие напоминания</b>\n\n<i>Прошедших напоминаний пока нет.</i>"
 	}
 
-	return "Прошедшие напоминания\n\nВыберите напоминание из списка."
+	return "<b>Прошедшие напоминания</b>\n\n<i>Выберите напоминание из списка.</i>"
 }
 
 func SettingsText(settings database.UserSettings) string {
 	return fmt.Sprintf(
-		"Настройки\n\nЯзык: русский\nЧасовой пояс: %s\nНастойчивые напоминания: %s\nИнтервал: %s",
-		settings.Timezone,
+		"<b>Настройки</b>\n\nЯзык: русский\nЧасовой пояс: %s\nНастойчивые напоминания: %s\nИнтервал: %s",
+		html.EscapeString(settings.Timezone),
 		intrusiveEnabledText(settings.IntrusiveEnabled),
 		settings.IntrusiveInterval,
 	)
@@ -136,14 +141,17 @@ func SettingsText(settings database.UserSettings) string {
 
 func IntrusiveSettingsText(settings database.UserSettings) string {
 	return fmt.Sprintf(
-		"Настойчивые напоминания\n\nСостояние: %s\nИнтервал: %s",
+		"<b>Настойчивые напоминания</b>\n\nСостояние: %s\nИнтервал: %s",
 		intrusiveEnabledText(settings.IntrusiveEnabled),
 		settings.IntrusiveInterval,
 	)
 }
 
 func IntrusiveIntervalText(interval time.Duration) string {
-	return fmt.Sprintf("Интервал настойчивых напоминаний\n\nТекущее значение: %s", interval)
+	return fmt.Sprintf(
+		"<b>Интервал настойчивых напоминаний</b>\n\nТекущее значение: %s\n\n<i>Выберите шаг или задайте минуты вручную.</i>",
+		interval,
+	)
 }
 
 func ReminderStatusText(status database.ReminderStatus) string {
@@ -171,24 +179,43 @@ func intrusiveEnabledText(enabled bool) string {
 	return "выключены"
 }
 
+func weekdayText(value time.Time) string {
+	switch value.Weekday() {
+	case time.Monday:
+		return "Пн"
+	case time.Tuesday:
+		return "Вт"
+	case time.Wednesday:
+		return "Ср"
+	case time.Thursday:
+		return "Чт"
+	case time.Friday:
+		return "Пт"
+	case time.Saturday:
+		return "Сб"
+	default:
+		return "Вс"
+	}
+}
+
 func RepeatText(draft Draft) string {
 	switch draft.Repeat {
 	case RepeatEveryDay:
-		return "Повторять: каждый день\n"
+		return "Повторять: каждый день"
 	case RepeatEveryWeek:
-		return "Повторять: каждую неделю\n"
+		return "Повторять: каждую неделю"
 	case RepeatEveryTwoDays:
-		return "Повторять: каждые 2 дня\n"
+		return "Повторять: каждые 2 дня"
 	case RepeatWeekdays:
-		return "Повторять: по будням\n"
+		return "Повторять: по будням"
 	case RepeatCustomWeekdays:
-		return fmt.Sprintf("Повторять: выбрано дней недели: %d\n", SelectedWeekdayCount(draft.WeekdaysMask))
+		return fmt.Sprintf("Повторять: выбрано дней недели: %d", SelectedWeekdayCount(draft.WeekdaysMask))
 	case RepeatCustomDates:
-		return fmt.Sprintf("Повторять: выбрано дат: %d\n", len(draft.CustomDates))
+		return fmt.Sprintf("Повторять: выбрано дат: %d", len(draft.CustomDates))
 	case RepeatCustomInterval:
-		return fmt.Sprintf("Повторять: каждые %d дн.\n", draft.IntervalDays)
+		return fmt.Sprintf("Повторять: каждые %d дн.", draft.IntervalDays)
 	default:
-		return "Повторять: нет\n"
+		return "Повторять: нет"
 	}
 }
 

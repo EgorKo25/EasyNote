@@ -241,7 +241,7 @@ func (b *ReminderBot) handleMessage(ctx context.Context, message telego.Message)
 	if err := b.replaceUI(
 		ctx,
 		chatID,
-		"Не понял команду. Используйте основную клавиатуру.",
+		"<i>Не понял команду. Используйте основную клавиатуру.</i>",
 		telegramui.MainKeyboard(),
 	); err != nil {
 		return err
@@ -280,6 +280,10 @@ func (b *ReminderBot) handleKnownMessage(
 }
 
 func (b *ReminderBot) runKnownMessageCommand(ctx context.Context, chatID int64, text string) (error, bool) {
+	if handled, err := b.handleSelectedReplyMessage(ctx, chatID, text); handled || err != nil {
+		return err, handled
+	}
+
 	if err, handled := b.runMainMessageCommand(ctx, chatID, text); handled {
 		return err, true
 	}
@@ -290,10 +294,6 @@ func (b *ReminderBot) runKnownMessageCommand(ctx context.Context, chatID int64, 
 
 	if err, handled := b.runSettingsMessageCommand(ctx, chatID, text); handled {
 		return err, true
-	}
-
-	if handled, err := b.handleSelectedReplyMessage(ctx, chatID, text); handled || err != nil {
-		return err, handled
 	}
 
 	return nil, false
@@ -403,6 +403,10 @@ func (b *ReminderBot) runDraftRepeatMessageCommand(ctx context.Context, chatID i
 		b.applyDraftRepeat(chatID, string(telegramui.RepeatCustomInterval))
 
 		return b.replaceDraft(ctx, chatID), true
+	case telegramui.ButtonRepeatNone:
+		b.applyDraftRepeat(chatID, string(telegramui.RepeatNone))
+
+		return b.replaceDraft(ctx, chatID), true
 	default:
 		return nil, false
 	}
@@ -412,16 +416,36 @@ func (b *ReminderBot) runDraftTimeMessageCommand(ctx context.Context, chatID int
 	switch text {
 	case telegramui.ButtonDone:
 		return b.handleDoneMessage(ctx, chatID), true
-	case telegramui.ButtonMinusHour:
-		return b.handleTimeShiftMessage(ctx, chatID, -60), true
-	case telegramui.ButtonPlusHour:
-		return b.handleTimeShiftMessage(ctx, chatID, 60), true
-	case telegramui.ButtonMinusFiveMinutes:
-		return b.handleTimeShiftMessage(ctx, chatID, -5), true
-	case telegramui.ButtonPlusFiveMinutes:
-		return b.handleTimeShiftMessage(ctx, chatID, 5), true
 	default:
-		return nil, false
+		minutes, ok := replyShiftMinutes(text)
+		if !ok {
+			return nil, false
+		}
+
+		return b.handleTimeShiftMessage(ctx, chatID, minutes), true
+	}
+}
+
+func replyShiftMinutes(text string) (int, bool) {
+	switch text {
+	case telegramui.ButtonMinusHour:
+		return -60, true
+	case telegramui.ButtonPlusHour:
+		return 60, true
+	case telegramui.ButtonMinusFiveMinutes:
+		return -5, true
+	case telegramui.ButtonPlusFiveMinutes:
+		return 5, true
+	case telegramui.ButtonMinusMinute:
+		return -1, true
+	case telegramui.ButtonPlusMinute:
+		return 1, true
+	case telegramui.ButtonMinusFifteenMinutes:
+		return -15, true
+	case telegramui.ButtonPlusFifteenMinutes:
+		return 15, true
+	default:
+		return 0, false
 	}
 }
 
@@ -447,7 +471,12 @@ func (b *ReminderBot) runDraftDateMessageCommand(ctx context.Context, chatID int
 func (b *ReminderBot) runSettingsMessageCommand(ctx context.Context, chatID int64, text string) (error, bool) {
 	switch text {
 	case telegramui.ButtonSettingsLanguage:
-		return b.replaceUI(ctx, chatID, "Язык приложения: русский", telegramui.SettingsKeyboard()), true
+		return b.replaceUI(
+			ctx,
+			chatID,
+			"<b>Язык</b>\n\n<i>Язык приложения: русский.</i>",
+			telegramui.SettingsKeyboard(),
+		), true
 	case telegramui.ButtonSettingsTimezone:
 		return b.sendTimezoneSettings(ctx, chatID), true
 	case telegramui.ButtonSettingsIntrusive:
@@ -552,7 +581,12 @@ func (b *ReminderBot) handleSettingsCallback(
 	case telegramui.CallbackSettings:
 		return true, b.editSettings(ctx, chatID, messageID)
 	case telegramui.CallbackSettingsLanguage:
-		return true, b.replaceUI(ctx, chatID, "Язык приложения: русский", telegramui.SettingsKeyboard())
+		return true, b.replaceUI(
+			ctx,
+			chatID,
+			"<b>Язык</b>\n\n<i>Язык приложения: русский.</i>",
+			telegramui.SettingsKeyboard(),
+		)
 	case telegramui.CallbackSettingsIntrusive:
 		b.setDraftWaitingFor(chatID, telegramui.FieldIntrusiveInterval)
 
@@ -986,7 +1020,7 @@ func (b *ReminderBot) editTimezoneSettings(ctx context.Context, chatID int64, me
 	return b.replaceUI(
 		ctx,
 		chatID,
-		"Выберите часовой пояс.",
+		"<b>Часовой пояс</b>\n\n<i>Выберите часовой пояс.</i>",
 		telegramui.TimezoneKeyboard(index, b.now(chatID)),
 	)
 }
@@ -1002,14 +1036,24 @@ func (b *ReminderBot) sendTimezoneSettings(ctx context.Context, chatID int64) er
 	index := telegramui.TimezoneIndex(settings.Timezone)
 	b.setTimezoneIndex(chatID, index)
 
-	return b.replaceUI(ctx, chatID, "Выберите часовой пояс.", telegramui.TimezoneKeyboard(index, b.now(chatID)))
+	return b.replaceUI(
+		ctx,
+		chatID,
+		"<b>Часовой пояс</b>\n\n<i>Выберите часовой пояс.</i>",
+		telegramui.TimezoneKeyboard(index, b.now(chatID)),
+	)
 }
 
 func (b *ReminderBot) shiftTimezone(ctx context.Context, chatID int64, shift int) error {
 	index := telegramui.TimezoneIndexByShift(b.timezoneIndex(chatID), shift)
 	b.setTimezoneIndex(chatID, index)
 
-	return b.replaceUI(ctx, chatID, "Выберите часовой пояс.", telegramui.TimezoneKeyboard(index, b.now(chatID)))
+	return b.replaceUI(
+		ctx,
+		chatID,
+		"<b>Часовой пояс</b>\n\n<i>Выберите часовой пояс.</i>",
+		telegramui.TimezoneKeyboard(index, b.now(chatID)),
+	)
 }
 
 func (b *ReminderBot) saveCurrentTimezone(ctx context.Context, chatID int64) error {
@@ -1224,7 +1268,7 @@ func (b *ReminderBot) saveDraft(ctx context.Context, chatID int64, messageID int
 		ctx,
 		chatID,
 		messageID,
-		"Напоминание сохранено.\n\n"+telegramui.ReminderViewText(reminder, b.location(chatID)),
+		"<i>Напоминание сохранено.</i>\n\n"+telegramui.ReminderViewText(reminder, b.location(chatID)),
 		telegramui.ReminderCreatedKeyboard(),
 	)
 }
@@ -1309,7 +1353,7 @@ func (b *ReminderBot) viewReminder(ctx context.Context, chatID int64, messageID 
 	return b.replaceUI(
 		ctx,
 		chatID,
-		"Напоминание не найдено.\n\n"+telegramui.ReminderListText(reminders),
+		"<i>Напоминание не найдено.</i>\n\n"+telegramui.ReminderListText(reminders),
 		telegramui.ReminderListKeyboard(reminders),
 	)
 }
@@ -1334,7 +1378,7 @@ func (b *ReminderBot) deleteReminder(ctx context.Context, chatID int64, messageI
 	return b.replaceUI(
 		ctx,
 		chatID,
-		"Напоминание удалено.\n\n"+telegramui.ReminderListText(reminders),
+		"<i>Напоминание удалено.</i>\n\n"+telegramui.ReminderListText(reminders),
 		telegramui.ReminderListKeyboard(reminders),
 	)
 }
@@ -1378,8 +1422,8 @@ func (b *ReminderBot) replaceUI(ctx context.Context, chatID int64, text string, 
 		params.WithReplyMarkup(replyMarkup)
 	}
 
-	if strings.Contains(text, "*Главное меню*") {
-		params.WithParseMode("Markdown")
+	if hasTelegramHTML(text) {
+		params.WithParseMode(telego.ModeHTML)
 	}
 
 	message, err := b.bot.SendMessage(ctx, params)
@@ -1410,6 +1454,9 @@ func (b *ReminderBot) editUI(
 	}
 
 	params := tu.EditMessageText(tu.ID(chatID), messageID, text).WithReplyMarkup(replyMarkup)
+	if hasTelegramHTML(text) {
+		params.WithParseMode(telego.ModeHTML)
+	}
 
 	message, err := b.bot.EditMessageText(ctx, params)
 	if err != nil {
@@ -1421,6 +1468,10 @@ func (b *ReminderBot) editUI(
 	}
 
 	return nil
+}
+
+func hasTelegramHTML(text string) bool {
+	return strings.Contains(text, "<b>") || strings.Contains(text, "<i>")
 }
 
 func (b *ReminderBot) applyDraftText(ctx context.Context, chatID int64, text string) bool {
@@ -1752,6 +1803,12 @@ func (b *ReminderBot) applyDraftRepeat(chatID int64, value string) bool {
 
 		draft.waitingFor = telegramui.FieldRepeatInterval
 		draft.screen = telegramui.ScreenInterval
+	case telegramui.RepeatNone:
+		draft.customDates = nil
+		draft.weekdaysMask = 0
+		draft.intervalDays = 0
+		draft.waitingFor = ""
+		draft.screen = telegramui.ScreenMain
 	default:
 		draft.screen = telegramui.ScreenMain
 	}
