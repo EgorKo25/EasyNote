@@ -51,12 +51,8 @@ func DraftKeyboard(draft Draft, now time.Time) *telego.InlineKeyboardMarkup {
 }
 
 func draftMainKeyboard(draft Draft) *telego.InlineKeyboardMarkup {
-	titleButtonText := ButtonDraftTitle
-	if draft.Title != "" {
-		titleButtonText = ButtonDraftEditTitle
-	}
-
-	descriptionButtonText := ButtonDraftEditDescription
+	titleButtonText := draftTitleButtonText(draft)
+	descriptionButtonText := draftDescriptionButtonText(draft)
 
 	dateButtonText := "Изменить дату"
 	if draft.Repeat != RepeatNone {
@@ -77,6 +73,30 @@ func draftMainKeyboard(draft Draft) *telego.InlineKeyboardMarkup {
 			tu.InlineKeyboardButton(ButtonDraftCancel).WithCallbackData(CallbackDraftCancel),
 		),
 	)
+}
+
+func draftTitleButtonText(draft Draft) string {
+	if draft.WaitingFor == FieldTitle {
+		return ButtonDraftEnterTitle
+	}
+
+	if draft.Title != "" {
+		return ButtonDraftEditTitle
+	}
+
+	return ButtonDraftTitle
+}
+
+func draftDescriptionButtonText(draft Draft) string {
+	if draft.WaitingFor == FieldDescription {
+		return ButtonDraftEnterDescription
+	}
+
+	if draft.Description != "" {
+		return ButtonDraftEditDescription
+	}
+
+	return ButtonDraftDescription
 }
 
 func DraftReplyKeyboard(draft Draft, now time.Time) *telego.ReplyKeyboardMarkup {
@@ -101,12 +121,8 @@ func DraftReplyKeyboard(draft Draft, now time.Time) *telego.ReplyKeyboardMarkup 
 			tu.KeyboardRow(tu.KeyboardButton(ButtonRepeatNone)),
 		).WithResizeKeyboard()
 	default:
-		titleButtonText := ButtonDraftTitle
-		if draft.Title != "" {
-			titleButtonText = ButtonDraftEditTitle
-		}
-
-		descriptionButtonText := ButtonDraftEditDescription
+		titleButtonText := draftTitleButtonText(draft)
+		descriptionButtonText := draftDescriptionButtonText(draft)
 
 		dateButtonText := "Изменить дату"
 
@@ -297,7 +313,7 @@ func SettingsKeyboard() *telego.ReplyKeyboardMarkup {
 		tu.KeyboardRow(tu.KeyboardButton(ButtonSettingsLanguage)),
 		tu.KeyboardRow(tu.KeyboardButton(ButtonSettingsTimezone)),
 		tu.KeyboardRow(tu.KeyboardButton(ButtonSettingsIntrusive)),
-		tu.KeyboardRow(tu.KeyboardButton(ButtonBack)),
+		tu.KeyboardRow(tu.KeyboardButton(ButtonSettingsSave)),
 	).WithResizeKeyboard()
 }
 
@@ -311,7 +327,7 @@ func TimezoneKeyboard(index int, now time.Time) *telego.ReplyKeyboardMarkup {
 			tu.KeyboardButton(TimezoneButtonText(option, now)),
 			tu.KeyboardButton(ButtonNextPage),
 		),
-		tu.KeyboardRow(tu.KeyboardButton(ButtonBack)),
+		tu.KeyboardRow(tu.KeyboardButton(ButtonSettingsSave), tu.KeyboardButton(ButtonBack)),
 	).WithResizeKeyboard()
 }
 
@@ -389,8 +405,8 @@ func normalizeTimezoneIndex(index int) int {
 }
 
 var timezoneOptions = []TimezoneOption{
-	{City: "Москва", Timezone: "Europe/Moscow"},
 	{City: "Калининград", Timezone: "Europe/Kaliningrad"},
+	{City: "Москва", Timezone: "Europe/Moscow"},
 	{City: "Самара", Timezone: "Europe/Samara"},
 	{City: "Екатеринбург", Timezone: "Asia/Yekaterinburg"},
 	{City: "Омск", Timezone: "Asia/Omsk"},
@@ -401,4 +417,27 @@ var timezoneOptions = []TimezoneOption{
 	{City: "Владивосток", Timezone: "Asia/Vladivostok"},
 	{City: "Магадан", Timezone: "Asia/Magadan"},
 	{City: "Камчатка", Timezone: "Asia/Kamchatka"},
+	{City: "Лондон", Timezone: "Europe/London"},
+	{City: "Берлин", Timezone: "Europe/Berlin"},
+	{City: "Париж", Timezone: "Europe/Paris"},
+	{City: "Стамбул", Timezone: "Europe/Istanbul"},
+	{City: "Дубай", Timezone: "Asia/Dubai"},
+	{City: "Токио", Timezone: "Asia/Tokyo"},
+	{City: "Сеул", Timezone: "Asia/Seoul"},
+	{City: "Пекин", Timezone: "Asia/Shanghai"},
+	{City: "Сингапур", Timezone: "Asia/Singapore"},
+	{City: "Дели", Timezone: "Asia/Kolkata"},
+	{City: "Бангкок", Timezone: "Asia/Bangkok"},
+	{City: "Сидней", Timezone: "Australia/Sydney"},
+	{City: "Окленд", Timezone: "Pacific/Auckland"},
+	{City: "Нью-Йорк", Timezone: "America/New_York"},
+	{City: "Чикаго", Timezone: "America/Chicago"},
+	{City: "Денвер", Timezone: "America/Denver"},
+	{City: "Лос-Анджелес", Timezone: "America/Los_Angeles"},
+	{City: "Торонто", Timezone: "America/Toronto"},
+	{City: "Мехико", Timezone: "America/Mexico_City"},
+	{City: "Сан-Паулу", Timezone: "America/Sao_Paulo"},
+	{City: "Буэнос-Айрес", Timezone: "America/Argentina/Buenos_Aires"},
+	{City: "Каир", Timezone: "Africa/Cairo"},
+	{City: "Йоханнесбург", Timezone: "Africa/Johannesburg"},
 }

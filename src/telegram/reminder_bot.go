@@ -326,6 +326,10 @@ func (b *ReminderBot) runTopLevelMessageCommand(ctx context.Context, chatID int6
 }
 
 func (b *ReminderBot) runDraftMessageCommand(ctx context.Context, chatID int64, text string) (error, bool) {
+	if !b.draftExists(chatID) {
+		return nil, false
+	}
+
 	for _, handler := range []func(context.Context, int64, string) (error, bool){
 		b.runDraftFieldMessageCommand,
 		b.runDraftRepeatMessageCommand,
@@ -357,11 +361,13 @@ func (b *ReminderBot) runReminderListMessageCommand(ctx context.Context, chatID 
 
 func (b *ReminderBot) runDraftFieldMessageCommand(ctx context.Context, chatID int64, text string) (error, bool) {
 	switch text {
-	case telegramui.ButtonDraftTitle, telegramui.ButtonDraftEditTitle:
+	case telegramui.ButtonDraftTitle, telegramui.ButtonDraftEnterTitle, telegramui.ButtonDraftEditTitle:
 		b.setDraftWaitingFor(chatID, telegramui.FieldTitle)
 
 		return b.editDraftText(ctx, chatID), true
-	case telegramui.ButtonDraftDescription, telegramui.ButtonDraftEditDescription:
+	case telegramui.ButtonDraftDescription,
+		telegramui.ButtonDraftEnterDescription,
+		telegramui.ButtonDraftEditDescription:
 		b.setDraftWaitingFor(chatID, telegramui.FieldDescription)
 
 		return b.editDraftText(ctx, chatID), true
@@ -482,6 +488,8 @@ func (b *ReminderBot) runSettingsMessageCommand(ctx context.Context, chatID int6
 		return b.sendIntrusiveSettings(ctx, chatID), true
 	case telegramui.ButtonIntrusiveEnabled, telegramui.ButtonIntrusiveDisabled:
 		return b.toggleIntrusiveSettings(ctx, chatID), true
+	case telegramui.ButtonSettingsSave:
+		return b.saveSettingsMenu(ctx, chatID), true
 	default:
 		return nil, false
 	}
@@ -1062,6 +1070,17 @@ func (b *ReminderBot) saveCurrentTimezone(ctx context.Context, chatID int64) err
 	return b.sendSettings(ctx, chatID)
 }
 
+func (b *ReminderBot) saveSettingsMenu(ctx context.Context, chatID int64) error {
+	if b.chatMenu(chatID) == chatMenuTimezone {
+		option := telegramui.TimezoneByIndex(b.timezoneIndex(chatID))
+		if err := b.repository.UpdateUserTimezone(ctx, chatID, option.Timezone); err != nil {
+			return fmt.Errorf("set user timezone: %w", err)
+		}
+	}
+
+	return b.sendStart(ctx, chatID)
+}
+
 func (b *ReminderBot) setTimezoneByCallback(ctx context.Context, chatID int64, messageID int, data string) error {
 	index, err := timezoneCallbackIndex(data)
 	if err != nil {
@@ -1230,7 +1249,7 @@ func (b *ReminderBot) viewReminderByReply(ctx context.Context, chatID int64, tex
 				ctx,
 				chatID,
 				telegramui.ReminderViewText(reminder, b.location(chatID)),
-				telegramui.ReminderListKeyboard(reminders),
+				telegramui.ReminderDetailsKeyboard(reminder),
 			)
 		}
 	}
