@@ -55,9 +55,10 @@ func TestTextRendering(t *testing.T) {
 			expected: struct {
 				text string
 			}{
-				text: "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀<b>Pay rent</b>\n\nBefore lunch\n\n" +
-					"Время начала напоминания: 02.06.2026, Вт 09:30\n\n" +
-					"Повторять: нет\n\n" +
+				text: "<b>Название:</b>\nPay rent\n\n" +
+					"<b>Описание:</b>\nBefore lunch\n\n" +
+					"<b>Дата начала напоминаний:</b>\n02.06.2026, Вт 09:30\n\n" +
+					"<b>Повторять:</b>\nнет\n\n" +
 					"<i>Проверьте шаблон и сохраните напоминание.</i>",
 			},
 		},
@@ -74,17 +75,17 @@ func TestTextRendering(t *testing.T) {
 			}{text: "Повторять: выбрано дней недели: 3"},
 		},
 		{
-			name: "short draft title gets wider center padding",
+			name: "short draft title renders as field value",
 			action: func() string {
 				return telegramui.DraftText(telegramui.Draft{Title: "A"}, location)
 			},
 			expected: struct {
 				text string
 			}{
-				text: "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀<b>A</b>\n\n" +
-					"Здесь может быть описание вашей задачи. Описание не задано.\n\n" +
-					"Время начала напоминания: Дата и время не заданы\n\n" +
-					"Повторять: нет\n\n" +
+				text: "<b>Название:</b>\nA\n\n" +
+					"<b>Описание:</b>\n\n\n" +
+					"<b>Дата начала напоминаний:</b>\n\n\n" +
+					"<b>Повторять:</b>\nнет\n\n" +
 					"<i>Выберите дату и введите время напоминания.</i>",
 			},
 		},
@@ -114,10 +115,10 @@ func TestTextRendering(t *testing.T) {
 			expected: struct {
 				text string
 			}{
-				text: "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀<b>Название</b>\n\n" +
-					"Здесь может быть описание вашей задачи. Описание не задано.\n\n" +
-					"Время начала напоминания: Дата и время не заданы\n\n" +
-					"Повторять: нет\n\n" +
+				text: "<b>Название:</b>\n\n\n" +
+					"<b>Описание:</b>\n\n\n" +
+					"<b>Дата начала напоминаний:</b>\n\n\n" +
+					"<b>Повторять:</b>\nнет\n\n" +
 					"<i>Введите название напоминания сообщением.</i>",
 			},
 		},
@@ -153,7 +154,7 @@ func TestKeyboardRendering(t *testing.T) {
 			expected: struct {
 				rows      int
 				firstText string
-			}{rows: 4, firstText: "Изменить дату"},
+			}{rows: 4, firstText: "Дата и время"},
 		},
 		{
 			name: "filled recurring telegramui.Draft asks to change start date time",
@@ -370,7 +371,7 @@ func TestMenuAndActionKeyboards(t *testing.T) {
 			action: func() [][]string {
 				keyboard := telegramui.DraftKeyboard(telegramui.Draft{WaitingFor: telegramui.FieldTitle}, time.Now())
 
-				return keyboardTexts(keyboard.InlineKeyboard[2:3])
+				return keyboardTexts(keyboard.InlineKeyboard[1:2])
 			},
 			expected: struct {
 				rows [][]string
@@ -384,7 +385,7 @@ func TestMenuAndActionKeyboards(t *testing.T) {
 					Description: "Before lunch",
 				}, time.Now())
 
-				return keyboardTexts(keyboard.InlineKeyboard[2:3])
+				return keyboardTexts(keyboard.InlineKeyboard[1:2])
 			},
 			expected: struct {
 				rows [][]string
@@ -397,7 +398,7 @@ func TestMenuAndActionKeyboards(t *testing.T) {
 			},
 			expected: struct {
 				rows [][]string
-			}{rows: [][]string{{"Выключено"}, {"Назад"}}},
+			}{rows: [][]string{{"Выключено"}, {"Сохранить"}}},
 		},
 		{
 			name: "repeat draft screen exposes repeat choices",

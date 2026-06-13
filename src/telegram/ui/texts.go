@@ -5,14 +5,8 @@ import (
 	"html"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/EgorKo25/EasyNote/src/database"
-)
-
-const (
-	draftTitleCenterWidth = 32
-	draftTitleMinPadding  = 6
 )
 
 func MainMenuText(stats database.ReminderStats) string {
@@ -36,10 +30,10 @@ func CreateText() string {
 }
 
 func DraftText(draft Draft, location *time.Location) string {
-	dateText := "Дата и время не заданы"
-	title := "Название"
-	description := "Здесь может быть описание вашей задачи. Описание не задано."
-	repeat := RepeatText(draft)
+	dateText := ""
+	title := html.EscapeString(draft.Title)
+	description := html.EscapeString(draft.Description)
+	repeat := strings.TrimPrefix(RepeatText(draft), "Повторять: ")
 
 	remindAt := draft.RemindAt(location)
 	if remindAt.IsZero() && len(draft.CustomDates) > 0 {
@@ -65,26 +59,17 @@ func DraftText(draft Draft, location *time.Location) string {
 		)
 	}
 
-	if draft.Title != "" {
-		title = html.EscapeString(draft.Title)
-	}
-
-	if draft.Description != "" {
-		description = html.EscapeString(draft.Description)
-	}
-
 	notice := ""
 	if draft.Notice != "" {
 		notice = "\n\n<i>" + html.EscapeString(draft.Notice) + "</i>"
 	}
 
 	return fmt.Sprintf(
-		"%s<b>%s</b>\n\n"+
-			"%s\n\n"+
-			"Время начала напоминания: %s\n\n"+
-			"%s\n\n"+
+		"<b>Название:</b>\n%s\n\n"+
+			"<b>Описание:</b>\n%s\n\n"+
+			"<b>Дата начала напоминаний:</b>\n%s\n\n"+
+			"<b>Повторять:</b>\n%s\n\n"+
 			"<i>%s</i>%s",
-		draftTitlePadding(title),
 		title,
 		description,
 		dateText,
@@ -92,13 +77,6 @@ func DraftText(draft Draft, location *time.Location) string {
 		draftNextStep(draft, location),
 		notice,
 	)
-}
-
-func draftTitlePadding(title string) string {
-	titleWidth := utf8.RuneCountInString(html.UnescapeString(title))
-	paddingWidth := max((draftTitleCenterWidth-titleWidth)/2, draftTitleMinPadding)
-
-	return strings.Repeat("⠀", paddingWidth)
 }
 
 func draftNextStep(draft Draft, location *time.Location) string {

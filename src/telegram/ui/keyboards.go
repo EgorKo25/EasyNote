@@ -54,7 +54,7 @@ func draftMainKeyboard(draft Draft) *telego.InlineKeyboardMarkup {
 	titleButtonText := draftTitleButtonText(draft)
 	descriptionButtonText := draftDescriptionButtonText(draft)
 
-	dateButtonText := "Изменить дату"
+	dateButtonText := ButtonDraftDate
 	if draft.Repeat != RepeatNone {
 		dateButtonText = "Изменить дату и время начала"
 	}
@@ -62,11 +62,11 @@ func draftMainKeyboard(draft Draft) *telego.InlineKeyboardMarkup {
 	return tu.InlineKeyboard(
 		tu.InlineKeyboardRow(tu.InlineKeyboardButton(dateButtonText).WithCallbackData(CallbackDraftDate)),
 		tu.InlineKeyboardRow(
-			tu.InlineKeyboardButton(ButtonDraftRepeat).WithCallbackData(CallbackDraftRepeat),
-		),
-		tu.InlineKeyboardRow(
 			tu.InlineKeyboardButton(titleButtonText).WithCallbackData(CallbackDraftTitle),
 			tu.InlineKeyboardButton(descriptionButtonText).WithCallbackData(CallbackDraftDescription),
+		),
+		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton(ButtonDraftRepeat).WithCallbackData(CallbackDraftRepeat),
 		),
 		tu.InlineKeyboardRow(
 			tu.InlineKeyboardButton(ButtonDraftSave).WithCallbackData(CallbackDraftSave),
@@ -342,7 +342,7 @@ func IntrusiveSettingsKeyboard(enabled bool) *telego.InlineKeyboardMarkup {
 
 	return tu.InlineKeyboard(
 		tu.InlineKeyboardRow(tu.InlineKeyboardButton(toggleText).WithCallbackData(callback)),
-		tu.InlineKeyboardRow(tu.InlineKeyboardButton(ButtonBack).WithCallbackData(CallbackSettings)),
+		tu.InlineKeyboardRow(tu.InlineKeyboardButton(ButtonSettingsSave).WithCallbackData(CallbackSettings)),
 	)
 }
 
