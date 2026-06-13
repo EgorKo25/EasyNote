@@ -6,7 +6,7 @@ Telegram reminder bot for routine tasks.
 
 The source of truth for the application version is `CHANGELIST.md`.
 
-Current version: `1.2.0`.
+Current version: `1.3.2`.
 
 ## Tests
 
@@ -113,9 +113,13 @@ scheduler:
 
 ### Telegram UI
 
+The main menu is a reply-keyboard message with a compact stats block for completed, pending, and skipped tasks.
+
 Reminder draft buttons now reflect filled fields: `Название`, `Описание`, and `Дата` become `Изменить ...` after input. Recurring reminder drafts use `Дата и время начала` / `Изменить дату и время начала` so the user sees that the value starts the recurring schedule.
 
-After the main reply-keyboard commands `Создать напоминание` and `Список напоминаний` are handled, the bot deletes those user messages from the dialog and logs deletion failures without interrupting the command.
+Reminder notifications keep the main reply keyboard available by briefly sending and deleting a main-menu message before the inline reminder notification. The notification itself uses only inline `Готово` and `Отменить` actions and is deleted after either action.
+
+After reply-keyboard commands and user text inputs are handled, the bot deletes those user messages from the dialog and logs deletion failures without interrupting the command.
 
 ## Deployment
 
@@ -196,10 +200,30 @@ docker compose up -d --no-deps app
 
 PostgreSQL is not restarted by the beta CD job.
 
+For a manual deployment from a pull request branch, run the same workflow manually on the PR branch and enable `deploy_from_pr`. The image tag is built as `X.Y.Z.<short_sha>`, for example `1.3.2.a1b2c3d`, and that exact tag is deployed.
+
 ## Changelist
 
 <div style="max-height: 420px; overflow-y: auto; border: 1px solid #d0d7de; border-radius: 6px; padding: 16px;">
-<p><strong>version: 1.2.0</strong></p>
+<p><strong>version: 1.3.2</strong></p>
+
+<h2>v1.3.2 - Telegram UI recovery and PR deployment</h2>
+<ul>
+  <li>The main menu message was restored with completed, pending, and skipped task counters.</li>
+  <li>Reminder notifications refresh the reply keyboard through a temporary main-menu message and keep inline actions on the notification itself.</li>
+  <li>Reminder draft buttons switch to "Изменить ..." after values are entered, and handled user input is deleted from chat.</li>
+  <li>Intrusive reminder interval settings support manual input from 1 to 120 minutes.</li>
+  <li>Manual PR deployment can publish and deploy an image tagged as X.Y.Z.&lt;short_sha&gt;.</li>
+</ul>
+
+<h2>v1.3.1 - reply keyboard reminder navigation</h2>
+<ul>
+  <li>Active and past reminder lists use reply keyboards with two reminders per page and previous/next navigation.</li>
+  <li>Reminder list pagination is performed in database queries with limit and offset.</li>
+  <li>Creation, settings, timezone, regularity, and intrusive reminder menus moved to reply keyboards.</li>
+  <li>The recurrence wording was updated to "Настроить регулярность", "Повторять", and "нет".</li>
+  <li>The recurrence menu added "По будням", and intrusive reminders use one state button: "Включено" or "Выключено".</li>
+</ul>
 
 <h2>v1.2.0 - scheduler runtime runner</h2>
 <ul>

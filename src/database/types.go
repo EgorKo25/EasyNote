@@ -79,6 +79,12 @@ type ReminderView struct {
 	CreatedAt time.Time
 }
 
+type ReminderStats struct {
+	Completed int
+	Pending   int
+	Skipped   int
+}
+
 type ReminderRuleType string
 
 const (

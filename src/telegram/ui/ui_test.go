@@ -28,11 +28,20 @@ func TestTextRendering(t *testing.T) {
 		}
 	}{
 		{
-			name:   "main menu text stays visually empty",
-			action: telegramui.MainMenuText,
+			name: "main menu text renders statistics",
+			action: func() string {
+				return telegramui.MainMenuText(database.ReminderStats{Completed: 3, Pending: 2, Skipped: 1})
+			},
 			expected: struct {
 				text string
-			}{text: " "},
+			}{
+				text: "*Главное меню*\n\n" +
+					"```\n" +
+					"✓ Задач выполнено:          3\n" +
+					"• Задач ожидает выполнения: 2\n" +
+					"❗ Задач пропущено:          1\n" +
+					"```",
+			},
 		},
 		{
 			name: "filled draft text shows reminder fields",

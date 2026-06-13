@@ -136,6 +136,31 @@ func (d *Database) FindReminderHistoryByChat(
 	return reminders, nil
 }
 
+func (d *Database) ReminderStatsByChat(ctx context.Context, telegramChatID int64) (database.ReminderStats, error) {
+	query := `
+		SELECT
+			count(*) FILTER (WHERE r.status = 'completed') AS completed,
+			count(*) FILTER (WHERE r.status = 'new') AS pending,
+			count(*) FILTER (WHERE r.status = 'skipped') AS skipped
+		FROM reminders r
+		JOIN notes n ON n.id = r.note_id
+		WHERE n.telegram_chat_id = $1
+	`
+
+	var stats database.ReminderStats
+
+	err := d.pool.QueryRow(ctx, query, telegramChatID).Scan(
+		&stats.Completed,
+		&stats.Pending,
+		&stats.Skipped,
+	)
+	if err != nil {
+		return database.ReminderStats{}, fmt.Errorf("load reminder stats by chat: %w", err)
+	}
+
+	return stats, nil
+}
+
 func (d *Database) CancelReminder(ctx context.Context, telegramChatID int64, reminderID int64) error {
 	transaction, err := d.pool.Begin(ctx)
 	if err != nil {
