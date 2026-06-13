@@ -10,17 +10,19 @@ The main menu stats block no longer uses a Markdown code block; it is rendered w
 
 Reminder delivery now refreshes the reply main keyboard through a temporary main-menu message, deletes that temporary message, and then sends the reminder itself with inline `Готово` and `Отменить` actions only.
 
-Reminder creation was fixed after the reply-keyboard migration: filled draft fields switch to `Изменить ...`, field buttons wait for user input again, and user input messages are deleted after handling.
+Reminder creation returned to inline keyboards because the previous reply-keyboard editor made field editing and time selection harder to use. Filled draft fields still switch to `Изменить ...`, field buttons wait for user input again, and user input messages are deleted after handling.
 
 Reminder creation text was reorganized around title, description, repeat state, and selected date. Service prompts are rendered in italic.
 
-The reminder draft now explicitly marks the screen as a template, shows default description copy, labels the start date, and exposes `Изменить описание` / `Изменить дату` directly on the reply keyboard.
+The reminder draft now explicitly marks the screen as a template, centers the title, separates description, repeat state, and start time with blank lines, shows default description copy, and keeps start time on one line.
 
-The `Название` and `Описание` draft buttons now switch the message into input-waiting mode by editing the existing message text, avoiding a delete/send blink when the reply keyboard does not need to change.
+The `Название` and `Описание` draft buttons now switch the message into input-waiting mode by editing the existing message text, avoiding a delete/send blink. Draft prompts now only ask for the missing required fields: title, time, or both.
 
 Delivered reminder actions now remove the notification message after `Готово` or `Отменить`.
 
-Intrusive reminder settings now use only the `Включено` / `Выключено` toggle and accept manual interval input directly from chat, from 1 to 120 minutes.
+Intrusive reminder settings now use an inline `Включено` / `Выключено` toggle and accept manual interval input directly from chat, from 1 minute to 2 hours. Plain numbers are treated as minutes, and Go duration values such as `1m` and `1h30m` are supported.
+
+Intrusive reminder settings now edit the existing settings message after manual input instead of deleting and sending a new message. Interval values are rendered as user-facing text, for example `каждые 30 минут` or `раз в 1 час 20 минут`.
 
 Timezone reply-keyboard arrows are handled in the timezone context before reminder-list pagination, so they no longer open active reminders.
 

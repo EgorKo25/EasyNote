@@ -35,7 +35,7 @@ func TestTextRendering(t *testing.T) {
 			expected: struct {
 				text string
 			}{
-				text: "⠀⠀⠀⠀<b>Главное меню</b>\n\n" +
+				text: "⠀⠀⠀⠀⠀⠀⠀⠀<b>Главное меню</b>\n\n" +
 					"✅ Задачи выполнены: 3\n" +
 					"⏳ Задачи ожидают выполнения: 2\n" +
 					"❗ Задачи пропущены: 1",
@@ -56,9 +56,9 @@ func TestTextRendering(t *testing.T) {
 				text string
 			}{
 				text: "<i>Шаблон напоминания</i>\n\n" +
-					"⠀⠀⠀⠀<b>Pay rent</b>\n\nОписание: Before lunch\nПовторять: нет\n\n" +
-					"Дата начала напоминания:\n⠀⠀⠀⠀02.06.2026, Вт 09:30\n\n" +
-					"<i>Выберите дату и время кнопкой ниже.</i>",
+					"⠀⠀⠀⠀⠀⠀⠀⠀<b>Pay rent</b>\n\nОписание: Before lunch\n\nПовторять: нет\n\n" +
+					"Время начала напоминания: 02.06.2026, Вт 09:30\n\n" +
+					"<i>Проверьте шаблон и сохраните напоминание.</i>",
 			},
 		},
 		{
@@ -80,7 +80,7 @@ func TestTextRendering(t *testing.T) {
 			},
 			expected: struct {
 				text string
-			}{text: "02.06.2026 09:30\n<b>Pay rent</b>\nBefore lunch"},
+			}{text: "<b>Pay rent</b>\n\nBefore lunch\n\n02.06.2026 09:30"},
 		},
 		{
 			name: "empty reminder list text explains empty state",
@@ -100,10 +100,10 @@ func TestTextRendering(t *testing.T) {
 				text string
 			}{
 				text: "<i>Шаблон напоминания</i>\n\n" +
-					"⠀⠀⠀⠀<b>Название</b>\n\n" +
-					"Описание: Здесь может быть описание вашего напоминания.\n" +
-					"Повторять: нет\n\nДата начала напоминания:\n" +
-					"⠀⠀⠀⠀Сегодня\n\n<i>Введите название напоминания сообщением.</i>",
+					"⠀⠀⠀⠀⠀⠀⠀⠀<b>Название</b>\n\n" +
+					"Описание: Здесь может быть описание вашего напоминания.\n\n" +
+					"Повторять: нет\n\nВремя начала напоминания: Сегодня\n\n" +
+					"<i>Введите название напоминания сообщением.</i>",
 			},
 		},
 	}
@@ -138,7 +138,7 @@ func TestKeyboardRendering(t *testing.T) {
 			expected: struct {
 				rows      int
 				firstText string
-			}{rows: 4, firstText: "Дата"},
+			}{rows: 4, firstText: "Изменить дату"},
 		},
 		{
 			name: "filled recurring telegramui.Draft asks to change start date time",
@@ -177,7 +177,7 @@ func TestKeyboardRendering(t *testing.T) {
 			}{rows: 8, firstText: "<"},
 		},
 		{
-			name: "time screen renders presets and steppers",
+			name: "time screen renders day and done actions",
 			action: func() any {
 				return telegramui.DraftKeyboard(telegramui.Draft{
 					Screen: telegramui.ScreenTime,
@@ -188,7 +188,7 @@ func TestKeyboardRendering(t *testing.T) {
 			expected: struct {
 				rows      int
 				firstText string
-			}{rows: 4, firstText: "09:00"},
+			}{rows: 1, firstText: "День"},
 		},
 		{
 			name: "empty reminder list keeps pagination and back actions",
@@ -351,13 +351,13 @@ func TestMenuAndActionKeyboards(t *testing.T) {
 			}{rows: [][]string{{"Язык: русский"}, {"Часовой пояс"}, {"Настойчивые напоминания"}, {"Назад"}}},
 		},
 		{
-			name: "intrusive settings keyboard exposes enable disable and back",
+			name: "intrusive settings keyboard exposes inline toggle",
 			action: func() [][]string {
-				return keyboardTexts(telegramui.IntrusiveSettingsKeyboard(false).Keyboard)
+				return keyboardTexts(telegramui.IntrusiveSettingsKeyboard(false).InlineKeyboard)
 			},
 			expected: struct {
 				rows [][]string
-			}{rows: [][]string{{"Выключено"}, {"Назад"}}},
+			}{rows: [][]string{{"Выключено"}}},
 		},
 		{
 			name: "repeat draft screen exposes repeat choices",
@@ -455,7 +455,7 @@ func TestSettingsHistoryAndStatusTexts(t *testing.T) {
 				text string
 			}{
 				text: "<b>Настройки</b>\n\nЯзык: русский\nЧасовой пояс: Europe/Moscow\n" +
-					"Настойчивые напоминания: включены\nИнтервал: 45m0s",
+					"Настойчивые напоминания: включены\nИнтервал: каждые 45 минут",
 			},
 		},
 		{
@@ -469,10 +469,19 @@ func TestSettingsHistoryAndStatusTexts(t *testing.T) {
 			expected: struct {
 				text string
 			}{
-				text: "<b>Настойчивые напоминания</b>\n\nСостояние: выключены\nИнтервал: 30m0s\n\n" +
+				text: "<b>Настойчивые напоминания</b>\n\nСостояние: выключены\nИнтервал: каждые 30 минут\n\n" +
 					"<i>Вы можете ввести желаемый интервал напоминания с клавиатуры. " +
-					"Просто отправьте его в чат.</i>",
+					"Лучше использовать формат 1h30m. Просто отправьте его в чат.</i>",
 			},
+		},
+		{
+			name: "intrusive interval text renders hour and minutes",
+			action: func() string {
+				return telegramui.IntrusiveIntervalValueText(80 * time.Minute)
+			},
+			expected: struct {
+				text string
+			}{text: "раз в 1 час 20 минут"},
 		},
 		{
 			name: "failed status text is localized",
