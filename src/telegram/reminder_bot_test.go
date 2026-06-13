@@ -481,12 +481,17 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 		}
 	}{
 		{
-			name:   "main menu text is visually empty",
-			action: telegramui.MainMenuText,
+			name: "main menu text renders statistics",
+			action: func() string {
+				return telegramui.MainMenuText(database.ReminderStats{Completed: 3, Pending: 2, Skipped: 1})
+			},
 			expected: struct {
 				expectedText string
 			}{
-				expectedText: " ",
+				expectedText: "⠀⠀⠀⠀⠀⠀⠀⠀<b>Главное меню</b>\n\n" +
+					"✅ Задачи выполнены: 3\n" +
+					"⏳ Задачи ожидают выполнения: 2\n" +
+					"❗ Задачи пропущены: 1",
 			},
 		},
 		{
@@ -503,12 +508,11 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 			expected: struct {
 				expectedText string
 			}{
-				expectedText: "Создание напоминания\n\n" +
-					"Дата и время: 02.06.2026 09:30\n" +
-					"Название: Pay rent\n" +
-					"Описание: Before lunch\n" +
-					"Повторять: нет\n\n" +
-					"Выберите дату и время кнопкой ниже.",
+				expectedText: "<b>Название:</b>\nPay rent\n\n" +
+					"<b>Описание:</b>\nBefore lunch\n\n" +
+					"<b>Дата начала напоминаний:</b>\n02.06.2026, Вт 09:30\n\n" +
+					"<b>Повторять:</b>\nнет\n\n" +
+					"<i>Проверьте шаблон и сохраните напоминание.</i>",
 			},
 		},
 		{
@@ -527,12 +531,11 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 			expected: struct {
 				expectedText string
 			}{
-				expectedText: "Создание напоминания\n\n" +
-					"Дата и время: не задано\n" +
-					"Название: Pay rent\n" +
-					"Описание: Before lunch\n" +
-					"Повторять: выбрано дат: 2\n\n" +
-					"Выберите дату и время кнопкой ниже.",
+				expectedText: "<b>Название:</b>\nPay rent\n\n" +
+					"<b>Описание:</b>\nBefore lunch\n\n" +
+					"<b>Дата начала напоминаний:</b>\n02.06.2026, Вт 00:00\n\n" +
+					"<b>Повторять:</b>\nвыбрано дат: 2\n\n" +
+					"<i>Выберите дату и введите время напоминания.</i>",
 			},
 		},
 		{
@@ -542,7 +545,7 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 			},
 			expected: struct {
 				expectedText string
-			}{expectedText: "02.06.2026 09:30\nPay rent\nBefore lunch"},
+			}{expectedText: "<b>Pay rent</b>\n\nBefore lunch\n\n02.06.2026 09:30"},
 		},
 		{
 			name: "empty draft text shows missing fields and empty repeat",
@@ -552,12 +555,11 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 			expected: struct {
 				expectedText string
 			}{
-				expectedText: "Создание напоминания\n\n" +
-					"Дата и время: не задано\n" +
-					"Название: не задано\n" +
-					"Описание: не задано\n" +
-					"Повторять: нет\n\n" +
-					"Выберите дату и время кнопкой ниже.",
+				expectedText: "<b>Название:</b>\n\n\n" +
+					"<b>Описание:</b>\n\n\n" +
+					"<b>Дата начала напоминаний:</b>\n\n\n" +
+					"<b>Повторять:</b>\nнет\n\n" +
+					"<i>Введите название и время напоминания.</i>",
 			},
 		},
 		{
@@ -568,8 +570,7 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 			expected: struct {
 				expectedText string
 			}{
-				expectedText: "Активных напоминаний пока нет.\n\n" +
-					"Создайте первое напоминание на основной клавиатуре.",
+				expectedText: "<b>Активные напоминания</b>\n\n<i>Активных напоминаний пока нет.</i>",
 			},
 		},
 	}
@@ -602,7 +603,7 @@ func TestReminderUIBuildsExpectedKeyboards(t *testing.T) {
 			expected: struct {
 				rowCount        int
 				firstButtonText string
-			}{rowCount: 4, firstButtonText: "Дата"},
+			}{rowCount: 4, firstButtonText: "Дата и время"},
 		},
 		{
 			name: "filled one time draft keyboard offers changing date",
@@ -614,7 +615,7 @@ func TestReminderUIBuildsExpectedKeyboards(t *testing.T) {
 			expected: struct {
 				rowCount        int
 				firstButtonText string
-			}{rowCount: 4, firstButtonText: "Изменить дату"},
+			}{rowCount: 4, firstButtonText: "Дата и время"},
 		},
 		{
 			name: "empty recurring draft keyboard explains start date time",
@@ -624,7 +625,7 @@ func TestReminderUIBuildsExpectedKeyboards(t *testing.T) {
 			expected: struct {
 				rowCount        int
 				firstButtonText string
-			}{rowCount: 4, firstButtonText: "Дата и время начала"},
+			}{rowCount: 4, firstButtonText: "Изменить дату и время начала"},
 		},
 		{
 			name: "filled recurring draft keyboard offers changing start date time",
@@ -663,7 +664,7 @@ func TestReminderUIBuildsExpectedKeyboards(t *testing.T) {
 			}{rowCount: 8},
 		},
 		{
-			name: "time keyboard has future presets, steppers and done",
+			name: "time keyboard asks for text input and keeps day action",
 			action: func() any {
 				return telegramui.DraftKeyboard(uiDraft(reminderDraft{
 					screen: telegramui.ScreenTime,
@@ -674,7 +675,7 @@ func TestReminderUIBuildsExpectedKeyboards(t *testing.T) {
 			expected: struct {
 				rowCount        int
 				firstButtonText string
-			}{rowCount: 4},
+			}{rowCount: 1, firstButtonText: "День"},
 		},
 		{
 			name: "empty reminder list keyboard still has pagination and back",
@@ -697,7 +698,7 @@ func TestReminderUIBuildsExpectedKeyboards(t *testing.T) {
 			expected: struct {
 				rowCount        int
 				firstButtonText string
-			}{rowCount: 4, firstButtonText: "#1 Pay rent"},
+			}{rowCount: 4, firstButtonText: "Pay rent"},
 		},
 	}
 
@@ -742,10 +743,13 @@ func TestReminderUIBuildsExpectedKeyboards(t *testing.T) {
 func TestSenderSendsReminder(t *testing.T) {
 	t.Parallel()
 
+	previousMessageID := 40
+
 	tests := []struct {
 		name     string
 		cfg      config.Telegram
 		reminder database.ScheduledReminder
+		state    func(sender *Sender)
 		before   func(caller *telegoapimock.MockCaller)
 		expected struct {
 			expectedErr error
@@ -761,7 +765,7 @@ func TestSenderSendsReminder(t *testing.T) {
 			before: func(caller *telegoapimock.MockCaller) {
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(testTelegramResponse(t, telego.Message{MessageID: 1}), nil).
-					Times(1)
+					Times(2)
 			},
 		},
 		{
@@ -775,7 +779,7 @@ func TestSenderSendsReminder(t *testing.T) {
 			before: func(caller *telegoapimock.MockCaller) {
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(testTelegramResponse(t, telego.Message{MessageID: 2}), nil).
-					Times(1)
+					Times(2)
 			},
 		},
 		{
@@ -789,7 +793,7 @@ func TestSenderSendsReminder(t *testing.T) {
 			before: func(caller *telegoapimock.MockCaller) {
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(testTelegramResponse(t, telego.Message{MessageID: 3}), nil).
-					Times(1)
+					Times(2)
 			},
 		},
 		{
@@ -803,7 +807,37 @@ func TestSenderSendsReminder(t *testing.T) {
 			before: func(caller *telegoapimock.MockCaller) {
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(testTelegramResponse(t, telego.Message{MessageID: 4}), nil).
-					Times(1)
+					Times(2)
+			},
+		},
+		{
+			name: "previous intrusive reminder message is deleted before new reminder is sent",
+			reminder: database.ScheduledReminder{
+				ID:                7,
+				TelegramChatID:    100,
+				Title:             "Pay rent",
+				TelegramMessageID: &previousMessageID,
+			},
+			before: func(caller *telegoapimock.MockCaller) {
+				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(testTelegramResponse(t, telego.Message{MessageID: 7}), nil).
+					Times(3)
+			},
+		},
+		{
+			name: "previous main menu message is deleted from memory before new reminder is sent",
+			reminder: database.ScheduledReminder{
+				ID:             8,
+				TelegramChatID: 100,
+				Title:          "Pay rent",
+			},
+			state: func(sender *Sender) {
+				sender.setMainMenuMessageID(100, 55)
+			},
+			before: func(caller *telegoapimock.MockCaller) {
+				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(testTelegramResponse(t, telego.Message{MessageID: 8}), nil).
+					Times(3)
 			},
 		},
 		{
@@ -814,8 +848,14 @@ func TestSenderSendsReminder(t *testing.T) {
 				Title:          "Pay rent",
 			},
 			before: func(caller *telegoapimock.MockCaller) {
-				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, errTelegramAPI).
-					Times(1)
+				gomock.InOrder(
+					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+						Return(testTelegramResponse(t, telego.Message{MessageID: 5}), nil).
+						Times(1),
+					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+						Return(nil, errTelegramAPI).
+						Times(1),
+				)
 			},
 			expected: struct{ expectedErr error }{
 				expectedErr: errExpectedSendCaller,
@@ -829,12 +869,17 @@ func TestSenderSendsReminder(t *testing.T) {
 				Title:          "Pay rent",
 			},
 			before: func(caller *telegoapimock.MockCaller) {
-				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(&telegoapi.Response{
-						Ok:    false,
-						Error: &telegoapi.Error{ErrorCode: 400, Description: "bad request"},
-					}, nil).
-					Times(1)
+				gomock.InOrder(
+					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+						Return(testTelegramResponse(t, telego.Message{MessageID: 6}), nil).
+						Times(1),
+					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+						Return(&telegoapi.Response{
+							Ok:    false,
+							Error: &telegoapi.Error{ErrorCode: 400, Description: "bad request"},
+						}, nil).
+						Times(1),
+				)
 			},
 			expected: struct{ expectedErr error }{
 				expectedErr: errExpectedSendResponse,
@@ -859,6 +904,10 @@ func TestSenderSendsReminder(t *testing.T) {
 			require.NoError(t, err)
 
 			sender := &Sender{bot: bot, cfg: test.cfg}
+			if test.state != nil {
+				test.state(sender)
+			}
+
 			_, err = sender.SendReminder(t.Context(), test.reminder)
 
 			if test.expected.expectedErr != nil {
@@ -1168,9 +1217,13 @@ func TestReminderBotHandlesMessages(t *testing.T) {
 			name:    "start command opens main menu",
 			message: telego.Message{MessageID: messageID, Chat: telego.Chat{ID: chatID}, Text: "/start"},
 			before: func(caller *telegoapimock.MockCaller, _ *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
+				repository.EXPECT().
+					ReminderStatsByChat(gomock.Any(), chatID).
+					Return(database.ReminderStats{Completed: 3, Pending: 2, Skipped: 1}, nil).
+					Times(1)
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(testTelegramResponse(t, telego.Message{MessageID: 1}), nil).
-					Times(1)
+					Times(2)
 			},
 		},
 		{
@@ -1311,6 +1364,10 @@ func TestReminderBotRunsReplyMessageCommands(t *testing.T) {
 			name: "create reminder kind starts draft",
 			text: telegramui.ButtonCreateReminderKind,
 			before: func(_ *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
+				repository.EXPECT().
+					UserSettings(gomock.Any(), chatID).
+					Return(database.UserSettings{Timezone: "UTC"}, nil).
+					Times(1)
 			},
 			expected: struct {
 				handled         bool
@@ -1322,10 +1379,16 @@ func TestReminderBotRunsReplyMessageCommands(t *testing.T) {
 			name: "active reminders command loads first database page",
 			text: telegramui.ButtonReminderList,
 			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
-				repository.EXPECT().
-					FindRemindersByChat(gomock.Any(), chatID, reminderPageSize, 0).
-					Return([]database.ReminderView{reminder}, nil).
-					Times(1)
+				gomock.InOrder(
+					repository.EXPECT().
+						UserSettings(gomock.Any(), chatID).
+						Return(database.UserSettings{Timezone: "UTC"}, nil).
+						Times(1),
+					repository.EXPECT().
+						FindRemindersByChat(gomock.Any(), chatID, reminderPageSize, 0).
+						Return([]database.ReminderView{reminder}, nil).
+						Times(1),
+				)
 			},
 			expected: struct {
 				handled         bool
@@ -1340,10 +1403,16 @@ func TestReminderBotRunsReplyMessageCommands(t *testing.T) {
 				bot.setReminderListState(chatID, reminderListState{kind: reminderListActive, offset: 2})
 			},
 			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
-				repository.EXPECT().
-					FindRemindersByChat(gomock.Any(), chatID, reminderPageSize, 4).
-					Return([]database.ReminderView{reminder}, nil).
-					Times(1)
+				gomock.InOrder(
+					repository.EXPECT().
+						UserSettings(gomock.Any(), chatID).
+						Return(database.UserSettings{Timezone: "UTC"}, nil).
+						Times(1),
+					repository.EXPECT().
+						FindRemindersByChat(gomock.Any(), chatID, reminderPageSize, 4).
+						Return([]database.ReminderView{reminder}, nil).
+						Times(1),
+				)
 			},
 			expected: struct {
 				handled         bool
@@ -1359,6 +1428,46 @@ func TestReminderBotRunsReplyMessageCommands(t *testing.T) {
 					UserSettings(gomock.Any(), chatID).
 					Return(database.UserSettings{Timezone: "UTC"}, nil).
 					Times(2)
+			},
+			expected: struct {
+				handled         bool
+				expectedErrText string
+				draftExists     bool
+			}{handled: true},
+		},
+		{
+			name: "settings save returns to main menu",
+			text: telegramui.ButtonSettingsSave,
+			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
+				repository.EXPECT().
+					ReminderStatsByChat(gomock.Any(), chatID).
+					Return(database.ReminderStats{Completed: 1, Pending: 2, Skipped: 3}, nil).
+					Times(1)
+			},
+			expected: struct {
+				handled         bool
+				expectedErrText string
+				draftExists     bool
+			}{handled: true},
+		},
+		{
+			name: "timezone settings save stores selected timezone and returns to main menu",
+			text: telegramui.ButtonSettingsSave,
+			botState: func(bot *ReminderBot) {
+				bot.setChatMenu(chatID, chatMenuTimezone)
+				bot.setTimezoneIndex(chatID, 14)
+			},
+			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
+				gomock.InOrder(
+					repository.EXPECT().
+						UpdateUserTimezone(gomock.Any(), chatID, "Europe/Moscow").
+						Return(nil).
+						Times(1),
+					repository.EXPECT().
+						ReminderStatsByChat(gomock.Any(), chatID).
+						Return(database.ReminderStats{Completed: 1, Pending: 2, Skipped: 3}, nil).
+						Times(1),
+				)
 			},
 			expected: struct {
 				handled         bool
@@ -1392,7 +1501,7 @@ func TestReminderBotRunsReplyMessageCommands(t *testing.T) {
 			}{handled: false},
 		},
 		{
-			name: "malformed reminder button returns parse error",
+			name: "legacy id reminder button is not handled",
 			text: "#bad",
 			before: func(_ *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 			},
@@ -1400,7 +1509,7 @@ func TestReminderBotRunsReplyMessageCommands(t *testing.T) {
 				handled         bool
 				expectedErrText string
 				draftExists     bool
-			}{handled: true, expectedErrText: `parse reminder id: strconv.ParseInt: parsing "bad": invalid syntax`},
+			}{handled: false},
 		},
 	}
 
@@ -1467,6 +1576,7 @@ func TestReminderBotHandlesReplyNavigationState(t *testing.T) {
 		state    func(bot *ReminderBot)
 		expected struct {
 			expectedErrText string
+			apiBodyContains []string
 		}
 	}{
 		{
@@ -1487,7 +1597,7 @@ func TestReminderBotHandlesReplyNavigationState(t *testing.T) {
 			},
 			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
-					repository.EXPECT().UpdateUserTimezone(gomock.Any(), chatID, "Europe/Samara").Return(nil).Times(1),
+					repository.EXPECT().UpdateUserTimezone(gomock.Any(), chatID, "Europe/Moscow").Return(nil).Times(1),
 					repository.EXPECT().
 						UserSettings(gomock.Any(), chatID).
 						Return(database.UserSettings{Timezone: "UTC"}, nil).
@@ -1500,21 +1610,7 @@ func TestReminderBotHandlesReplyNavigationState(t *testing.T) {
 			},
 			state: func(bot *ReminderBot) {
 				bot.menuByChat[chatID] = chatMenuTimezone
-				bot.timezoneByChat[chatID] = 2
-			},
-		},
-		{
-			name: "done from intrusive interval returns to intrusive settings",
-			action: func(ctx context.Context, bot *ReminderBot) error {
-				return bot.handleDoneMessage(ctx, chatID)
-			},
-			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
-				repository.EXPECT().UserSettings(gomock.Any(), chatID).
-					Return(database.UserSettings{Timezone: "UTC", IntrusiveInterval: time.Minute}, nil).
-					Times(2)
-			},
-			state: func(bot *ReminderBot) {
-				bot.menuByChat[chatID] = chatMenuIntrusiveInterval
+				bot.timezoneByChat[chatID] = 14
 			},
 		},
 		{
@@ -1529,67 +1625,6 @@ func TestReminderBotHandlesReplyNavigationState(t *testing.T) {
 			},
 		},
 		{
-			name: "intrusive interval shift inside boundaries saves interval",
-			action: func(ctx context.Context, bot *ReminderBot) error {
-				return bot.handleTimeShiftMessage(ctx, chatID, -5)
-			},
-			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
-				gomock.InOrder(
-					repository.EXPECT().UserSettings(gomock.Any(), chatID).
-						Return(database.UserSettings{IntrusiveEnabled: true, IntrusiveInterval: 30 * time.Minute}, nil).
-						Times(1),
-					repository.EXPECT().
-						UpdateIntrusiveSettings(gomock.Any(), chatID, true, 25*time.Minute).
-						Return(nil).
-						Times(1),
-					repository.EXPECT().UserSettings(gomock.Any(), chatID).
-						Return(database.UserSettings{IntrusiveEnabled: true, IntrusiveInterval: 25 * time.Minute}, nil).
-						Times(1),
-				)
-			},
-			state: func(bot *ReminderBot) {
-				bot.menuByChat[chatID] = chatMenuIntrusiveInterval
-			},
-		},
-		{
-			name: "intrusive interval shift below lower boundary does not save interval",
-			action: func(ctx context.Context, bot *ReminderBot) error {
-				return bot.handleTimeShiftMessage(ctx, chatID, -5)
-			},
-			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
-				gomock.InOrder(
-					repository.EXPECT().UserSettings(gomock.Any(), chatID).
-						Return(database.UserSettings{IntrusiveEnabled: true, IntrusiveInterval: time.Minute}, nil).
-						Times(1),
-					repository.EXPECT().UserSettings(gomock.Any(), chatID).
-						Return(database.UserSettings{IntrusiveEnabled: true, IntrusiveInterval: time.Minute}, nil).
-						Times(1),
-				)
-			},
-			state: func(bot *ReminderBot) {
-				bot.menuByChat[chatID] = chatMenuIntrusiveInterval
-			},
-		},
-		{
-			name: "intrusive interval shift above upper boundary does not save interval",
-			action: func(ctx context.Context, bot *ReminderBot) error {
-				return bot.handleTimeShiftMessage(ctx, chatID, 60)
-			},
-			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
-				gomock.InOrder(
-					repository.EXPECT().UserSettings(gomock.Any(), chatID).
-						Return(database.UserSettings{IntrusiveEnabled: true, IntrusiveInterval: 2 * time.Hour}, nil).
-						Times(1),
-					repository.EXPECT().UserSettings(gomock.Any(), chatID).
-						Return(database.UserSettings{IntrusiveEnabled: true, IntrusiveInterval: 2 * time.Hour}, nil).
-						Times(1),
-				)
-			},
-			state: func(bot *ReminderBot) {
-				bot.menuByChat[chatID] = chatMenuIntrusiveInterval
-			},
-		},
-		{
 			name: "reply reminder button opens current page reminder",
 			action: func(ctx context.Context, bot *ReminderBot) error {
 				handled, err := bot.handleSelectedReplyMessage(ctx, chatID, telegramui.ReminderButtonText(reminder))
@@ -1598,12 +1633,38 @@ func TestReminderBotHandlesReplyNavigationState(t *testing.T) {
 				return err
 			},
 			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
-				repository.EXPECT().
-					FindRemindersByChat(gomock.Any(), chatID, reminderPageSize, 0).
-					Return([]database.ReminderView{reminder}, nil).
-					Times(1)
+				gomock.InOrder(
+					repository.EXPECT().
+						UserSettings(gomock.Any(), chatID).
+						Return(database.UserSettings{Timezone: "UTC"}, nil).
+						Times(1),
+					repository.EXPECT().
+						FindRemindersByChat(gomock.Any(), chatID, reminderPageSize, 0).
+						Return([]database.ReminderView{reminder}, nil).
+						Times(1),
+				)
 			},
 			state: func(bot *ReminderBot) {
+				bot.menuByChat[chatID] = chatMenuReminderList
+				bot.listByChat[chatID] = reminderListState{kind: reminderListActive}
+			},
+			expected: struct {
+				expectedErrText string
+				apiBodyContains []string
+			}{apiBodyContains: []string{"Удалить", "reminder:delete:7"}},
+		},
+		{
+			name: "back reply from reminder list stays available for navigation",
+			action: func(ctx context.Context, bot *ReminderBot) error {
+				handled, err := bot.handleSelectedReplyMessage(ctx, chatID, telegramui.ButtonBack)
+				require.False(t, handled)
+
+				return err
+			},
+			before: func(_ *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
+			},
+			state: func(bot *ReminderBot) {
+				bot.menuByChat[chatID] = chatMenuReminderList
 				bot.listByChat[chatID] = reminderListState{kind: reminderListActive}
 			},
 		},
@@ -1616,12 +1677,19 @@ func TestReminderBotHandlesReplyNavigationState(t *testing.T) {
 				return err
 			},
 			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
-				repository.EXPECT().
-					FindReminderHistoryByChat(gomock.Any(), chatID, reminderPageSize, 2).
-					Return([]database.ReminderView{reminder}, nil).
-					Times(1)
+				gomock.InOrder(
+					repository.EXPECT().
+						UserSettings(gomock.Any(), chatID).
+						Return(database.UserSettings{Timezone: "UTC"}, nil).
+						Times(1),
+					repository.EXPECT().
+						FindReminderHistoryByChat(gomock.Any(), chatID, reminderPageSize, 2).
+						Return([]database.ReminderView{reminder}, nil).
+						Times(1),
+				)
 			},
 			state: func(bot *ReminderBot) {
+				bot.menuByChat[chatID] = chatMenuReminderList
 				bot.listByChat[chatID] = reminderListState{kind: reminderListHistory, offset: 2}
 			},
 		},
@@ -1706,18 +1774,15 @@ func TestReminderBotHandlesReplyNavigationState(t *testing.T) {
 			},
 		},
 		{
-			name: "malformed reply reminder button returns parse error",
+			name: "legacy id reply reminder button is ignored outside reminder list",
 			action: func(ctx context.Context, bot *ReminderBot) error {
 				handled, err := bot.handleSelectedReplyMessage(ctx, chatID, "#bad")
-				require.True(t, handled)
+				require.False(t, handled)
 
 				return err
 			},
 			before: func(_ *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 			},
-			expected: struct {
-				expectedErrText string
-			}{expectedErrText: `parse reminder id: strconv.ParseInt: parsing "bad": invalid syntax`},
 		},
 		{
 			name: "unknown selected reply message is ignored",
@@ -1742,9 +1807,15 @@ func TestReminderBotHandlesReplyNavigationState(t *testing.T) {
 			repository := telegrammocks.NewMockReminderRepository(ctrl)
 			test.before(service, repository)
 
+			apiBodies := make([]string, 0)
+
 			caller.EXPECT().
 				Call(gomock.Any(), gomock.Any(), gomock.Any()).
-				Return(testTelegramResponse(t, telego.Message{MessageID: messageID}), nil).
+				DoAndReturn(func(_ context.Context, _ string, data *telegoapi.RequestData) (*telegoapi.Response, error) {
+					apiBodies = append(apiBodies, string(data.BodyRaw))
+
+					return testTelegramResponse(t, telego.Message{MessageID: messageID}), nil
+				}).
 				AnyTimes()
 
 			botAPI, err := telego.NewBot(testTelegramToken, telego.WithAPICaller(caller))
@@ -1774,6 +1845,179 @@ func TestReminderBotHandlesReplyNavigationState(t *testing.T) {
 			}
 
 			require.NoError(t, err)
+
+			apiBody := strings.Join(apiBodies, "\n")
+			for _, text := range test.expected.apiBodyContains {
+				require.Contains(t, apiBody, text)
+			}
+		})
+	}
+}
+
+func TestReplyShiftMinutes(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		text     string
+		expected struct {
+			minutes int
+			handled bool
+		}
+	}{
+		{
+			name: "minus hour button shifts back sixty minutes",
+			text: telegramui.ButtonMinusHour,
+			expected: struct {
+				minutes int
+				handled bool
+			}{minutes: -60, handled: true},
+		},
+		{
+			name: "plus hour button shifts forward sixty minutes",
+			text: telegramui.ButtonPlusHour,
+			expected: struct {
+				minutes int
+				handled bool
+			}{minutes: 60, handled: true},
+		},
+		{
+			name: "minus five minutes button shifts back five minutes",
+			text: telegramui.ButtonMinusFiveMinutes,
+			expected: struct {
+				minutes int
+				handled bool
+			}{minutes: -5, handled: true},
+		},
+		{
+			name: "plus five minutes button shifts forward five minutes",
+			text: telegramui.ButtonPlusFiveMinutes,
+			expected: struct {
+				minutes int
+				handled bool
+			}{minutes: 5, handled: true},
+		},
+		{
+			name: "minus fifteen minutes button shifts back fifteen minutes",
+			text: telegramui.ButtonMinusFifteenMinutes,
+			expected: struct {
+				minutes int
+				handled bool
+			}{minutes: -15, handled: true},
+		},
+		{
+			name: "minus one minute button shifts back one minute",
+			text: telegramui.ButtonMinusMinute,
+			expected: struct {
+				minutes int
+				handled bool
+			}{minutes: -1, handled: true},
+		},
+		{
+			name: "plus one minute button shifts forward one minute",
+			text: telegramui.ButtonPlusMinute,
+			expected: struct {
+				minutes int
+				handled bool
+			}{minutes: 1, handled: true},
+		},
+		{
+			name: "plus fifteen minutes button shifts forward fifteen minutes",
+			text: telegramui.ButtonPlusFifteenMinutes,
+			expected: struct {
+				minutes int
+				handled bool
+			}{minutes: 15, handled: true},
+		},
+		{
+			name: "done button is not a shift",
+			text: telegramui.ButtonDone,
+			expected: struct {
+				minutes int
+				handled bool
+			}{},
+		},
+		{
+			name: "unknown text is not a shift",
+			text: "unknown",
+			expected: struct {
+				minutes int
+				handled bool
+			}{},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			minutes, handled := replyShiftMinutes(test.text)
+
+			require.Equal(t, test.expected.minutes, minutes)
+			require.Equal(t, test.expected.handled, handled)
+		})
+	}
+}
+
+func TestHasTelegramHTML(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		text     string
+		expected struct {
+			hasHTML bool
+		}
+	}{
+		{
+			name: "bold title is html",
+			text: "<b>Главное меню</b>",
+			expected: struct {
+				hasHTML bool
+			}{hasHTML: true},
+		},
+		{
+			name: "italic prompt is html",
+			text: "<i>Выберите тип.</i>",
+			expected: struct {
+				hasHTML bool
+			}{hasHTML: true},
+		},
+		{
+			name: "bold and italic draft text is html",
+			text: "<i>Шаблон</i>\n<b>Название</b>",
+			expected: struct {
+				hasHTML bool
+			}{hasHTML: true},
+		},
+		{
+			name: "plain text around html is html",
+			text: "Описание\n<i>Подсказка</i>",
+			expected: struct {
+				hasHTML bool
+			}{hasHTML: true},
+		},
+		{
+			name: "plain text is not html",
+			text: "Главное меню",
+			expected: struct {
+				hasHTML bool
+			}{},
+		},
+		{
+			name: "escaped angle brackets without supported tags are not html",
+			text: "&lt;b&gt;Главное меню&lt;/b&gt;",
+			expected: struct {
+				hasHTML bool
+			}{},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			require.Equal(t, test.expected.hasHTML, hasTelegramHTML(test.text))
 		})
 	}
 }
@@ -1789,9 +2033,10 @@ func TestReminderBotCommandCallbacks(t *testing.T) {
 		data     string
 		draft    reminderDraft
 		expected struct {
-			handled bool
-			screen  telegramui.Screen
-			waiting telegramui.Field
+			handled  bool
+			screen   telegramui.Screen
+			waiting  telegramui.Field
+			apiCalls int
 		}
 	}{
 		{
@@ -1799,49 +2044,54 @@ func TestReminderBotCommandCallbacks(t *testing.T) {
 			data:  telegramui.CallbackDraftTitle,
 			draft: reminderDraft{},
 			expected: struct {
-				handled bool
-				screen  telegramui.Screen
-				waiting telegramui.Field
-			}{handled: true, screen: telegramui.ScreenMain, waiting: telegramui.FieldTitle},
+				handled  bool
+				screen   telegramui.Screen
+				waiting  telegramui.Field
+				apiCalls int
+			}{handled: true, screen: telegramui.ScreenMain, waiting: telegramui.FieldTitle, apiCalls: 1},
 		},
 		{
 			name:  "description callback waits for description",
 			data:  telegramui.CallbackDraftDescription,
 			draft: reminderDraft{},
 			expected: struct {
-				handled bool
-				screen  telegramui.Screen
-				waiting telegramui.Field
-			}{handled: true, screen: telegramui.ScreenMain, waiting: telegramui.FieldDescription},
+				handled  bool
+				screen   telegramui.Screen
+				waiting  telegramui.Field
+				apiCalls int
+			}{handled: true, screen: telegramui.ScreenMain, waiting: telegramui.FieldDescription, apiCalls: 1},
 		},
 		{
 			name:  "calendar callback opens calendar",
 			data:  telegramui.CallbackDraftCalendar,
 			draft: reminderDraft{screen: telegramui.ScreenDate},
 			expected: struct {
-				handled bool
-				screen  telegramui.Screen
-				waiting telegramui.Field
-			}{handled: true, screen: telegramui.ScreenCalendar},
+				handled  bool
+				screen   telegramui.Screen
+				waiting  telegramui.Field
+				apiCalls int
+			}{handled: true, screen: telegramui.ScreenCalendar, apiCalls: 1},
 		},
 		{
 			name:  "date callback opens compact date choice",
 			data:  telegramui.CallbackDraftDate,
 			draft: reminderDraft{},
 			expected: struct {
-				handled bool
-				screen  telegramui.Screen
-				waiting telegramui.Field
-			}{handled: true, screen: telegramui.ScreenDate},
+				handled  bool
+				screen   telegramui.Screen
+				waiting  telegramui.Field
+				apiCalls int
+			}{handled: true, screen: telegramui.ScreenDate, apiCalls: 1},
 		},
 		{
 			name:  "unknown callback is not handled",
 			data:  "unknown",
 			draft: reminderDraft{},
 			expected: struct {
-				handled bool
-				screen  telegramui.Screen
-				waiting telegramui.Field
+				handled  bool
+				screen   telegramui.Screen
+				waiting  telegramui.Field
+				apiCalls int
 			}{handled: false},
 		},
 		{
@@ -1849,9 +2099,10 @@ func TestReminderBotCommandCallbacks(t *testing.T) {
 			data:  telegramui.CallbackNoop,
 			draft: reminderDraft{screen: telegramui.ScreenMain},
 			expected: struct {
-				handled bool
-				screen  telegramui.Screen
-				waiting telegramui.Field
+				handled  bool
+				screen   telegramui.Screen
+				waiting  telegramui.Field
+				apiCalls int
 			}{handled: false, screen: telegramui.ScreenMain},
 		},
 		{
@@ -1859,10 +2110,11 @@ func TestReminderBotCommandCallbacks(t *testing.T) {
 			data:  telegramui.CallbackDraftBack,
 			draft: reminderDraft{screen: telegramui.ScreenCalendar},
 			expected: struct {
-				handled bool
-				screen  telegramui.Screen
-				waiting telegramui.Field
-			}{handled: true, screen: telegramui.ScreenMain},
+				handled  bool
+				screen   telegramui.Screen
+				waiting  telegramui.Field
+				apiCalls int
+			}{handled: true, screen: telegramui.ScreenMain, apiCalls: 1},
 		},
 	}
 
@@ -1873,10 +2125,10 @@ func TestReminderBotCommandCallbacks(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			caller := telegoapimock.NewMockCaller(ctrl)
-			if test.expected.handled {
+			if test.expected.apiCalls > 0 {
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(testTelegramResponse(t, telego.Message{MessageID: messageID}), nil).
-					Times(1)
+					Times(test.expected.apiCalls)
 			}
 
 			botAPI, err := telego.NewBot(
@@ -1966,6 +2218,30 @@ func TestReminderBotAppliesRepeatDateAndIntervalCallbacks(t *testing.T) {
 			}{
 				applied: true, repeat: telegramui.RepeatCustomInterval, screen: telegramui.ScreenInterval,
 				waitingFor: telegramui.FieldRepeatInterval, intervalDays: 1,
+			},
+		},
+		{
+			name: "repeat none clears recurring draft options",
+			draft: reminderDraft{
+				repeat:       telegramui.RepeatCustomInterval,
+				screen:       telegramui.ScreenInterval,
+				intervalDays: 3,
+				customDates:  []time.Time{time.Date(2099, 6, 5, 0, 0, 0, 0, location)},
+			},
+			data: telegramui.CallbackRepeatPrefix + string(telegramui.RepeatNone),
+			expected: struct {
+				applied      bool
+				repeat       telegramui.Repeat
+				screen       telegramui.Screen
+				waitingFor   telegramui.Field
+				intervalDays int
+				customDates  []time.Time
+				notice       string
+			}{
+				applied:     true,
+				repeat:      telegramui.RepeatNone,
+				screen:      telegramui.ScreenMain,
+				customDates: nil,
 			},
 		},
 		{
@@ -2103,16 +2379,16 @@ func TestReminderBotAppliesSettingsTextInput(t *testing.T) {
 		}
 	}{
 		{
-			name:  "intrusive interval updates existing enabled setting",
+			name:  "intrusive interval updates existing enabled setting by minutes number",
 			draft: reminderDraft{waitingFor: telegramui.FieldIntrusiveInterval},
-			input: "45",
+			input: "1",
 			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
 					repository.EXPECT().UserSettings(gomock.Any(), chatID).Return(database.UserSettings{
 						IntrusiveEnabled: true,
 					}, nil).Times(1),
 					repository.EXPECT().
-						UpdateIntrusiveSettings(gomock.Any(), chatID, true, 45*time.Minute).
+						UpdateIntrusiveSettings(gomock.Any(), chatID, true, time.Minute).
 						Return(nil).
 						Times(1),
 				)
@@ -2125,16 +2401,38 @@ func TestReminderBotAppliesSettingsTextInput(t *testing.T) {
 			}{applied: true},
 		},
 		{
-			name:  "intrusive interval updates disabled setting",
+			name:  "intrusive interval updates disabled setting by duration",
 			draft: reminderDraft{waitingFor: telegramui.FieldIntrusiveInterval},
-			input: "120",
+			input: "1m",
 			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
 					repository.EXPECT().UserSettings(gomock.Any(), chatID).Return(database.UserSettings{
 						IntrusiveEnabled: false,
 					}, nil).Times(1),
 					repository.EXPECT().
-						UpdateIntrusiveSettings(gomock.Any(), chatID, false, 2*time.Hour).
+						UpdateIntrusiveSettings(gomock.Any(), chatID, false, time.Minute).
+						Return(nil).
+						Times(1),
+				)
+			},
+			expected: struct {
+				applied     bool
+				draftExists bool
+				notice      string
+				waitingFor  telegramui.Field
+			}{applied: true},
+		},
+		{
+			name:  "intrusive interval updates setting by hour minute duration",
+			draft: reminderDraft{waitingFor: telegramui.FieldIntrusiveInterval},
+			input: "1h30m",
+			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
+				gomock.InOrder(
+					repository.EXPECT().UserSettings(gomock.Any(), chatID).Return(database.UserSettings{
+						IntrusiveEnabled: true,
+					}, nil).Times(1),
+					repository.EXPECT().
+						UpdateIntrusiveSettings(gomock.Any(), chatID, true, 90*time.Minute).
 						Return(nil).
 						Times(1),
 				)
@@ -2173,7 +2471,7 @@ func TestReminderBotAppliesSettingsTextInput(t *testing.T) {
 			}{applied: true, draftExists: true},
 		},
 		{
-			name:  "invalid intrusive interval text keeps draft with notice",
+			name:  "invalid intrusive interval text clears service draft",
 			draft: reminderDraft{waitingFor: telegramui.FieldIntrusiveInterval},
 			input: "abc",
 			before: func(_ *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
@@ -2183,10 +2481,7 @@ func TestReminderBotAppliesSettingsTextInput(t *testing.T) {
 				draftExists bool
 				notice      string
 				waitingFor  telegramui.Field
-			}{
-				applied: true, draftExists: true,
-				notice: "Введите интервал в минутах от 1 до 120.",
-			},
+			}{applied: true},
 		},
 	}
 
@@ -2242,9 +2537,13 @@ func TestReminderBotHandlesReminderCallbacks(t *testing.T) {
 			name: "create reminder callback starts draft in current message",
 			data: telegramui.CallbackCreateReminder,
 			before: func(caller *telegoapimock.MockCaller, _ *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
+				repository.EXPECT().
+					UserSettings(gomock.Any(), chatID).
+					Return(database.UserSettings{Timezone: "UTC"}, nil).
+					Times(1)
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(testTelegramResponse(t, telego.Message{MessageID: messageID}), nil).
-					Times(1)
+					Times(2)
 			},
 			expected: struct {
 				expectedErrText string
@@ -2256,6 +2555,10 @@ func TestReminderBotHandlesReminderCallbacks(t *testing.T) {
 			data: telegramui.CallbackReminderList,
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
+					repository.EXPECT().
+						UserSettings(gomock.Any(), chatID).
+						Return(database.UserSettings{Timezone: "UTC"}, nil).
+						Times(1),
 					repository.EXPECT().FindRemindersByChat(gomock.Any(), chatID, gomock.Any(), gomock.Any()).
 						Return([]database.ReminderView{reminder}, nil).
 						Times(1),
@@ -2270,6 +2573,10 @@ func TestReminderBotHandlesReminderCallbacks(t *testing.T) {
 			data: telegramui.CallbackViewPrefix + "10",
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
+					repository.EXPECT().
+						UserSettings(gomock.Any(), chatID).
+						Return(database.UserSettings{Timezone: "UTC"}, nil).
+						Times(1),
 					repository.EXPECT().FindRemindersByChat(gomock.Any(), chatID, gomock.Any(), gomock.Any()).
 						Return([]database.ReminderView{reminder}, nil).
 						Times(1),
@@ -2284,6 +2591,10 @@ func TestReminderBotHandlesReminderCallbacks(t *testing.T) {
 			data: telegramui.CallbackViewPrefix + "99",
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
+					repository.EXPECT().
+						UserSettings(gomock.Any(), chatID).
+						Return(database.UserSettings{Timezone: "UTC"}, nil).
+						Times(1),
 					repository.EXPECT().FindRemindersByChat(gomock.Any(), chatID, gomock.Any(), gomock.Any()).
 						Return([]database.ReminderView{reminder}, nil).
 						Times(1),
@@ -2324,9 +2635,15 @@ func TestReminderBotHandlesReminderCallbacks(t *testing.T) {
 			name: "view reminder service error is returned",
 			data: telegramui.CallbackViewPrefix + "10",
 			before: func(_ *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
-				repository.EXPECT().FindRemindersByChat(gomock.Any(), chatID, gomock.Any(), gomock.Any()).
-					Return(nil, errLoadReminders).
-					Times(1)
+				gomock.InOrder(
+					repository.EXPECT().
+						UserSettings(gomock.Any(), chatID).
+						Return(database.UserSettings{Timezone: "UTC"}, nil).
+						Times(1),
+					repository.EXPECT().FindRemindersByChat(gomock.Any(), chatID, gomock.Any(), gomock.Any()).
+						Return(nil, errLoadReminders).
+						Times(1),
+				)
 			},
 			expected: struct {
 				expectedErrText string
@@ -2627,10 +2944,13 @@ func TestReminderBotHandlesSettingsCallbacks(t *testing.T) {
 		},
 		{
 			name: "timezone select callback saves timezone",
-			data: telegramui.TimezoneSelectCallback(0),
+			data: telegramui.TimezoneSelectCallback(14),
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
-					repository.EXPECT().UpdateUserTimezone(gomock.Any(), chatID, "Europe/Moscow").Return(nil).Times(1),
+					repository.EXPECT().
+						UpdateUserTimezone(gomock.Any(), chatID, "Europe/Moscow").
+						Return(nil).
+						Times(1),
 					repository.EXPECT().UserSettings(gomock.Any(), chatID).
 						Return(database.UserSettings{Timezone: "Europe/Moscow"}, nil).
 						Times(1),
@@ -2664,7 +2984,7 @@ func TestReminderBotHandlesSettingsCallbacks(t *testing.T) {
 		},
 		{
 			name: "timezone select callback returns service error",
-			data: telegramui.TimezoneSelectCallback(0),
+			data: telegramui.TimezoneSelectCallback(14),
 			before: func(_ *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				repository.EXPECT().UpdateUserTimezone(gomock.Any(), chatID, "Europe/Moscow").
 					Return(errTimezoneCity).
@@ -2691,7 +3011,7 @@ func TestReminderBotHandlesSettingsCallbacks(t *testing.T) {
 					}, nil).Times(1),
 					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 						Return(testTelegramResponse(t, telego.Message{MessageID: messageID}), nil).
-						Times(2),
+						Times(1),
 				)
 			},
 			expected: struct {
@@ -2705,30 +3025,34 @@ func TestReminderBotHandlesSettingsCallbacks(t *testing.T) {
 			data: telegramui.CallbackSettingsIntrusiveOn,
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
+					repository.EXPECT().UserSettings(gomock.Any(), chatID).Return(database.UserSettings{
+						Timezone:          "Europe/Moscow",
+						IntrusiveInterval: time.Minute,
+					}, nil).Times(1),
 					repository.EXPECT().
-						UpdateIntrusiveSettings(gomock.Any(), chatID, true, 30*time.Minute).
+						UpdateIntrusiveSettings(gomock.Any(), chatID, true, time.Minute).
 						Return(nil).
 						Times(1),
 					repository.EXPECT().UserSettings(gomock.Any(), chatID).Return(database.UserSettings{
 						Timezone:          "Europe/Moscow",
 						IntrusiveEnabled:  true,
-						IntrusiveInterval: 30 * time.Minute,
+						IntrusiveInterval: time.Minute,
 					}, nil).Times(1),
 					repository.EXPECT().UserSettings(gomock.Any(), chatID).Return(database.UserSettings{
 						Timezone:          "Europe/Moscow",
 						IntrusiveEnabled:  true,
-						IntrusiveInterval: 30 * time.Minute,
+						IntrusiveInterval: time.Minute,
 					}, nil).Times(1),
 					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 						Return(testTelegramResponse(t, telego.Message{MessageID: messageID}), nil).
-						Times(2),
+						Times(1),
 				)
 			},
 			expected: struct {
 				handled         bool
 				expectedErrText string
 				waitingFor      telegramui.Field
-			}{handled: true},
+			}{handled: true, waitingFor: telegramui.FieldIntrusiveInterval},
 		},
 		{
 			name: "unknown settings callback is not handled",
@@ -2745,16 +3069,22 @@ func TestReminderBotHandlesSettingsCallbacks(t *testing.T) {
 			name: "intrusive off callback returns service error",
 			data: telegramui.CallbackSettingsIntrusiveOff,
 			before: func(_ *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
-				repository.EXPECT().
-					UpdateIntrusiveSettings(gomock.Any(), chatID, false, 30*time.Minute).
-					Return(errDisableIntrusive).
-					Times(1)
+				gomock.InOrder(
+					repository.EXPECT().UserSettings(gomock.Any(), chatID).Return(database.UserSettings{
+						Timezone:          "Europe/Moscow",
+						IntrusiveInterval: 30 * time.Minute,
+					}, nil).Times(1),
+					repository.EXPECT().
+						UpdateIntrusiveSettings(gomock.Any(), chatID, false, 30*time.Minute).
+						Return(errDisableIntrusive).
+						Times(1),
+				)
 			},
 			expected: struct {
 				handled         bool
 				expectedErrText string
 				waitingFor      telegramui.Field
-			}{handled: true, expectedErrText: "disable intrusive reminders: disable intrusive"},
+			}{handled: true, expectedErrText: "disable intrusive reminders: update intrusive settings: disable intrusive"},
 		},
 	}
 
@@ -2824,15 +3154,17 @@ func TestReminderBotSendsListsAndSettingsScreens(t *testing.T) {
 				return bot.sendReminderList(ctx, chatID)
 			},
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
-				gomock.InOrder(
-					repository.EXPECT().
-						FindRemindersByChat(gomock.Any(), chatID, gomock.Any(), gomock.Any()).
-						Return([]database.ReminderView{reminder}, nil).
-						Times(1),
-					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
-						Return(testTelegramResponse(t, telego.Message{MessageID: 41}), nil).
-						Times(1),
-				)
+				repository.EXPECT().
+					UserSettings(gomock.Any(), chatID).
+					Return(database.UserSettings{Timezone: "UTC"}, nil).
+					Times(1)
+				repository.EXPECT().
+					FindRemindersByChat(gomock.Any(), chatID, gomock.Any(), gomock.Any()).
+					Return([]database.ReminderView{reminder}, nil).
+					Times(1)
+				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(testTelegramResponse(t, telego.Message{MessageID: 41}), nil).
+					Times(1)
 			},
 		},
 		{
@@ -2842,6 +3174,10 @@ func TestReminderBotSendsListsAndSettingsScreens(t *testing.T) {
 			},
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
+					repository.EXPECT().
+						UserSettings(gomock.Any(), chatID).
+						Return(database.UserSettings{Timezone: "UTC"}, nil).
+						Times(1),
 					repository.EXPECT().
 						FindRemindersByChat(gomock.Any(), chatID, gomock.Any(), gomock.Any()).
 						Return([]database.ReminderView{}, nil).
@@ -2906,10 +3242,16 @@ func TestReminderBotSendsListsAndSettingsScreens(t *testing.T) {
 				return bot.sendReminderList(ctx, chatID)
 			},
 			before: func(_ *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
-				repository.EXPECT().
-					FindRemindersByChat(gomock.Any(), chatID, gomock.Any(), gomock.Any()).
-					Return(nil, errLoadReminders).
-					Times(1)
+				gomock.InOrder(
+					repository.EXPECT().
+						UserSettings(gomock.Any(), chatID).
+						Return(database.UserSettings{Timezone: "UTC"}, nil).
+						Times(1),
+					repository.EXPECT().
+						FindRemindersByChat(gomock.Any(), chatID, gomock.Any(), gomock.Any()).
+						Return(nil, errLoadReminders).
+						Times(1),
+				)
 			},
 			expected: struct {
 				expectedErrText string

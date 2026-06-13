@@ -2,138 +2,227 @@ package ui
 
 import (
 	"fmt"
+	"html"
+	"strings"
 	"time"
 
 	"github.com/EgorKo25/EasyNote/src/database"
 )
 
-func MainMenuText() string {
-	return "Главное меню\n\nВыберите действие на клавиатуре."
+func MainMenuText(stats database.ReminderStats) string {
+	return fmt.Sprintf(
+		"⠀⠀⠀⠀⠀⠀⠀⠀<b>Главное меню</b>\n\n"+
+			"✅ Задачи выполнены: %d\n"+
+			"⏳ Задачи ожидают выполнения: %d\n"+
+			"❗ Задачи пропущены: %d",
+		stats.Completed,
+		stats.Pending,
+		stats.Skipped,
+	)
 }
 
 func RemindersText() string {
-	return "Напоминания\n\nВыберите список напоминаний."
+	return "<b>Напоминания</b>\n\n<i>Выберите список напоминаний.</i>"
 }
 
 func CreateText() string {
-	return "Создать\n\nВыберите тип."
+	return "<b>Создать</b>\n\n<i>Выберите тип.</i>"
 }
 
 func DraftText(draft Draft, location *time.Location) string {
-	remindAt, title, description := emptyFieldText, emptyFieldText, emptyFieldText
-	repeat := RepeatText(draft)
+	dateText := ""
+	title := html.EscapeString(draft.Title)
+	description := html.EscapeString(draft.Description)
+	repeat := strings.TrimPrefix(RepeatText(draft), "Повторять: ")
 
-	if !draft.RemindAt(location).IsZero() {
-		remindAt = draft.RemindAt(location).In(location).Format("02.01.2006 15:04")
+	remindAt := draft.RemindAt(location)
+	if remindAt.IsZero() && len(draft.CustomDates) > 0 {
+		remindAt = time.Date(
+			draft.CustomDates[0].Year(),
+			draft.CustomDates[0].Month(),
+			draft.CustomDates[0].Day(),
+			draft.Hour,
+			draft.Minute,
+			0,
+			0,
+			location,
+		)
 	}
 
-	if draft.Title != "" {
-		title = draft.Title
+	if !remindAt.IsZero() {
+		remindAt = remindAt.In(location)
+		dateText = fmt.Sprintf(
+			"%s, %s %s",
+			remindAt.Format("02.01.2006"),
+			weekdayText(remindAt),
+			remindAt.Format("15:04"),
+		)
 	}
-
-	if draft.Description != "" {
-		description = draft.Description
-	}
-
-	nextStep := draftNextStep(draft)
 
 	notice := ""
 	if draft.Notice != "" {
-		notice = "\n\n" + draft.Notice
+		notice = "\n\n<i>" + html.EscapeString(draft.Notice) + "</i>"
 	}
 
 	return fmt.Sprintf(
-		"Создание напоминания\n\nДата и время: %s\nНазвание: %s\nОписание: %s\n%s\n%s%s",
-		remindAt,
+		"<b>Название:</b>\n%s\n\n"+
+			"<b>Описание:</b>\n%s\n\n"+
+			"<b>Дата начала напоминаний:</b>\n%s\n\n"+
+			"<b>Повторять:</b>\n%s\n\n"+
+			"<i>%s</i>%s",
 		title,
 		description,
+		dateText,
 		repeat,
-		nextStep,
+		draftNextStep(draft, location),
 		notice,
 	)
 }
 
-func draftNextStep(draft Draft) string {
-	if draft.WaitingFor == FieldTitle {
+func draftNextStep(draft Draft, location *time.Location) string {
+	if prompt := draftWaitingPrompt(draft.WaitingFor); prompt != "" {
+		return prompt
+	}
+
+	if prompt := draftScreenPrompt(draft.Screen); prompt != "" {
+		return prompt
+	}
+
+	hasTitle := draft.Title != ""
+	hasTime := !draft.RemindAt(location).IsZero()
+
+	return draftRequiredFieldsPrompt(hasTitle, hasTime)
+}
+
+func draftWaitingPrompt(field Field) string {
+	switch field {
+	case FieldTitle:
 		return "Введите название напоминания сообщением."
-	}
-
-	if draft.WaitingFor == FieldDescription {
+	case FieldDescription:
 		return "Введите описание напоминания сообщением."
+	default:
+		return ""
 	}
+}
 
-	if draft.Screen == ScreenDate {
+func draftScreenPrompt(screen Screen) string {
+	switch screen {
+	case ScreenDate:
 		return "Выберите быстрый вариант даты или откройте календарь."
-	}
-
-	if draft.Screen == ScreenCalendar {
+	case ScreenCalendar:
 		return "Выберите дату в календаре."
-	}
-
-	if draft.Screen == ScreenTime {
-		return "Выберите время напоминания."
-	}
-
-	if draft.Screen == ScreenRepeat {
+	case ScreenTime:
+		return "Введите время напоминания сообщением в формате HH:MM."
+	case ScreenRepeat:
 		return "Выберите регулярность напоминания."
-	}
-
-	if draft.Screen == ScreenWeekdays {
+	case ScreenWeekdays:
 		return "Выберите дни недели для повторения."
+	default:
+		return ""
 	}
+}
 
-	return "Выберите дату и время кнопкой ниже."
+func draftRequiredFieldsPrompt(hasTitle bool, hasTime bool) string {
+	switch {
+	case hasTitle && !hasTime:
+		return "Выберите дату и введите время напоминания."
+	case !hasTitle && hasTime:
+		return "Введите название напоминания."
+	case !hasTitle && !hasTime:
+		return "Введите название и время напоминания."
+	default:
+		return "Проверьте шаблон и сохраните напоминание."
+	}
 }
 
 func ReminderViewText(reminder database.ReminderView, location *time.Location) string {
 	description := "Без описания"
 	if reminder.Description != "" {
-		description = reminder.Description
+		description = html.EscapeString(reminder.Description)
 	}
 
 	return fmt.Sprintf(
-		"%s\n%s\n%s",
-		reminder.RemindAt.In(location).Format("02.01.2006 15:04"),
-		reminder.Title,
+		"<b>%s</b>\n\n%s\n\n%s",
+		html.EscapeString(reminder.Title),
 		description,
+		reminder.RemindAt.In(location).Format("02.01.2006 15:04"),
 	)
 }
 
 func ReminderListText(reminders []database.ReminderView) string {
 	if len(reminders) == 0 {
-		return "Активных напоминаний пока нет.\n\nСоздайте первое напоминание на основной клавиатуре."
+		return "<b>Активные напоминания</b>\n\n<i>Активных напоминаний пока нет.</i>"
 	}
 
-	return "Список напоминаний\n\nВыберите напоминание из списка."
+	return "<b>Список напоминаний</b>\n\n<i>Выберите напоминание из списка.</i>"
 }
 
 func ReminderHistoryText(reminders []database.ReminderView) string {
 	if len(reminders) == 0 {
-		return "Прошедших напоминаний пока нет."
+		return "<b>Прошедшие напоминания</b>\n\n<i>Прошедших напоминаний пока нет.</i>"
 	}
 
-	return "Прошедшие напоминания\n\nВыберите напоминание из списка."
+	return "<b>Прошедшие напоминания</b>\n\n<i>Выберите напоминание из списка.</i>"
 }
 
 func SettingsText(settings database.UserSettings) string {
 	return fmt.Sprintf(
-		"Настройки\n\nЯзык: русский\nЧасовой пояс: %s\nНастойчивые напоминания: %s\nИнтервал: %s",
-		settings.Timezone,
+		"<b>Настройки</b>\n\nЯзык: русский\nЧасовой пояс: %s\nНастойчивые напоминания: %s\nИнтервал: %s",
+		html.EscapeString(settings.Timezone),
 		intrusiveEnabledText(settings.IntrusiveEnabled),
-		settings.IntrusiveInterval,
+		IntrusiveIntervalValueText(settings.IntrusiveInterval),
 	)
 }
 
 func IntrusiveSettingsText(settings database.UserSettings) string {
 	return fmt.Sprintf(
-		"Настойчивые напоминания\n\nСостояние: %s\nИнтервал: %s",
+		"<b>Настойчивые напоминания</b>\n\nСостояние: %s\nИнтервал: %s\n\n"+
+			"<i>Вы можете ввести желаемый интервал напоминания с клавиатуры. "+
+			"Лучше использовать формат 1h30m. Просто отправьте его в чат.</i>",
 		intrusiveEnabledText(settings.IntrusiveEnabled),
-		settings.IntrusiveInterval,
+		IntrusiveIntervalValueText(settings.IntrusiveInterval),
 	)
 }
 
-func IntrusiveIntervalText(interval time.Duration) string {
-	return fmt.Sprintf("Интервал настойчивых напоминаний\n\nТекущее значение: %s", interval)
+func IntrusiveIntervalValueText(interval time.Duration) string {
+	minutes := int(interval / time.Minute)
+	if minutes < 60 {
+		if minutes == 1 {
+			return "каждую минуту"
+		}
+
+		return fmt.Sprintf("каждые %d %s", minutes, russianPlural(minutes, "минута", "минуты", "минут"))
+	}
+
+	hours := minutes / 60
+	restMinutes := minutes % 60
+
+	if restMinutes == 0 {
+		return fmt.Sprintf("раз в %d %s", hours, russianPlural(hours, "час", "часа", "часов"))
+	}
+
+	return fmt.Sprintf(
+		"раз в %d %s %d %s",
+		hours,
+		russianPlural(hours, "час", "часа", "часов"),
+		restMinutes,
+		russianPlural(restMinutes, "минута", "минуты", "минут"),
+	)
+}
+
+func russianPlural(value int, one string, few string, many string) string {
+	if value%100 >= 11 && value%100 <= 14 {
+		return many
+	}
+
+	switch value % 10 {
+	case 1:
+		return one
+	case 2, 3, 4:
+		return few
+	default:
+		return many
+	}
 }
 
 func ReminderStatusText(status database.ReminderStatus) string {
@@ -161,24 +250,43 @@ func intrusiveEnabledText(enabled bool) string {
 	return "выключены"
 }
 
+func weekdayText(value time.Time) string {
+	switch value.Weekday() {
+	case time.Monday:
+		return "Пн"
+	case time.Tuesday:
+		return "Вт"
+	case time.Wednesday:
+		return "Ср"
+	case time.Thursday:
+		return "Чт"
+	case time.Friday:
+		return "Пт"
+	case time.Saturday:
+		return "Сб"
+	default:
+		return "Вс"
+	}
+}
+
 func RepeatText(draft Draft) string {
 	switch draft.Repeat {
 	case RepeatEveryDay:
-		return "Повторять: каждый день\n"
+		return "Повторять: каждый день"
 	case RepeatEveryWeek:
-		return "Повторять: каждую неделю\n"
+		return "Повторять: каждую неделю"
 	case RepeatEveryTwoDays:
-		return "Повторять: каждые 2 дня\n"
+		return "Повторять: каждые 2 дня"
 	case RepeatWeekdays:
-		return "Повторять: по будням\n"
+		return "Повторять: по будням"
 	case RepeatCustomWeekdays:
-		return fmt.Sprintf("Повторять: выбрано дней недели: %d\n", SelectedWeekdayCount(draft.WeekdaysMask))
+		return fmt.Sprintf("Повторять: выбрано дней недели: %d", SelectedWeekdayCount(draft.WeekdaysMask))
 	case RepeatCustomDates:
-		return fmt.Sprintf("Повторять: выбрано дат: %d\n", len(draft.CustomDates))
+		return fmt.Sprintf("Повторять: выбрано дат: %d", len(draft.CustomDates))
 	case RepeatCustomInterval:
-		return fmt.Sprintf("Повторять: каждые %d дн.\n", draft.IntervalDays)
+		return fmt.Sprintf("Повторять: каждые %d дн.", draft.IntervalDays)
 	default:
-		return "Повторять: нет\n"
+		return "Повторять: нет"
 	}
 }
 
