@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"sync"
 
 	"github.com/EgorKo25/EasyNote/src/config"
 	"github.com/EgorKo25/EasyNote/src/database"
@@ -45,12 +46,14 @@ func NewSender(ctx context.Context, cfg config.Telegram) (*Sender, error) {
 		return nil, fmt.Errorf("create telegram bot: %w", err)
 	}
 
-	return &Sender{bot: bot, cfg: cfg}, nil
+	return &Sender{bot: bot, cfg: cfg, mainMenuByChat: make(map[int64]int)}, nil
 }
 
 type Sender struct {
-	bot *telego.Bot
-	cfg config.Telegram
+	bot            *telego.Bot
+	cfg            config.Telegram
+	mainMenuMu     sync.Mutex
+	mainMenuByChat map[int64]int
 }
 
 func (s *Sender) SendReminder(ctx context.Context, reminder database.ScheduledReminder) (int, error) {
@@ -69,6 +72,68 @@ func (s *Sender) SendReminder(ctx context.Context, reminder database.ScheduledRe
 		}
 	}
 
+	if err := s.refreshMainKeyboard(ctx, reminder); err != nil {
+		return 0, fmt.Errorf("send telegram main menu keyboard before reminder %d: %w", reminder.ID, err)
+	}
+
+	params := s.reminderMessageParams(reminder, text)
+
+	message, err := s.bot.SendMessage(ctx, params)
+	if err != nil {
+		return 0, fmt.Errorf("send telegram reminder %d: %w", reminder.ID, err)
+	}
+
+	if message == nil {
+		return 0, nil
+	}
+
+	return message.MessageID, nil
+}
+
+func (s *Sender) refreshMainKeyboard(ctx context.Context, reminder database.ScheduledReminder) error {
+	if previousMenuID := s.mainMenuMessageID(reminder.TelegramChatID); previousMenuID != 0 {
+		err := s.bot.DeleteMessage(ctx, &telego.DeleteMessageParams{
+			ChatID:    tu.ID(reminder.TelegramChatID),
+			MessageID: previousMenuID,
+		})
+		if err != nil {
+			logger.Get("telegram/sender").Warn("cannot delete previous main menu message", logger.Any("error", err))
+		}
+	}
+
+	menuMessage, err := s.bot.SendMessage(ctx,
+		tu.Message(tu.ID(reminder.TelegramChatID), "Главное меню").WithReplyMarkup(telegramui.MainKeyboard()),
+	)
+	if err != nil {
+		return fmt.Errorf("send telegram main menu keyboard message: %w", err)
+	}
+
+	if menuMessage != nil {
+		s.setMainMenuMessageID(reminder.TelegramChatID, menuMessage.MessageID)
+	}
+
+	return nil
+}
+
+func (s *Sender) mainMenuMessageID(chatID int64) int {
+	s.mainMenuMu.Lock()
+	defer s.mainMenuMu.Unlock()
+
+	return s.mainMenuByChat[chatID]
+}
+
+func (s *Sender) setMainMenuMessageID(chatID int64, messageID int) {
+	s.mainMenuMu.Lock()
+	defer s.mainMenuMu.Unlock()
+
+	if s.mainMenuByChat == nil {
+		s.mainMenuByChat = make(map[int64]int)
+	}
+
+	s.mainMenuByChat[chatID] = messageID
+}
+
+func (s *Sender) reminderMessageParams(reminder database.ScheduledReminder, text string) *telego.SendMessageParams {
 	params := tu.Message(tu.ID(reminder.TelegramChatID), text)
 	if reminder.IntrusiveEnabled {
 		params.WithReplyMarkup(tu.InlineKeyboard(
@@ -77,14 +142,6 @@ func (s *Sender) SendReminder(ctx context.Context, reminder database.ScheduledRe
 					WithCallbackData(telegramui.CallbackReminderDone+strconv.FormatInt(reminder.ID, 10)),
 				tu.InlineKeyboardButton("Отменить").
 					WithCallbackData(telegramui.CallbackReminderCancelDelivered+strconv.FormatInt(reminder.ID, 10)),
-			),
-			tu.InlineKeyboardRow(
-				tu.InlineKeyboardButton(telegramui.ButtonCreateReminder).
-					WithCallbackData(telegramui.CallbackCreateReminder),
-				tu.InlineKeyboardButton(telegramui.ButtonReminders).
-					WithCallbackData(telegramui.CallbackReminderList),
-				tu.InlineKeyboardButton(telegramui.ButtonSettings).
-					WithCallbackData(telegramui.CallbackSettings),
 			),
 		))
 	}
@@ -101,14 +158,5 @@ func (s *Sender) SendReminder(ctx context.Context, reminder database.ScheduledRe
 		params.WithProtectContent()
 	}
 
-	message, err := s.bot.SendMessage(ctx, params)
-	if err != nil {
-		return 0, fmt.Errorf("send telegram reminder %d: %w", reminder.ID, err)
-	}
-
-	if message == nil {
-		return 0, nil
-	}
-
-	return message.MessageID, nil
+	return params
 }

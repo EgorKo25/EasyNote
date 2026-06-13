@@ -6,7 +6,7 @@ Telegram reminder bot for routine tasks.
 
 The source of truth for the application version is `CHANGELIST.md`.
 
-Current version: `1.2.0`.
+Current version: `1.3.2`.
 
 ## Tests
 
@@ -113,9 +113,25 @@ scheduler:
 
 ### Telegram UI
 
-Reminder draft buttons now reflect filled fields: `Название`, `Описание`, and `Дата` become `Изменить ...` after input. Recurring reminder drafts use `Дата и время начала` / `Изменить дату и время начала` so the user sees that the value starts the recurring schedule.
+The main menu is a reply-keyboard message with a compact formatted stats block for completed, pending, and missed tasks. Missed tasks include canceled, skipped, and failed reminders.
 
-After the main reply-keyboard commands `Создать напоминание` and `Список напоминаний` are handled, the bot deletes those user messages from the dialog and logs deletion failures without interrupting the command.
+Reminder creation uses inline keyboards again. The draft message is rendered as labeled sections: title, description, reminder start date, and repeat state. Draft buttons are ordered as date/time, title/description, repeat, and save/cancel. While the bot waits for title or description input, those buttons change to `Введите название` or `Введите описание`; after input they change to `Изменить ...`.
+
+The draft screen shows service prompts in italic. The prompt only asks for missing required fields: title, time, or both.
+
+Reminder time is entered as text while the time screen is open, in `HH:MM` format.
+
+Active reminders opened from the reply-keyboard list show inline details actions, including `Удалить`. Reminder list buttons hide internal reminder IDs.
+
+Intrusive reminder settings use an inline `Включено` / `Выключено` toggle, a `Сохранить` button that returns to settings, and edit the existing settings message after manual interval input. Intervals can be entered as plain minutes or Go duration values such as `1m` and `1h30m`, are persisted from 1 to 120 minutes, and are displayed as user-facing text such as `каждые 30 минут` or `раз в 1 час 20 минут`.
+
+Settings have an explicit `Сохранить` button that returns to the main menu. Timezone selection contains 24 unique UTC hour offsets shown uniformly as `UTC (+N)` / `UTC (-N)`; the UTC+3 option uses Moscow internally as the default timezone. Reminder drafts and reminder details load the user's timezone before formatting or calculating reminder time.
+
+Reminder lists keep their reply `Назад` navigation available while reminder-title buttons still open reminder details.
+
+Reminder notifications keep the main reply keyboard available by sending a visible main-menu message before the inline reminder notification. The sender stores the latest main-menu message id in memory and deletes the previous one before the next reminder for that chat. The notification itself uses only inline `Готово` and `Отменить` actions and is deleted after either action.
+
+After reply-keyboard commands and user text inputs are handled, the bot deletes those user messages from the dialog and logs deletion failures without interrupting the command.
 
 ## Deployment
 
@@ -196,10 +212,31 @@ docker compose up -d --no-deps app
 
 PostgreSQL is not restarted by the beta CD job.
 
+For a manual deployment from a pull request branch, run the same workflow manually on the PR branch and enable `deploy_from_pr`. The image tag is built as `X.Y.Z.<short_sha>`, for example `1.3.2.a1b2c3d`, and that exact tag is deployed.
+
 ## Changelist
 
 <div style="max-height: 420px; overflow-y: auto; border: 1px solid #d0d7de; border-radius: 6px; padding: 16px;">
-<p><strong>version: 1.2.0</strong></p>
+<p><strong>version: 1.3.2</strong></p>
+
+<h2>v1.3.2 - Telegram UI recovery and PR deployment</h2>
+<ul>
+  <li>The main menu message was restored with formatted completed, pending, and missed task counters; missed includes canceled, skipped, and failed reminders.</li>
+  <li>Reminder notifications refresh the reply keyboard through a visible main-menu message, delete the previous in-memory menu message before the next notification, and keep inline actions on the notification itself.</li>
+  <li>Reminder creation returned to inline keyboards; the draft uses labeled sections, draft prompts ask only for missing title/time fields, title/description buttons show input-waiting state, internal reminder IDs are hidden, and reminder time is typed as HH:MM.</li>
+  <li>Intrusive reminder settings use an inline toggle plus a Save action, edit the existing message after manual input, persist 1-120 minute intervals, and accept minute or duration values such as 1m and 1h30m.</li>
+  <li>Reminder-list back navigation stays available, intrusive settings expose Save, and timezone buttons use uniform UTC (+N) labels while reminder creation/details load the user's timezone.</li>
+  <li>Manual PR deployment can publish and deploy an image tagged as X.Y.Z.&lt;short_sha&gt;.</li>
+</ul>
+
+<h2>v1.3.1 - reply keyboard reminder navigation</h2>
+<ul>
+  <li>Active and past reminder lists use reply keyboards with two reminders per page and previous/next navigation.</li>
+  <li>Reminder list pagination is performed in database queries with limit and offset.</li>
+  <li>Creation, settings, timezone, regularity, and intrusive reminder menus moved to reply keyboards.</li>
+  <li>The recurrence wording was updated to "Настроить регулярность", "Повторять", and "нет".</li>
+  <li>The recurrence menu added "По будням", and intrusive reminders use one state button: "Включено" or "Выключено".</li>
+</ul>
 
 <h2>v1.2.0 - scheduler runtime runner</h2>
 <ul>

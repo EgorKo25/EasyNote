@@ -1,4 +1,90 @@
-version: 1.3.0
+version: 1.3.2
+
+## v1.3.2 - Telegram UI recovery and PR deployment
+
+### What was done
+
+The Telegram main menu message was restored because Telegram cannot attach reply and inline keyboards to one message. The menu now shows completed, pending, and missed task counters in one formatted block. Missed tasks include canceled, skipped, and failed reminders.
+
+The main menu stats block no longer uses a Markdown code block; it is rendered with Telegram HTML formatting and counts `canceled`, `skipped`, and `failed` reminders as missed tasks.
+
+Reminder delivery now refreshes the reply main keyboard through a visible main-menu message and then sends the reminder itself with inline `Готово` and `Отменить` actions only. The sender keeps the last main-menu message id in memory per chat and deletes that previous menu before sending the next reminder.
+
+Reminder creation returned to inline keyboards because the previous reply-keyboard editor made field editing and time selection harder to use. Filled draft fields still switch to `Изменить ...`, field buttons wait for user input again, and user input messages are deleted after handling.
+
+Reminder creation text was returned to the sectioned layout with bold labels for `Название`, `Описание`, `Дата начала напоминаний`, and `Повторять`. Service prompts are rendered in italic.
+
+The reminder draft no longer shows the extra template label. Empty title, description, and start date are rendered as empty field values under their labels.
+
+The main draft inline keyboard is ordered as date/time, title/description, repeat, and save/cancel.
+
+The `Название` and `Описание` draft buttons now switch the message into input-waiting mode by editing the existing message text, avoiding a delete/send blink. While the bot waits for input, the buttons show `Введите название` / `Введите описание`; after input they show `Изменить название` / `Изменить описание`.
+
+Active reminders opened from the reply-keyboard list now show the inline reminder details keyboard again, including the `Удалить` action. Reminder list buttons no longer expose internal reminder IDs.
+
+Delivered reminder actions now remove the notification message after `Готово` or `Отменить`.
+
+Intrusive reminder settings now use an inline `Включено` / `Выключено` toggle plus a `Сохранить` action and accept manual interval input directly from chat, from 1 minute to 2 hours. Plain numbers are treated as minutes, and Go duration values such as `1m` and `1h30m` are supported.
+
+Intrusive reminder settings now edit the existing settings message after manual input instead of deleting and sending a new message. Interval values are rendered as user-facing text, for example `каждые 30 минут` or `раз в 1 час 20 минут`.
+
+The database interval constraint was relaxed to 1-120 minutes, so values below 30 minutes can be persisted and used by the scheduler.
+
+Timezone reply-keyboard arrows are handled in the timezone context before reminder-list pagination, so they no longer open active reminders.
+
+Settings now have an explicit `Сохранить` button that returns to the main menu. Timezone selection now contains 24 unique UTC hour offsets; `Калининград` is used for UTC+2, `Москва` is used for UTC+3, and the default timezone is Moscow.
+
+Timezone buttons are now labeled uniformly as `UTC (+N)` / `UTC (-N)`, including the UTC+3 default option. Reminder drafts, active reminder lists, and reminder detail views load the user's timezone before calculating or formatting reminder times.
+
+The reminder-list `Назад` button is no longer treated as a reminder title, so it returns to the reminders menu. Intrusive reminder settings now expose a `Назад` inline button that returns to settings.
+
+The recurrence menu can now reset an already selected repeat mode with `Не повторять`.
+
+Manual CI deployment from a pull request branch can now deploy an image tagged as `X.Y.Z.<short_sha>`.
+
+### API changes
+
+- added `ReminderStatsByChat` storage/repository method for main-menu counters;
+- added the manual `workflow_dispatch.deploy_from_pr` CI input.
+
+### Affected files
+
+- `.github/workflows/ci.yml`
+- `README.md`
+- `README_RU.md`
+- `migrations/00004_add_user_settings_and_intrusive_reminders.go`
+- `migrations/00005_relax_intrusive_interval_and_default_timezone.go`
+- `src/database/postgresql/reminders_storage.go`
+- `src/database/types.go`
+- `src/telegram/reminder_bot.go`
+- `src/telegram/sender.go`
+- `src/telegram/ui`
+
+## v1.3.1 - Reply keyboard reminder navigation
+
+### What was done
+
+Active and past reminder lists moved to reply keyboards with two reminders per page and previous/next navigation buttons.
+
+Reminder list pagination is performed at the database query level through limit and offset instead of loading a larger set into UI code.
+
+Reminder creation, settings, timezone, regularity, and intrusive reminder menus moved from inline keyboards to reply keyboards where Telegram supports that interaction.
+
+The recurrence draft wording was updated: `Регулярность` became `Настроить регулярность`, `Повторяемость` became `Повторять`, and the empty value is shown as `нет`.
+
+The recurrence menu replaced `Без повторений` with `По будням`, and intrusive reminder settings now use a single state button with `Включено` / `Выключено`.
+
+### API changes
+
+Reminder list repository methods now accept database-level pagination parameters.
+
+### Affected files
+
+- `src/database/postgresql/reminders_storage.go`
+- `src/database/types.go`
+- `src/service/reminders.go`
+- `src/telegram/reminder_bot.go`
+- `src/telegram/ui`
 
 ## v1.3.0 - Reminder settings and persistent delivery
 

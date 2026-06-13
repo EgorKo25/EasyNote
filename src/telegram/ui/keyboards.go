@@ -51,42 +51,52 @@ func DraftKeyboard(draft Draft, now time.Time) *telego.InlineKeyboardMarkup {
 }
 
 func draftMainKeyboard(draft Draft) *telego.InlineKeyboardMarkup {
-	titleButtonText := ButtonDraftTitle
-	if draft.Title != "" {
-		titleButtonText = ButtonDraftEditTitle
-	}
-
-	descriptionButtonText := ButtonDraftDescription
-	if draft.Description != "" {
-		descriptionButtonText = ButtonDraftEditDescription
-	}
+	titleButtonText := draftTitleButtonText(draft)
+	descriptionButtonText := draftDescriptionButtonText(draft)
 
 	dateButtonText := ButtonDraftDate
 	if draft.Repeat != RepeatNone {
-		dateButtonText = "Дата и время начала"
-	}
-
-	if draftDateIsSet(draft) {
-		dateButtonText = "Изменить дату"
-		if draft.Repeat != RepeatNone {
-			dateButtonText = "Изменить дату и время начала"
-		}
+		dateButtonText = "Изменить дату и время начала"
 	}
 
 	return tu.InlineKeyboard(
 		tu.InlineKeyboardRow(tu.InlineKeyboardButton(dateButtonText).WithCallbackData(CallbackDraftDate)),
 		tu.InlineKeyboardRow(
-			tu.InlineKeyboardButton(ButtonDraftRepeat).WithCallbackData(CallbackDraftRepeat),
-		),
-		tu.InlineKeyboardRow(
 			tu.InlineKeyboardButton(titleButtonText).WithCallbackData(CallbackDraftTitle),
 			tu.InlineKeyboardButton(descriptionButtonText).WithCallbackData(CallbackDraftDescription),
+		),
+		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton(ButtonDraftRepeat).WithCallbackData(CallbackDraftRepeat),
 		),
 		tu.InlineKeyboardRow(
 			tu.InlineKeyboardButton(ButtonDraftSave).WithCallbackData(CallbackDraftSave),
 			tu.InlineKeyboardButton(ButtonDraftCancel).WithCallbackData(CallbackDraftCancel),
 		),
 	)
+}
+
+func draftTitleButtonText(draft Draft) string {
+	if draft.WaitingFor == FieldTitle {
+		return ButtonDraftEnterTitle
+	}
+
+	if draft.Title != "" {
+		return ButtonDraftEditTitle
+	}
+
+	return ButtonDraftTitle
+}
+
+func draftDescriptionButtonText(draft Draft) string {
+	if draft.WaitingFor == FieldDescription {
+		return ButtonDraftEnterDescription
+	}
+
+	if draft.Description != "" {
+		return ButtonDraftEditDescription
+	}
+
+	return ButtonDraftDescription
 }
 
 func DraftReplyKeyboard(draft Draft, now time.Time) *telego.ReplyKeyboardMarkup {
@@ -108,13 +118,19 @@ func DraftReplyKeyboard(draft Draft, now time.Time) *telego.ReplyKeyboardMarkup 
 		return tu.Keyboard(
 			tu.KeyboardRow(tu.KeyboardButton(ButtonRepeatEveryDay), tu.KeyboardButton(ButtonRepeatWeekdays)),
 			tu.KeyboardRow(tu.KeyboardButton(ButtonRepeatCustomWeekdays), tu.KeyboardButton(ButtonRepeatInterval)),
-			tu.KeyboardRow(tu.KeyboardButton(ButtonBack)),
+			tu.KeyboardRow(tu.KeyboardButton(ButtonRepeatNone)),
 		).WithResizeKeyboard()
 	default:
+		titleButtonText := draftTitleButtonText(draft)
+		descriptionButtonText := draftDescriptionButtonText(draft)
+
+		dateButtonText := "Изменить дату"
+
 		return tu.Keyboard(
-			tu.KeyboardRow(tu.KeyboardButton(ButtonDraftDate), tu.KeyboardButton(ButtonDraftRepeat)),
-			tu.KeyboardRow(tu.KeyboardButton(ButtonDraftTitle), tu.KeyboardButton(ButtonDraftDescription)),
-			tu.KeyboardRow(tu.KeyboardButton(ButtonDraftSave), tu.KeyboardButton(ButtonDraftCancel)),
+			tu.KeyboardRow(tu.KeyboardButton(dateButtonText), tu.KeyboardButton(ButtonDraftRepeat)),
+			tu.KeyboardRow(tu.KeyboardButton(titleButtonText), tu.KeyboardButton(descriptionButtonText)),
+			tu.KeyboardRow(tu.KeyboardButton(ButtonDraftSave)),
+			tu.KeyboardRow(tu.KeyboardButton(ButtonDraftCancel)),
 		).WithResizeKeyboard()
 	}
 }
@@ -138,10 +154,6 @@ func timePresetReplyRow(draft Draft, now time.Time) []telego.KeyboardButton {
 	return buttons
 }
 
-func draftDateIsSet(draft Draft) bool {
-	return !draft.Date.IsZero() || len(draft.CustomDates) > 0
-}
-
 func repeatKeyboard() *telego.InlineKeyboardMarkup {
 	return tu.InlineKeyboard(
 		tu.InlineKeyboardRow(
@@ -156,7 +168,7 @@ func repeatKeyboard() *telego.InlineKeyboardMarkup {
 		tu.InlineKeyboardRow(
 			tu.InlineKeyboardButton(ButtonRepeatInterval).WithCallbackData(RepeatCallback(RepeatCustomInterval)),
 		),
-		tu.InlineKeyboardRow(tu.InlineKeyboardButton("Назад").WithCallbackData(CallbackDraftBack)),
+		tu.InlineKeyboardRow(tu.InlineKeyboardButton(ButtonRepeatNone).WithCallbackData(RepeatCallback(RepeatNone))),
 	)
 }
 
@@ -256,42 +268,7 @@ func dateKeyboard(draft Draft, now time.Time) *telego.InlineKeyboardMarkup {
 }
 
 func timeKeyboard(draft Draft, now time.Time) *telego.InlineKeyboardMarkup {
-	presetButtons := make([]telego.InlineKeyboardButton, 0, 4)
-
-	for _, preset := range []struct {
-		hour   int
-		minute int
-	}{
-		{hour: 9},
-		{hour: 12},
-		{hour: 18},
-		{hour: 21},
-	} {
-		if isFutureDraftTime(draft, preset.hour, preset.minute, now) {
-			presetButtons = append(presetButtons,
-				tu.InlineKeyboardButton(fmt.Sprintf("%02d:%02d", preset.hour, preset.minute)).
-					WithCallbackData(TimeSetCallback(preset.hour, preset.minute)),
-			)
-		}
-	}
-
-	if len(presetButtons) == 0 {
-		presetButtons = append(presetButtons,
-			tu.InlineKeyboardButton("Нет доступного времени").WithCallbackData(CallbackNoop),
-		)
-	}
-
 	return tu.InlineKeyboard(
-		presetButtons,
-		tu.InlineKeyboardRow(
-			tu.InlineKeyboardButton("-1ч").WithCallbackData(TimeShiftCallback(-60)),
-			tu.InlineKeyboardButton(draft.SelectedTimeText()).WithCallbackData(CallbackNoop),
-			tu.InlineKeyboardButton("+1ч").WithCallbackData(TimeShiftCallback(60)),
-		),
-		tu.InlineKeyboardRow(
-			tu.InlineKeyboardButton("-5м").WithCallbackData(TimeShiftCallback(-5)),
-			tu.InlineKeyboardButton("+5м").WithCallbackData(TimeShiftCallback(5)),
-		),
 		tu.InlineKeyboardRow(
 			tu.InlineKeyboardButton("День").WithCallbackData(CallbackDraftDate),
 			tu.InlineKeyboardButton("Готово").WithCallbackData(CallbackDraftTimeDone),
@@ -336,7 +313,7 @@ func SettingsKeyboard() *telego.ReplyKeyboardMarkup {
 		tu.KeyboardRow(tu.KeyboardButton(ButtonSettingsLanguage)),
 		tu.KeyboardRow(tu.KeyboardButton(ButtonSettingsTimezone)),
 		tu.KeyboardRow(tu.KeyboardButton(ButtonSettingsIntrusive)),
-		tu.KeyboardRow(tu.KeyboardButton(ButtonBack)),
+		tu.KeyboardRow(tu.KeyboardButton(ButtonSettingsSave)),
 	).WithResizeKeyboard()
 }
 
@@ -350,44 +327,27 @@ func TimezoneKeyboard(index int, now time.Time) *telego.ReplyKeyboardMarkup {
 			tu.KeyboardButton(TimezoneButtonText(option, now)),
 			tu.KeyboardButton(ButtonNextPage),
 		),
-		tu.KeyboardRow(tu.KeyboardButton(ButtonBack)),
+		tu.KeyboardRow(tu.KeyboardButton(ButtonSettingsSave), tu.KeyboardButton(ButtonBack)),
 	).WithResizeKeyboard()
 }
 
-func IntrusiveSettingsKeyboard(enabled bool) *telego.ReplyKeyboardMarkup {
+func IntrusiveSettingsKeyboard(enabled bool) *telego.InlineKeyboardMarkup {
 	toggleText := ButtonIntrusiveDisabled
+	callback := CallbackSettingsIntrusiveOn
+
 	if enabled {
 		toggleText = ButtonIntrusiveEnabled
+		callback = CallbackSettingsIntrusiveOff
 	}
 
-	return tu.Keyboard(
-		tu.KeyboardRow(tu.KeyboardButton(toggleText)),
-		tu.KeyboardRow(tu.KeyboardButton(ButtonIntrusiveInterval)),
-		tu.KeyboardRow(tu.KeyboardButton(ButtonBack)),
-	).WithResizeKeyboard()
-}
-
-func IntrusiveIntervalKeyboard(interval time.Duration) *telego.ReplyKeyboardMarkup {
-	rows := make([][]telego.KeyboardButton, 0, 4)
-
-	if interval > time.Minute {
-		rows = append(rows, tu.KeyboardRow(
-			tu.KeyboardButton(ButtonMinusHour),
-			tu.KeyboardButton(ButtonMinusFiveMinutes),
-		))
-	}
-
-	if interval < 2*time.Hour {
-		rows = append(rows, tu.KeyboardRow(tu.KeyboardButton(ButtonPlusFiveMinutes), tu.KeyboardButton(ButtonPlusHour)))
-	}
-
-	rows = append(rows, tu.KeyboardRow(tu.KeyboardButton(ButtonDone), tu.KeyboardButton(ButtonBack)))
-
-	return tu.Keyboard(rows...).WithResizeKeyboard()
+	return tu.InlineKeyboard(
+		tu.InlineKeyboardRow(tu.InlineKeyboardButton(toggleText).WithCallbackData(callback)),
+		tu.InlineKeyboardRow(tu.InlineKeyboardButton(ButtonSettingsSave).WithCallbackData(CallbackSettings)),
+	)
 }
 
 func ReminderButtonText(reminder database.ReminderView) string {
-	return fmt.Sprintf("#%d %s", reminder.ID, reminder.Title)
+	return reminder.Title
 }
 
 func TimezoneIndex(timezone string) int {
@@ -397,7 +357,7 @@ func TimezoneIndex(timezone string) int {
 		}
 	}
 
-	return 0
+	return moscowTimezoneIndex()
 }
 
 func TimezoneByIndex(index int) TimezoneOption {
@@ -416,7 +376,7 @@ func TimezoneButtonText(option TimezoneOption, now time.Time) string {
 
 	_, offset := now.In(location).Zone()
 
-	return fmt.Sprintf("%s (%+d)", option.City, offset/3600)
+	return fmt.Sprintf("UTC (%+d)", offset/3600)
 }
 
 func TimezonePrevCallback(index int) string {
@@ -445,17 +405,39 @@ func normalizeTimezoneIndex(index int) int {
 	return index
 }
 
+func moscowTimezoneIndex() int {
+	for index, option := range timezoneOptions {
+		if option.Timezone == "Europe/Moscow" {
+			return index
+		}
+	}
+
+	return 0
+}
+
 var timezoneOptions = []TimezoneOption{
-	{City: "Москва", Timezone: "Europe/Moscow"},
+	{City: "UTC-11", Timezone: "Etc/GMT+11"},
+	{City: "UTC-10", Timezone: "Etc/GMT+10"},
+	{City: "UTC-09", Timezone: "Etc/GMT+9"},
+	{City: "UTC-08", Timezone: "Etc/GMT+8"},
+	{City: "UTC-07", Timezone: "Etc/GMT+7"},
+	{City: "UTC-06", Timezone: "Etc/GMT+6"},
+	{City: "UTC-05", Timezone: "Etc/GMT+5"},
+	{City: "UTC-04", Timezone: "Etc/GMT+4"},
+	{City: "UTC-03", Timezone: "Etc/GMT+3"},
+	{City: "UTC-02", Timezone: "Etc/GMT+2"},
+	{City: "UTC-01", Timezone: "Etc/GMT+1"},
+	{City: "UTC+00", Timezone: "Etc/GMT"},
+	{City: "UTC+01", Timezone: "Etc/GMT-1"},
 	{City: "Калининград", Timezone: "Europe/Kaliningrad"},
-	{City: "Самара", Timezone: "Europe/Samara"},
-	{City: "Екатеринбург", Timezone: "Asia/Yekaterinburg"},
-	{City: "Омск", Timezone: "Asia/Omsk"},
-	{City: "Новосибирск", Timezone: "Asia/Novosibirsk"},
-	{City: "Красноярск", Timezone: "Asia/Krasnoyarsk"},
-	{City: "Иркутск", Timezone: "Asia/Irkutsk"},
-	{City: "Якутск", Timezone: "Asia/Yakutsk"},
-	{City: "Владивосток", Timezone: "Asia/Vladivostok"},
-	{City: "Магадан", Timezone: "Asia/Magadan"},
-	{City: "Камчатка", Timezone: "Asia/Kamchatka"},
+	{City: "Москва", Timezone: "Europe/Moscow"},
+	{City: "UTC+04", Timezone: "Etc/GMT-4"},
+	{City: "UTC+05", Timezone: "Etc/GMT-5"},
+	{City: "UTC+06", Timezone: "Etc/GMT-6"},
+	{City: "UTC+07", Timezone: "Etc/GMT-7"},
+	{City: "UTC+08", Timezone: "Etc/GMT-8"},
+	{City: "UTC+09", Timezone: "Etc/GMT-9"},
+	{City: "UTC+10", Timezone: "Etc/GMT-10"},
+	{City: "UTC+11", Timezone: "Etc/GMT-11"},
+	{City: "UTC+12", Timezone: "Etc/GMT-12"},
 }
