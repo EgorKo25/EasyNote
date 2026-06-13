@@ -342,6 +342,7 @@ func IntrusiveSettingsKeyboard(enabled bool) *telego.InlineKeyboardMarkup {
 
 	return tu.InlineKeyboard(
 		tu.InlineKeyboardRow(tu.InlineKeyboardButton(toggleText).WithCallbackData(callback)),
+		tu.InlineKeyboardRow(tu.InlineKeyboardButton(ButtonBack).WithCallbackData(CallbackSettings)),
 	)
 }
 
@@ -375,7 +376,7 @@ func TimezoneButtonText(option TimezoneOption, now time.Time) string {
 
 	_, offset := now.In(location).Zone()
 
-	return fmt.Sprintf("%s (%+d)", option.City, offset/3600)
+	return fmt.Sprintf("UTC (%+d)", offset/3600)
 }
 
 func TimezonePrevCallback(index int) string {

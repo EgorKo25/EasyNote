@@ -1349,6 +1349,10 @@ func TestReminderBotRunsReplyMessageCommands(t *testing.T) {
 			name: "create reminder kind starts draft",
 			text: telegramui.ButtonCreateReminderKind,
 			before: func(_ *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
+				repository.EXPECT().
+					UserSettings(gomock.Any(), chatID).
+					Return(database.UserSettings{Timezone: "UTC"}, nil).
+					Times(1)
 			},
 			expected: struct {
 				handled         bool
@@ -1360,10 +1364,16 @@ func TestReminderBotRunsReplyMessageCommands(t *testing.T) {
 			name: "active reminders command loads first database page",
 			text: telegramui.ButtonReminderList,
 			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
-				repository.EXPECT().
-					FindRemindersByChat(gomock.Any(), chatID, reminderPageSize, 0).
-					Return([]database.ReminderView{reminder}, nil).
-					Times(1)
+				gomock.InOrder(
+					repository.EXPECT().
+						UserSettings(gomock.Any(), chatID).
+						Return(database.UserSettings{Timezone: "UTC"}, nil).
+						Times(1),
+					repository.EXPECT().
+						FindRemindersByChat(gomock.Any(), chatID, reminderPageSize, 0).
+						Return([]database.ReminderView{reminder}, nil).
+						Times(1),
+				)
 			},
 			expected: struct {
 				handled         bool
@@ -1378,10 +1388,16 @@ func TestReminderBotRunsReplyMessageCommands(t *testing.T) {
 				bot.setReminderListState(chatID, reminderListState{kind: reminderListActive, offset: 2})
 			},
 			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
-				repository.EXPECT().
-					FindRemindersByChat(gomock.Any(), chatID, reminderPageSize, 4).
-					Return([]database.ReminderView{reminder}, nil).
-					Times(1)
+				gomock.InOrder(
+					repository.EXPECT().
+						UserSettings(gomock.Any(), chatID).
+						Return(database.UserSettings{Timezone: "UTC"}, nil).
+						Times(1),
+					repository.EXPECT().
+						FindRemindersByChat(gomock.Any(), chatID, reminderPageSize, 4).
+						Return([]database.ReminderView{reminder}, nil).
+						Times(1),
+				)
 			},
 			expected: struct {
 				handled         bool
@@ -1602,10 +1618,16 @@ func TestReminderBotHandlesReplyNavigationState(t *testing.T) {
 				return err
 			},
 			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
-				repository.EXPECT().
-					FindRemindersByChat(gomock.Any(), chatID, reminderPageSize, 0).
-					Return([]database.ReminderView{reminder}, nil).
-					Times(1)
+				gomock.InOrder(
+					repository.EXPECT().
+						UserSettings(gomock.Any(), chatID).
+						Return(database.UserSettings{Timezone: "UTC"}, nil).
+						Times(1),
+					repository.EXPECT().
+						FindRemindersByChat(gomock.Any(), chatID, reminderPageSize, 0).
+						Return([]database.ReminderView{reminder}, nil).
+						Times(1),
+				)
 			},
 			state: func(bot *ReminderBot) {
 				bot.menuByChat[chatID] = chatMenuReminderList
@@ -1617,6 +1639,21 @@ func TestReminderBotHandlesReplyNavigationState(t *testing.T) {
 			}{apiBodyContains: []string{"Удалить", "reminder:delete:7"}},
 		},
 		{
+			name: "back reply from reminder list stays available for navigation",
+			action: func(ctx context.Context, bot *ReminderBot) error {
+				handled, err := bot.handleSelectedReplyMessage(ctx, chatID, telegramui.ButtonBack)
+				require.False(t, handled)
+
+				return err
+			},
+			before: func(_ *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
+			},
+			state: func(bot *ReminderBot) {
+				bot.menuByChat[chatID] = chatMenuReminderList
+				bot.listByChat[chatID] = reminderListState{kind: reminderListActive}
+			},
+		},
+		{
 			name: "reply history reminder button opens current history page reminder",
 			action: func(ctx context.Context, bot *ReminderBot) error {
 				handled, err := bot.handleSelectedReplyMessage(ctx, chatID, telegramui.ReminderButtonText(reminder))
@@ -1625,10 +1662,16 @@ func TestReminderBotHandlesReplyNavigationState(t *testing.T) {
 				return err
 			},
 			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
-				repository.EXPECT().
-					FindReminderHistoryByChat(gomock.Any(), chatID, reminderPageSize, 2).
-					Return([]database.ReminderView{reminder}, nil).
-					Times(1)
+				gomock.InOrder(
+					repository.EXPECT().
+						UserSettings(gomock.Any(), chatID).
+						Return(database.UserSettings{Timezone: "UTC"}, nil).
+						Times(1),
+					repository.EXPECT().
+						FindReminderHistoryByChat(gomock.Any(), chatID, reminderPageSize, 2).
+						Return([]database.ReminderView{reminder}, nil).
+						Times(1),
+				)
 			},
 			state: func(bot *ReminderBot) {
 				bot.menuByChat[chatID] = chatMenuReminderList
@@ -2479,6 +2522,10 @@ func TestReminderBotHandlesReminderCallbacks(t *testing.T) {
 			name: "create reminder callback starts draft in current message",
 			data: telegramui.CallbackCreateReminder,
 			before: func(caller *telegoapimock.MockCaller, _ *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
+				repository.EXPECT().
+					UserSettings(gomock.Any(), chatID).
+					Return(database.UserSettings{Timezone: "UTC"}, nil).
+					Times(1)
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(testTelegramResponse(t, telego.Message{MessageID: messageID}), nil).
 					Times(2)
@@ -2493,6 +2540,10 @@ func TestReminderBotHandlesReminderCallbacks(t *testing.T) {
 			data: telegramui.CallbackReminderList,
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
+					repository.EXPECT().
+						UserSettings(gomock.Any(), chatID).
+						Return(database.UserSettings{Timezone: "UTC"}, nil).
+						Times(1),
 					repository.EXPECT().FindRemindersByChat(gomock.Any(), chatID, gomock.Any(), gomock.Any()).
 						Return([]database.ReminderView{reminder}, nil).
 						Times(1),
@@ -2507,6 +2558,10 @@ func TestReminderBotHandlesReminderCallbacks(t *testing.T) {
 			data: telegramui.CallbackViewPrefix + "10",
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
+					repository.EXPECT().
+						UserSettings(gomock.Any(), chatID).
+						Return(database.UserSettings{Timezone: "UTC"}, nil).
+						Times(1),
 					repository.EXPECT().FindRemindersByChat(gomock.Any(), chatID, gomock.Any(), gomock.Any()).
 						Return([]database.ReminderView{reminder}, nil).
 						Times(1),
@@ -2521,6 +2576,10 @@ func TestReminderBotHandlesReminderCallbacks(t *testing.T) {
 			data: telegramui.CallbackViewPrefix + "99",
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
+					repository.EXPECT().
+						UserSettings(gomock.Any(), chatID).
+						Return(database.UserSettings{Timezone: "UTC"}, nil).
+						Times(1),
 					repository.EXPECT().FindRemindersByChat(gomock.Any(), chatID, gomock.Any(), gomock.Any()).
 						Return([]database.ReminderView{reminder}, nil).
 						Times(1),
@@ -2561,9 +2620,15 @@ func TestReminderBotHandlesReminderCallbacks(t *testing.T) {
 			name: "view reminder service error is returned",
 			data: telegramui.CallbackViewPrefix + "10",
 			before: func(_ *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
-				repository.EXPECT().FindRemindersByChat(gomock.Any(), chatID, gomock.Any(), gomock.Any()).
-					Return(nil, errLoadReminders).
-					Times(1)
+				gomock.InOrder(
+					repository.EXPECT().
+						UserSettings(gomock.Any(), chatID).
+						Return(database.UserSettings{Timezone: "UTC"}, nil).
+						Times(1),
+					repository.EXPECT().FindRemindersByChat(gomock.Any(), chatID, gomock.Any(), gomock.Any()).
+						Return(nil, errLoadReminders).
+						Times(1),
+				)
 			},
 			expected: struct {
 				expectedErrText string
@@ -3074,15 +3139,17 @@ func TestReminderBotSendsListsAndSettingsScreens(t *testing.T) {
 				return bot.sendReminderList(ctx, chatID)
 			},
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
-				gomock.InOrder(
-					repository.EXPECT().
-						FindRemindersByChat(gomock.Any(), chatID, gomock.Any(), gomock.Any()).
-						Return([]database.ReminderView{reminder}, nil).
-						Times(1),
-					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
-						Return(testTelegramResponse(t, telego.Message{MessageID: 41}), nil).
-						Times(1),
-				)
+				repository.EXPECT().
+					UserSettings(gomock.Any(), chatID).
+					Return(database.UserSettings{Timezone: "UTC"}, nil).
+					Times(1)
+				repository.EXPECT().
+					FindRemindersByChat(gomock.Any(), chatID, gomock.Any(), gomock.Any()).
+					Return([]database.ReminderView{reminder}, nil).
+					Times(1)
+				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(testTelegramResponse(t, telego.Message{MessageID: 41}), nil).
+					Times(1)
 			},
 		},
 		{
@@ -3092,6 +3159,10 @@ func TestReminderBotSendsListsAndSettingsScreens(t *testing.T) {
 			},
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
+					repository.EXPECT().
+						UserSettings(gomock.Any(), chatID).
+						Return(database.UserSettings{Timezone: "UTC"}, nil).
+						Times(1),
 					repository.EXPECT().
 						FindRemindersByChat(gomock.Any(), chatID, gomock.Any(), gomock.Any()).
 						Return([]database.ReminderView{}, nil).
@@ -3156,10 +3227,16 @@ func TestReminderBotSendsListsAndSettingsScreens(t *testing.T) {
 				return bot.sendReminderList(ctx, chatID)
 			},
 			before: func(_ *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
-				repository.EXPECT().
-					FindRemindersByChat(gomock.Any(), chatID, gomock.Any(), gomock.Any()).
-					Return(nil, errLoadReminders).
-					Times(1)
+				gomock.InOrder(
+					repository.EXPECT().
+						UserSettings(gomock.Any(), chatID).
+						Return(database.UserSettings{Timezone: "UTC"}, nil).
+						Times(1),
+					repository.EXPECT().
+						FindRemindersByChat(gomock.Any(), chatID, gomock.Any(), gomock.Any()).
+						Return(nil, errLoadReminders).
+						Times(1),
+				)
 			},
 			expected: struct {
 				expectedErrText string

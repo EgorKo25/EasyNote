@@ -32,6 +32,10 @@ Timezone reply-keyboard arrows are handled in the timezone context before remind
 
 Settings now have an explicit `Сохранить` button that returns to the main menu. Timezone selection now contains 24 unique UTC hour offsets; `Калининград` is used for UTC+2, `Москва` is used for UTC+3, and the default timezone is Moscow.
 
+Timezone buttons are now labeled uniformly as `UTC (+N)` / `UTC (-N)`, including the UTC+3 default option. Reminder drafts, active reminder lists, and reminder detail views load the user's timezone before calculating or formatting reminder times.
+
+The reminder-list `Назад` button is no longer treated as a reminder title, so it returns to the reminders menu. Intrusive reminder settings now expose a `Назад` inline button that returns to settings.
+
 The recurrence menu can now reset an already selected repeat mode with `Не повторять`.
 
 Manual CI deployment from a pull request branch can now deploy an image tagged as `X.Y.Z.<short_sha>`.
