@@ -76,14 +76,13 @@ const (
 type chatMenu string
 
 const (
-	chatMenuMain              chatMenu = "main"
-	chatMenuCreate            chatMenu = "create"
-	chatMenuReminders         chatMenu = "reminders"
-	chatMenuReminderList      chatMenu = "reminder_list"
-	chatMenuSettings          chatMenu = "settings"
-	chatMenuTimezone          chatMenu = "timezone"
-	chatMenuIntrusive         chatMenu = "intrusive"
-	chatMenuIntrusiveInterval chatMenu = "intrusive_interval"
+	chatMenuMain         chatMenu = "main"
+	chatMenuCreate       chatMenu = "create"
+	chatMenuReminders    chatMenu = "reminders"
+	chatMenuReminderList chatMenu = "reminder_list"
+	chatMenuSettings     chatMenu = "settings"
+	chatMenuTimezone     chatMenu = "timezone"
+	chatMenuIntrusive    chatMenu = "intrusive"
 )
 
 //go:generate go run go.uber.org/mock/mockgen -source=reminder_bot.go -destination=mocks/reminder_bot_mock.go -package=mocks
@@ -255,7 +254,7 @@ func (b *ReminderBot) showDraftTextResult(ctx context.Context, chatID int64) err
 		return b.editDraft(ctx, chatID, b.currentUIMessageID(chatID))
 	}
 
-	if b.chatMenu(chatID) == chatMenuIntrusiveInterval {
+	if b.chatMenu(chatID) == chatMenuIntrusive {
 		return b.sendIntrusiveInterval(ctx, chatID)
 	}
 
@@ -483,12 +482,6 @@ func (b *ReminderBot) runSettingsMessageCommand(ctx context.Context, chatID int6
 		return b.sendIntrusiveSettings(ctx, chatID), true
 	case telegramui.ButtonIntrusiveEnabled, telegramui.ButtonIntrusiveDisabled:
 		return b.toggleIntrusiveSettings(ctx, chatID), true
-	case telegramui.ButtonIntrusiveInterval:
-		return b.sendIntrusiveInterval(ctx, chatID), true
-	case telegramui.ButtonIntrusiveManual:
-		b.setDraftWaitingFor(chatID, telegramui.FieldIntrusiveInterval)
-
-		return b.sendIntrusiveInterval(ctx, chatID), true
 	default:
 		return nil, false
 	}
@@ -938,6 +931,7 @@ func (b *ReminderBot) editIntrusiveSettings(ctx context.Context, chatID int64, m
 
 func (b *ReminderBot) sendIntrusiveSettings(ctx context.Context, chatID int64) error {
 	b.setChatMenu(chatID, chatMenuIntrusive)
+	b.setDraftWaitingFor(chatID, telegramui.FieldIntrusiveInterval)
 
 	if err := b.loadChatLocation(ctx, chatID); err != nil {
 		return err
@@ -975,7 +969,8 @@ func (b *ReminderBot) toggleIntrusiveSettings(ctx context.Context, chatID int64)
 }
 
 func (b *ReminderBot) sendIntrusiveInterval(ctx context.Context, chatID int64) error {
-	b.setChatMenu(chatID, chatMenuIntrusiveInterval)
+	b.setChatMenu(chatID, chatMenuIntrusive)
+	b.setDraftWaitingFor(chatID, telegramui.FieldIntrusiveInterval)
 
 	settings, err := b.repository.UserSettings(ctx, chatID)
 	if err != nil {
@@ -985,27 +980,9 @@ func (b *ReminderBot) sendIntrusiveInterval(ctx context.Context, chatID int64) e
 	return b.replaceUI(
 		ctx,
 		chatID,
-		telegramui.IntrusiveIntervalText(settings.IntrusiveInterval),
-		telegramui.IntrusiveIntervalKeyboard(settings.IntrusiveInterval),
+		telegramui.IntrusiveSettingsText(settings),
+		telegramui.IntrusiveSettingsKeyboard(settings.IntrusiveEnabled),
 	)
-}
-
-func (b *ReminderBot) shiftIntrusiveInterval(ctx context.Context, chatID int64, minutes int) error {
-	settings, err := b.repository.UserSettings(ctx, chatID)
-	if err != nil {
-		return fmt.Errorf("load user settings: %w", err)
-	}
-
-	interval := settings.IntrusiveInterval + time.Duration(minutes)*time.Minute
-	if interval < time.Minute || interval > 2*time.Hour {
-		return b.sendIntrusiveInterval(ctx, chatID)
-	}
-
-	if err = b.repository.UpdateIntrusiveSettings(ctx, chatID, settings.IntrusiveEnabled, interval); err != nil {
-		return fmt.Errorf("set intrusive interval: %w", err)
-	}
-
-	return b.sendIntrusiveInterval(ctx, chatID)
 }
 
 func (b *ReminderBot) editTimezoneSettings(ctx context.Context, chatID int64, messageID int, data string) error {
@@ -1128,8 +1105,6 @@ func (b *ReminderBot) handleBackMessage(ctx context.Context, chatID int64) error
 	switch b.chatMenu(chatID) {
 	case chatMenuTimezone:
 		return b.saveCurrentTimezone(ctx, chatID)
-	case chatMenuIntrusiveInterval:
-		return b.sendIntrusiveSettings(ctx, chatID)
 	case chatMenuIntrusive:
 		return b.sendSettings(ctx, chatID)
 	case chatMenuReminderList:
@@ -1140,10 +1115,6 @@ func (b *ReminderBot) handleBackMessage(ctx context.Context, chatID int64) error
 }
 
 func (b *ReminderBot) handleDoneMessage(ctx context.Context, chatID int64) error {
-	if b.chatMenu(chatID) == chatMenuIntrusiveInterval {
-		return b.sendIntrusiveSettings(ctx, chatID)
-	}
-
 	if !b.draftExists(chatID) {
 		return nil
 	}
@@ -1170,8 +1141,6 @@ func (b *ReminderBot) handleTimeShiftMessage(ctx context.Context, chatID int64, 
 		}
 
 		return b.shiftTimezone(ctx, chatID, 1)
-	case chatMenuIntrusiveInterval:
-		return b.shiftIntrusiveInterval(ctx, chatID, minutes)
 	default:
 		if b.applyDraftTimeShift(chatID, strconv.Itoa(minutes)) {
 			return b.replaceDraft(ctx, chatID)

@@ -115,7 +115,7 @@ scheduler:
 
 The main menu is a reply-keyboard message with a compact formatted stats block for completed, pending, and missed tasks. Missed tasks include both skipped and failed reminders.
 
-Reminder draft buttons now reflect filled fields: `Название`, `Описание`, and `Дата` become `Изменить ...` after input. Recurring reminder drafts can be reset with `Не повторять`, and service prompts are shown in italic.
+Reminder draft buttons now reflect filled fields and expose direct edit actions for description and date. The draft screen is marked as a template, shows default description copy, labels the reminder start date, and service prompts are shown in italic.
 
 Reminder notifications keep the main reply keyboard available by briefly sending and deleting a main-menu message before the inline reminder notification. The notification itself uses only inline `Готово` and `Отменить` actions and is deleted after either action.
 

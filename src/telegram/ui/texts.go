@@ -29,7 +29,9 @@ func CreateText() string {
 }
 
 func DraftText(draft Draft, location *time.Location) string {
-	dateText, title, description := "Сегодня", "Название", emptyFieldText
+	dateText := "Сегодня"
+	title := "Название"
+	description := "Здесь может быть описание вашего напоминания."
 	repeat := RepeatText(draft)
 
 	if !draft.RemindAt(location).IsZero() {
@@ -58,7 +60,8 @@ func DraftText(draft Draft, location *time.Location) string {
 	}
 
 	return fmt.Sprintf(
-		"⠀⠀⠀⠀<b>%s</b>\n\nОписание: %s\n%s\n\n⠀⠀⠀⠀%s\n\n<i>%s</i>%s",
+		"<i>Шаблон напоминания</i>\n\n"+
+			"⠀⠀⠀⠀<b>%s</b>\n\nОписание: %s\n%s\n\nДата начала напоминания:\n⠀⠀⠀⠀%s\n\n<i>%s</i>%s",
 		title,
 		description,
 		repeat,
@@ -141,7 +144,8 @@ func SettingsText(settings database.UserSettings) string {
 
 func IntrusiveSettingsText(settings database.UserSettings) string {
 	return fmt.Sprintf(
-		"<b>Настойчивые напоминания</b>\n\nСостояние: %s\nИнтервал: %s",
+		"<b>Настойчивые напоминания</b>\n\nСостояние: %s\nИнтервал: %s\n\n"+
+			"<i>Вы можете ввести желаемый интервал напоминания с клавиатуры. Просто отправьте его в чат.</i>",
 		intrusiveEnabledText(settings.IntrusiveEnabled),
 		settings.IntrusiveInterval,
 	)
