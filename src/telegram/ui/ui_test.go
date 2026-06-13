@@ -55,9 +55,9 @@ func TestTextRendering(t *testing.T) {
 			expected: struct {
 				text string
 			}{
-				text: "<i>Шаблон напоминания</i>\n\n" +
-					"⠀⠀⠀⠀⠀⠀⠀⠀<b>Pay rent</b>\n\nОписание: Before lunch\n\nПовторять: нет\n\n" +
+				text: "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀<b>Pay rent</b>\n\nBefore lunch\n\n" +
 					"Время начала напоминания: 02.06.2026, Вт 09:30\n\n" +
+					"Повторять: нет\n\n" +
 					"<i>Проверьте шаблон и сохраните напоминание.</i>",
 			},
 		},
@@ -81,10 +81,10 @@ func TestTextRendering(t *testing.T) {
 			expected: struct {
 				text string
 			}{
-				text: "<i>Шаблон напоминания</i>\n\n" +
-					"⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀<b>A</b>\n\n" +
-					"Описание: Здесь может быть описание вашего напоминания.\n\n" +
-					"Повторять: нет\n\nВремя начала напоминания: Сегодня\n\n" +
+				text: "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀<b>A</b>\n\n" +
+					"Здесь может быть описание вашей задачи. Описание не задано.\n\n" +
+					"Время начала напоминания: Дата и время не заданы\n\n" +
+					"Повторять: нет\n\n" +
 					"<i>Выберите дату и введите время напоминания.</i>",
 			},
 		},
@@ -114,10 +114,10 @@ func TestTextRendering(t *testing.T) {
 			expected: struct {
 				text string
 			}{
-				text: "<i>Шаблон напоминания</i>\n\n" +
-					"⠀⠀⠀⠀⠀⠀⠀⠀<b>Название</b>\n\n" +
-					"Описание: Здесь может быть описание вашего напоминания.\n\n" +
-					"Повторять: нет\n\nВремя начала напоминания: Сегодня\n\n" +
+				text: "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀<b>Название</b>\n\n" +
+					"Здесь может быть описание вашей задачи. Описание не задано.\n\n" +
+					"Время начала напоминания: Дата и время не заданы\n\n" +
+					"Повторять: нет\n\n" +
 					"<i>Введите название напоминания сообщением.</i>",
 			},
 		},
@@ -589,13 +589,13 @@ func TestTimezoneControls(t *testing.T) {
 		}
 	}{
 		{
-			name: "kaliningrad button text shows positive utc offset before moscow",
+			name: "first timezone button starts unique utc offsets",
 			action: func() string {
 				return telegramui.TimezoneButtonText(telegramui.TimezoneByIndex(0), now)
 			},
 			expected: struct {
 				text string
-			}{text: "Калининград (+2)"},
+			}{text: "UTC-11 (-11)"},
 		},
 		{
 			name: "next callback advances timezone index",
@@ -631,7 +631,7 @@ func TestTimezoneControls(t *testing.T) {
 			},
 			expected: struct {
 				text string
-			}{text: "settings:timezone:prev:34"},
+			}{text: "settings:timezone:prev:23"},
 		},
 		{
 			name: "large timezone index wraps through options",
@@ -640,45 +640,54 @@ func TestTimezoneControls(t *testing.T) {
 			},
 			expected: struct {
 				text string
-			}{text: "Торонто (-4)"},
+			}{text: "UTC-08 (-8)"},
 		},
 		{
-			name: "timezone lookup finds configured city index",
+			name: "unknown timezone lookup returns moscow index",
 			action: func() string {
 				return telegramui.TimezoneSelectCallback(telegramui.TimezoneIndex("Asia/Novosibirsk"))
 			},
 			expected: struct {
 				text string
-			}{text: "settings:timezone:select:5"},
+			}{text: "settings:timezone:select:14"},
 		},
 		{
-			name: "moscow follows kaliningrad in timezone options",
+			name: "kaliningrad is placed before moscow in timezone options",
 			action: func() string {
-				return telegramui.TimezoneButtonText(telegramui.TimezoneByIndex(1), now)
+				return telegramui.TimezoneButtonText(telegramui.TimezoneByIndex(13), now)
+			},
+			expected: struct {
+				text string
+			}{text: "Калининград (+2)"},
+		},
+		{
+			name: "moscow is standard timezone option",
+			action: func() string {
+				return telegramui.TimezoneButtonText(telegramui.TimezoneByIndex(14), now)
 			},
 			expected: struct {
 				text string
 			}{text: "Москва (+3)"},
 		},
 		{
-			name: "worldwide timezone lookup finds new york",
+			name: "fixed utc timezone lookup keeps unique offset",
 			action: func() string {
-				return telegramui.TimezoneSelectCallback(telegramui.TimezoneIndex("America/New_York"))
+				return telegramui.TimezoneSelectCallback(telegramui.TimezoneIndex("Etc/GMT+5"))
 			},
 			expected: struct {
 				text string
-			}{text: "settings:timezone:select:25"},
+			}{text: "settings:timezone:select:6"},
 		},
 		{
-			name: "timezone keyboard exposes arrows and selected city",
+			name: "timezone keyboard exposes arrows and standard moscow city",
 			action: func() string {
-				rows := keyboardTexts(telegramui.TimezoneKeyboard(0, now).Keyboard)
+				rows := keyboardTexts(telegramui.TimezoneKeyboard(telegramui.TimezoneIndex(""), now).Keyboard)
 
 				return rows[0][0] + rows[0][1] + rows[0][2]
 			},
 			expected: struct {
 				text string
-			}{text: "<-Калининград (+2)->"},
+			}{text: "<-Москва (+3)->"},
 		},
 	}
 

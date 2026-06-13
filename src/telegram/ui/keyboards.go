@@ -346,7 +346,7 @@ func IntrusiveSettingsKeyboard(enabled bool) *telego.InlineKeyboardMarkup {
 }
 
 func ReminderButtonText(reminder database.ReminderView) string {
-	return fmt.Sprintf("#%d %s", reminder.ID, reminder.Title)
+	return reminder.Title
 }
 
 func TimezoneIndex(timezone string) int {
@@ -356,7 +356,7 @@ func TimezoneIndex(timezone string) int {
 		}
 	}
 
-	return 0
+	return moscowTimezoneIndex()
 }
 
 func TimezoneByIndex(index int) TimezoneOption {
@@ -404,40 +404,39 @@ func normalizeTimezoneIndex(index int) int {
 	return index
 }
 
+func moscowTimezoneIndex() int {
+	for index, option := range timezoneOptions {
+		if option.Timezone == "Europe/Moscow" {
+			return index
+		}
+	}
+
+	return 0
+}
+
 var timezoneOptions = []TimezoneOption{
+	{City: "UTC-11", Timezone: "Etc/GMT+11"},
+	{City: "UTC-10", Timezone: "Etc/GMT+10"},
+	{City: "UTC-09", Timezone: "Etc/GMT+9"},
+	{City: "UTC-08", Timezone: "Etc/GMT+8"},
+	{City: "UTC-07", Timezone: "Etc/GMT+7"},
+	{City: "UTC-06", Timezone: "Etc/GMT+6"},
+	{City: "UTC-05", Timezone: "Etc/GMT+5"},
+	{City: "UTC-04", Timezone: "Etc/GMT+4"},
+	{City: "UTC-03", Timezone: "Etc/GMT+3"},
+	{City: "UTC-02", Timezone: "Etc/GMT+2"},
+	{City: "UTC-01", Timezone: "Etc/GMT+1"},
+	{City: "UTC+00", Timezone: "Etc/GMT"},
+	{City: "UTC+01", Timezone: "Etc/GMT-1"},
 	{City: "Калининград", Timezone: "Europe/Kaliningrad"},
 	{City: "Москва", Timezone: "Europe/Moscow"},
-	{City: "Самара", Timezone: "Europe/Samara"},
-	{City: "Екатеринбург", Timezone: "Asia/Yekaterinburg"},
-	{City: "Омск", Timezone: "Asia/Omsk"},
-	{City: "Новосибирск", Timezone: "Asia/Novosibirsk"},
-	{City: "Красноярск", Timezone: "Asia/Krasnoyarsk"},
-	{City: "Иркутск", Timezone: "Asia/Irkutsk"},
-	{City: "Якутск", Timezone: "Asia/Yakutsk"},
-	{City: "Владивосток", Timezone: "Asia/Vladivostok"},
-	{City: "Магадан", Timezone: "Asia/Magadan"},
-	{City: "Камчатка", Timezone: "Asia/Kamchatka"},
-	{City: "Лондон", Timezone: "Europe/London"},
-	{City: "Берлин", Timezone: "Europe/Berlin"},
-	{City: "Париж", Timezone: "Europe/Paris"},
-	{City: "Стамбул", Timezone: "Europe/Istanbul"},
-	{City: "Дубай", Timezone: "Asia/Dubai"},
-	{City: "Токио", Timezone: "Asia/Tokyo"},
-	{City: "Сеул", Timezone: "Asia/Seoul"},
-	{City: "Пекин", Timezone: "Asia/Shanghai"},
-	{City: "Сингапур", Timezone: "Asia/Singapore"},
-	{City: "Дели", Timezone: "Asia/Kolkata"},
-	{City: "Бангкок", Timezone: "Asia/Bangkok"},
-	{City: "Сидней", Timezone: "Australia/Sydney"},
-	{City: "Окленд", Timezone: "Pacific/Auckland"},
-	{City: "Нью-Йорк", Timezone: "America/New_York"},
-	{City: "Чикаго", Timezone: "America/Chicago"},
-	{City: "Денвер", Timezone: "America/Denver"},
-	{City: "Лос-Анджелес", Timezone: "America/Los_Angeles"},
-	{City: "Торонто", Timezone: "America/Toronto"},
-	{City: "Мехико", Timezone: "America/Mexico_City"},
-	{City: "Сан-Паулу", Timezone: "America/Sao_Paulo"},
-	{City: "Буэнос-Айрес", Timezone: "America/Argentina/Buenos_Aires"},
-	{City: "Каир", Timezone: "Africa/Cairo"},
-	{City: "Йоханнесбург", Timezone: "Africa/Johannesburg"},
+	{City: "UTC+04", Timezone: "Etc/GMT-4"},
+	{City: "UTC+05", Timezone: "Etc/GMT-5"},
+	{City: "UTC+06", Timezone: "Etc/GMT-6"},
+	{City: "UTC+07", Timezone: "Etc/GMT-7"},
+	{City: "UTC+08", Timezone: "Etc/GMT-8"},
+	{City: "UTC+09", Timezone: "Etc/GMT-9"},
+	{City: "UTC+10", Timezone: "Etc/GMT-10"},
+	{City: "UTC+11", Timezone: "Etc/GMT-11"},
+	{City: "UTC+12", Timezone: "Etc/GMT-12"},
 }
