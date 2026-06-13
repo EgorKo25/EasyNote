@@ -14,11 +14,13 @@ Reminder creation was fixed after the reply-keyboard migration: filled draft fie
 
 Reminder creation text was reorganized around title, description, repeat state, and selected date. Service prompts are rendered in italic.
 
+The reminder draft now explicitly marks the screen as a template, shows default description copy, labels the start date, and exposes `Изменить описание` / `Изменить дату` directly on the reply keyboard.
+
 The `Название` and `Описание` draft buttons now switch the message into input-waiting mode by editing the existing message text, avoiding a delete/send blink when the reply keyboard does not need to change.
 
 Delivered reminder actions now remove the notification message after `Готово` or `Отменить`.
 
-Intrusive reminder interval settings support manual minute input from 1 to 120 minutes, minute-level decrement below 30 minutes, and friendlier interval step buttons.
+Intrusive reminder settings now use only the `Включено` / `Выключено` toggle and accept manual interval input directly from chat, from 1 to 120 minutes.
 
 Timezone reply-keyboard arrows are handled in the timezone context before reminder-list pagination, so they no longer open active reminders.
 

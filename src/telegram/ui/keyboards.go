@@ -116,15 +116,9 @@ func DraftReplyKeyboard(draft Draft, now time.Time) *telego.ReplyKeyboardMarkup 
 			titleButtonText = ButtonDraftEditTitle
 		}
 
-		descriptionButtonText := ButtonDraftDescription
-		if draft.Description != "" {
-			descriptionButtonText = ButtonDraftEditDescription
-		}
+		descriptionButtonText := ButtonDraftEditDescription
 
-		dateButtonText := ButtonDraftDate
-		if draftDateIsSet(draft) {
-			dateButtonText = "Изменить дату"
-		}
+		dateButtonText := "Изменить дату"
 
 		return tu.Keyboard(
 			tu.KeyboardRow(tu.KeyboardButton(dateButtonText), tu.KeyboardButton(ButtonDraftRepeat)),
@@ -378,53 +372,8 @@ func IntrusiveSettingsKeyboard(enabled bool) *telego.ReplyKeyboardMarkup {
 
 	return tu.Keyboard(
 		tu.KeyboardRow(tu.KeyboardButton(toggleText)),
-		tu.KeyboardRow(tu.KeyboardButton(ButtonIntrusiveInterval)),
 		tu.KeyboardRow(tu.KeyboardButton(ButtonBack)),
 	).WithResizeKeyboard()
-}
-
-func IntrusiveIntervalKeyboard(interval time.Duration) *telego.ReplyKeyboardMarkup {
-	rows := make([][]telego.KeyboardButton, 0, 4)
-
-	minusButtons := make([]telego.KeyboardButton, 0, 3)
-
-	if interval > 15*time.Minute {
-		minusButtons = append(minusButtons, tu.KeyboardButton(ButtonMinusFifteenMinutes))
-	}
-
-	if interval > 5*time.Minute {
-		minusButtons = append(minusButtons, tu.KeyboardButton(ButtonMinusFiveMinutes))
-	}
-
-	if interval > time.Minute {
-		minusButtons = append(minusButtons, tu.KeyboardButton(ButtonMinusMinute))
-	}
-
-	if len(minusButtons) > 0 {
-		rows = append(rows, minusButtons)
-	}
-
-	plusButtons := make([]telego.KeyboardButton, 0, 3)
-	if interval < 2*time.Hour {
-		plusButtons = append(plusButtons, tu.KeyboardButton(ButtonPlusMinute))
-	}
-
-	if interval <= 115*time.Minute {
-		plusButtons = append(plusButtons, tu.KeyboardButton(ButtonPlusFiveMinutes))
-	}
-
-	if interval <= 105*time.Minute {
-		plusButtons = append(plusButtons, tu.KeyboardButton(ButtonPlusFifteenMinutes))
-	}
-
-	if len(plusButtons) > 0 {
-		rows = append(rows, plusButtons)
-	}
-
-	rows = append(rows, tu.KeyboardRow(tu.KeyboardButton(ButtonIntrusiveManual)))
-	rows = append(rows, tu.KeyboardRow(tu.KeyboardButton(ButtonDone), tu.KeyboardButton(ButtonBack)))
-
-	return tu.Keyboard(rows...).WithResizeKeyboard()
 }
 
 func ReminderButtonText(reminder database.ReminderView) string {

@@ -28,8 +28,6 @@ const (
 	ButtonSettingsLanguage     = "Язык: русский"
 	ButtonSettingsTimezone     = "Часовой пояс"
 	ButtonSettingsIntrusive    = "Настойчивые напоминания"
-	ButtonIntrusiveInterval    = "Интервал"
-	ButtonIntrusiveManual      = "Задать вручную"
 	ButtonIntrusiveEnabled     = "Включено"
 	ButtonIntrusiveDisabled    = "Выключено"
 	ButtonMinusHour            = "-1ч"
@@ -98,8 +96,6 @@ const (
 	ScreenWeekdays Screen = "weekdays"
 	ScreenInterval Screen = "interval"
 )
-
-const emptyFieldText = "не задано"
 
 type Field string
 type Screen string

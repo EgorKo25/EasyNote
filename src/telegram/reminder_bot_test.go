@@ -508,9 +508,11 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 			expected: struct {
 				expectedText string
 			}{
-				expectedText: "⠀⠀⠀⠀<b>Pay rent</b>\n\n" +
+				expectedText: "<i>Шаблон напоминания</i>\n\n" +
+					"⠀⠀⠀⠀<b>Pay rent</b>\n\n" +
 					"Описание: Before lunch\n" +
 					"Повторять: нет\n\n" +
+					"Дата начала напоминания:\n" +
 					"⠀⠀⠀⠀02.06.2026, Вт 09:30\n\n" +
 					"<i>Выберите дату и время кнопкой ниже.</i>",
 			},
@@ -531,9 +533,11 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 			expected: struct {
 				expectedText string
 			}{
-				expectedText: "⠀⠀⠀⠀<b>Pay rent</b>\n\n" +
+				expectedText: "<i>Шаблон напоминания</i>\n\n" +
+					"⠀⠀⠀⠀<b>Pay rent</b>\n\n" +
 					"Описание: Before lunch\n" +
 					"Повторять: выбрано дат: 2\n\n" +
+					"Дата начала напоминания:\n" +
 					"⠀⠀⠀⠀Сегодня\n\n" +
 					"<i>Выберите дату и время кнопкой ниже.</i>",
 			},
@@ -555,9 +559,11 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 			expected: struct {
 				expectedText string
 			}{
-				expectedText: "⠀⠀⠀⠀<b>Название</b>\n\n" +
-					"Описание: не задано\n" +
+				expectedText: "<i>Шаблон напоминания</i>\n\n" +
+					"⠀⠀⠀⠀<b>Название</b>\n\n" +
+					"Описание: Здесь может быть описание вашего напоминания.\n" +
 					"Повторять: нет\n\n" +
+					"Дата начала напоминания:\n" +
 					"⠀⠀⠀⠀Сегодня\n\n" +
 					"<i>Выберите дату и время кнопкой ниже.</i>",
 			},
@@ -1542,20 +1548,6 @@ func TestReminderBotHandlesReplyNavigationState(t *testing.T) {
 			},
 		},
 		{
-			name: "done from intrusive interval returns to intrusive settings",
-			action: func(ctx context.Context, bot *ReminderBot) error {
-				return bot.handleDoneMessage(ctx, chatID)
-			},
-			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
-				repository.EXPECT().UserSettings(gomock.Any(), chatID).
-					Return(database.UserSettings{Timezone: "UTC", IntrusiveInterval: time.Minute}, nil).
-					Times(2)
-			},
-			state: func(bot *ReminderBot) {
-				bot.menuByChat[chatID] = chatMenuIntrusiveInterval
-			},
-		},
-		{
 			name: "timezone shift updates selected timezone page",
 			action: func(ctx context.Context, bot *ReminderBot) error {
 				return bot.handleTimeShiftMessage(ctx, chatID, 60)
@@ -1564,67 +1556,6 @@ func TestReminderBotHandlesReplyNavigationState(t *testing.T) {
 			},
 			state: func(bot *ReminderBot) {
 				bot.menuByChat[chatID] = chatMenuTimezone
-			},
-		},
-		{
-			name: "intrusive interval shift inside boundaries saves interval",
-			action: func(ctx context.Context, bot *ReminderBot) error {
-				return bot.handleTimeShiftMessage(ctx, chatID, -5)
-			},
-			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
-				gomock.InOrder(
-					repository.EXPECT().UserSettings(gomock.Any(), chatID).
-						Return(database.UserSettings{IntrusiveEnabled: true, IntrusiveInterval: 30 * time.Minute}, nil).
-						Times(1),
-					repository.EXPECT().
-						UpdateIntrusiveSettings(gomock.Any(), chatID, true, 25*time.Minute).
-						Return(nil).
-						Times(1),
-					repository.EXPECT().UserSettings(gomock.Any(), chatID).
-						Return(database.UserSettings{IntrusiveEnabled: true, IntrusiveInterval: 25 * time.Minute}, nil).
-						Times(1),
-				)
-			},
-			state: func(bot *ReminderBot) {
-				bot.menuByChat[chatID] = chatMenuIntrusiveInterval
-			},
-		},
-		{
-			name: "intrusive interval shift below lower boundary does not save interval",
-			action: func(ctx context.Context, bot *ReminderBot) error {
-				return bot.handleTimeShiftMessage(ctx, chatID, -5)
-			},
-			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
-				gomock.InOrder(
-					repository.EXPECT().UserSettings(gomock.Any(), chatID).
-						Return(database.UserSettings{IntrusiveEnabled: true, IntrusiveInterval: time.Minute}, nil).
-						Times(1),
-					repository.EXPECT().UserSettings(gomock.Any(), chatID).
-						Return(database.UserSettings{IntrusiveEnabled: true, IntrusiveInterval: time.Minute}, nil).
-						Times(1),
-				)
-			},
-			state: func(bot *ReminderBot) {
-				bot.menuByChat[chatID] = chatMenuIntrusiveInterval
-			},
-		},
-		{
-			name: "intrusive interval shift above upper boundary does not save interval",
-			action: func(ctx context.Context, bot *ReminderBot) error {
-				return bot.handleTimeShiftMessage(ctx, chatID, 60)
-			},
-			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
-				gomock.InOrder(
-					repository.EXPECT().UserSettings(gomock.Any(), chatID).
-						Return(database.UserSettings{IntrusiveEnabled: true, IntrusiveInterval: 2 * time.Hour}, nil).
-						Times(1),
-					repository.EXPECT().UserSettings(gomock.Any(), chatID).
-						Return(database.UserSettings{IntrusiveEnabled: true, IntrusiveInterval: 2 * time.Hour}, nil).
-						Times(1),
-				)
-			},
-			state: func(bot *ReminderBot) {
-				bot.menuByChat[chatID] = chatMenuIntrusiveInterval
 			},
 		},
 		{
@@ -1921,6 +1852,69 @@ func TestReplyShiftMinutes(t *testing.T) {
 	}
 }
 
+func TestHasTelegramHTML(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		text     string
+		expected struct {
+			hasHTML bool
+		}
+	}{
+		{
+			name: "bold title is html",
+			text: "<b>Главное меню</b>",
+			expected: struct {
+				hasHTML bool
+			}{hasHTML: true},
+		},
+		{
+			name: "italic prompt is html",
+			text: "<i>Выберите тип.</i>",
+			expected: struct {
+				hasHTML bool
+			}{hasHTML: true},
+		},
+		{
+			name: "bold and italic draft text is html",
+			text: "<i>Шаблон</i>\n<b>Название</b>",
+			expected: struct {
+				hasHTML bool
+			}{hasHTML: true},
+		},
+		{
+			name: "plain text around html is html",
+			text: "Описание\n<i>Подсказка</i>",
+			expected: struct {
+				hasHTML bool
+			}{hasHTML: true},
+		},
+		{
+			name: "plain text is not html",
+			text: "Главное меню",
+			expected: struct {
+				hasHTML bool
+			}{},
+		},
+		{
+			name: "escaped angle brackets without supported tags are not html",
+			text: "&lt;b&gt;Главное меню&lt;/b&gt;",
+			expected: struct {
+				hasHTML bool
+			}{},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			require.Equal(t, test.expected.hasHTML, hasTelegramHTML(test.text))
+		})
+	}
+}
+
 func TestReminderBotCommandCallbacks(t *testing.T) {
 	t.Parallel()
 
@@ -2117,6 +2111,30 @@ func TestReminderBotAppliesRepeatDateAndIntervalCallbacks(t *testing.T) {
 			}{
 				applied: true, repeat: telegramui.RepeatCustomInterval, screen: telegramui.ScreenInterval,
 				waitingFor: telegramui.FieldRepeatInterval, intervalDays: 1,
+			},
+		},
+		{
+			name: "repeat none clears recurring draft options",
+			draft: reminderDraft{
+				repeat:       telegramui.RepeatCustomInterval,
+				screen:       telegramui.ScreenInterval,
+				intervalDays: 3,
+				customDates:  []time.Time{time.Date(2099, 6, 5, 0, 0, 0, 0, location)},
+			},
+			data: telegramui.CallbackRepeatPrefix + string(telegramui.RepeatNone),
+			expected: struct {
+				applied      bool
+				repeat       telegramui.Repeat
+				screen       telegramui.Screen
+				waitingFor   telegramui.Field
+				intervalDays int
+				customDates  []time.Time
+				notice       string
+			}{
+				applied:     true,
+				repeat:      telegramui.RepeatNone,
+				screen:      telegramui.ScreenMain,
+				customDates: nil,
 			},
 		},
 		{
@@ -2876,7 +2894,7 @@ func TestReminderBotHandlesSettingsCallbacks(t *testing.T) {
 				handled         bool
 				expectedErrText string
 				waitingFor      telegramui.Field
-			}{handled: true},
+			}{handled: true, waitingFor: telegramui.FieldIntrusiveInterval},
 		},
 		{
 			name: "unknown settings callback is not handled",

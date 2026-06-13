@@ -55,8 +55,10 @@ func TestTextRendering(t *testing.T) {
 			expected: struct {
 				text string
 			}{
-				text: "⠀⠀⠀⠀<b>Pay rent</b>\n\nОписание: Before lunch\nПовторять: нет\n\n" +
-					"⠀⠀⠀⠀02.06.2026, Вт 09:30\n\n<i>Выберите дату и время кнопкой ниже.</i>",
+				text: "<i>Шаблон напоминания</i>\n\n" +
+					"⠀⠀⠀⠀<b>Pay rent</b>\n\nОписание: Before lunch\nПовторять: нет\n\n" +
+					"Дата начала напоминания:\n⠀⠀⠀⠀02.06.2026, Вт 09:30\n\n" +
+					"<i>Выберите дату и время кнопкой ниже.</i>",
 			},
 		},
 		{
@@ -97,7 +99,10 @@ func TestTextRendering(t *testing.T) {
 			expected: struct {
 				text string
 			}{
-				text: "⠀⠀⠀⠀<b>Название</b>\n\nОписание: не задано\nПовторять: нет\n\n" +
+				text: "<i>Шаблон напоминания</i>\n\n" +
+					"⠀⠀⠀⠀<b>Название</b>\n\n" +
+					"Описание: Здесь может быть описание вашего напоминания.\n" +
+					"Повторять: нет\n\nДата начала напоминания:\n" +
 					"⠀⠀⠀⠀Сегодня\n\n<i>Введите название напоминания сообщением.</i>",
 			},
 		},
@@ -352,7 +357,7 @@ func TestMenuAndActionKeyboards(t *testing.T) {
 			},
 			expected: struct {
 				rows [][]string
-			}{rows: [][]string{{"Выключено"}, {"Интервал"}, {"Назад"}}},
+			}{rows: [][]string{{"Выключено"}, {"Назад"}}},
 		},
 		{
 			name: "repeat draft screen exposes repeat choices",
@@ -463,7 +468,11 @@ func TestSettingsHistoryAndStatusTexts(t *testing.T) {
 			},
 			expected: struct {
 				text string
-			}{text: "<b>Настойчивые напоминания</b>\n\nСостояние: выключены\nИнтервал: 30m0s"},
+			}{
+				text: "<b>Настойчивые напоминания</b>\n\nСостояние: выключены\nИнтервал: 30m0s\n\n" +
+					"<i>Вы можете ввести желаемый интервал напоминания с клавиатуры. " +
+					"Просто отправьте его в чат.</i>",
+			},
 		},
 		{
 			name: "failed status text is localized",
