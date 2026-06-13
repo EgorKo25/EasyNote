@@ -123,7 +123,9 @@ func deliveryForReminder(
 	sentAt time.Time,
 ) database.ReminderDelivery {
 	interval := reminder.IntrusiveInterval
-	interval = max(interval, 30*time.Minute)
+	if interval <= 0 {
+		interval = 30 * time.Minute
+	}
 
 	intrusiveUntil := reminder.RemindAt.Add(24 * time.Hour)
 	if messageID == 0 && reminder.TelegramMessageID != nil {

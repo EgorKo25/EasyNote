@@ -28,11 +28,18 @@ func TestTextRendering(t *testing.T) {
 		}
 	}{
 		{
-			name:   "main menu text stays visually empty",
-			action: telegramui.MainMenuText,
+			name: "main menu text renders statistics",
+			action: func() string {
+				return telegramui.MainMenuText(database.ReminderStats{Completed: 3, Pending: 2, Skipped: 1})
+			},
 			expected: struct {
 				text string
-			}{text: " "},
+			}{
+				text: "⠀⠀⠀⠀⠀⠀⠀⠀<b>Главное меню</b>\n\n" +
+					"✅ Задачи выполнены: 3\n" +
+					"⏳ Задачи ожидают выполнения: 2\n" +
+					"❗ Задачи пропущены: 1",
+			},
 		},
 		{
 			name: "filled draft text shows reminder fields",
@@ -48,9 +55,11 @@ func TestTextRendering(t *testing.T) {
 			expected: struct {
 				text string
 			}{
-				text: "Создание напоминания\n\nДата и время: 02.06.2026 09:30\n" +
-					"Название: Pay rent\nОписание: Before lunch\n" +
-					"Повторять: нет\n\nВыберите дату и время кнопкой ниже.",
+				text: "<b>Название:</b>\nPay rent\n\n" +
+					"<b>Описание:</b>\nBefore lunch\n\n" +
+					"<b>Дата начала напоминаний:</b>\n02.06.2026, Вт 09:30\n\n" +
+					"<b>Повторять:</b>\nнет\n\n" +
+					"<i>Проверьте шаблон и сохраните напоминание.</i>",
 			},
 		},
 		{
@@ -63,7 +72,22 @@ func TestTextRendering(t *testing.T) {
 			},
 			expected: struct {
 				text string
-			}{text: "Повторять: выбрано дней недели: 3\n"},
+			}{text: "Повторять: выбрано дней недели: 3"},
+		},
+		{
+			name: "short draft title renders as field value",
+			action: func() string {
+				return telegramui.DraftText(telegramui.Draft{Title: "A"}, location)
+			},
+			expected: struct {
+				text string
+			}{
+				text: "<b>Название:</b>\nA\n\n" +
+					"<b>Описание:</b>\n\n\n" +
+					"<b>Дата начала напоминаний:</b>\n\n\n" +
+					"<b>Повторять:</b>\nнет\n\n" +
+					"<i>Выберите дату и введите время напоминания.</i>",
+			},
 		},
 		{
 			name: "reminder view text includes formatted time",
@@ -72,7 +96,7 @@ func TestTextRendering(t *testing.T) {
 			},
 			expected: struct {
 				text string
-			}{text: "02.06.2026 09:30\nPay rent\nBefore lunch"},
+			}{text: "<b>Pay rent</b>\n\nBefore lunch\n\n02.06.2026 09:30"},
 		},
 		{
 			name: "empty reminder list text explains empty state",
@@ -81,7 +105,7 @@ func TestTextRendering(t *testing.T) {
 			},
 			expected: struct {
 				text string
-			}{text: "Активных напоминаний пока нет.\n\nСоздайте первое напоминание на основной клавиатуре."},
+			}{text: "<b>Активные напоминания</b>\n\n<i>Активных напоминаний пока нет.</i>"},
 		},
 		{
 			name: "telegramui.Draft waiting for title changes next step",
@@ -91,8 +115,11 @@ func TestTextRendering(t *testing.T) {
 			expected: struct {
 				text string
 			}{
-				text: "Создание напоминания\n\nДата и время: не задано\nНазвание: не задано\n" +
-					"Описание: не задано\nПовторять: нет\n\nВведите название напоминания сообщением.",
+				text: "<b>Название:</b>\n\n\n" +
+					"<b>Описание:</b>\n\n\n" +
+					"<b>Дата начала напоминаний:</b>\n\n\n" +
+					"<b>Повторять:</b>\nнет\n\n" +
+					"<i>Введите название напоминания сообщением.</i>",
 			},
 		},
 	}
@@ -127,7 +154,7 @@ func TestKeyboardRendering(t *testing.T) {
 			expected: struct {
 				rows      int
 				firstText string
-			}{rows: 4, firstText: "Дата"},
+			}{rows: 4, firstText: "Дата и время"},
 		},
 		{
 			name: "filled recurring telegramui.Draft asks to change start date time",
@@ -166,7 +193,7 @@ func TestKeyboardRendering(t *testing.T) {
 			}{rows: 8, firstText: "<"},
 		},
 		{
-			name: "time screen renders presets and steppers",
+			name: "time screen renders day and done actions",
 			action: func() any {
 				return telegramui.DraftKeyboard(telegramui.Draft{
 					Screen: telegramui.ScreenTime,
@@ -177,7 +204,7 @@ func TestKeyboardRendering(t *testing.T) {
 			expected: struct {
 				rows      int
 				firstText string
-			}{rows: 4, firstText: "09:00"},
+			}{rows: 1, firstText: "День"},
 		},
 		{
 			name: "empty reminder list keeps pagination and back actions",
@@ -337,16 +364,41 @@ func TestMenuAndActionKeyboards(t *testing.T) {
 			},
 			expected: struct {
 				rows [][]string
-			}{rows: [][]string{{"Язык: русский"}, {"Часовой пояс"}, {"Настойчивые напоминания"}, {"Назад"}}},
+			}{rows: [][]string{{"Язык: русский"}, {"Часовой пояс"}, {"Настойчивые напоминания"}, {"Сохранить"}}},
 		},
 		{
-			name: "intrusive settings keyboard exposes enable disable and back",
+			name: "draft keyboard asks for title while waiting title input",
 			action: func() [][]string {
-				return keyboardTexts(telegramui.IntrusiveSettingsKeyboard(false).Keyboard)
+				keyboard := telegramui.DraftKeyboard(telegramui.Draft{WaitingFor: telegramui.FieldTitle}, time.Now())
+
+				return keyboardTexts(keyboard.InlineKeyboard[1:2])
 			},
 			expected: struct {
 				rows [][]string
-			}{rows: [][]string{{"Выключено"}, {"Интервал"}, {"Назад"}}},
+			}{rows: [][]string{{"Введите название", "Описание"}}},
+		},
+		{
+			name: "draft keyboard offers edit actions after title and description input",
+			action: func() [][]string {
+				keyboard := telegramui.DraftKeyboard(telegramui.Draft{
+					Title:       "Pay rent",
+					Description: "Before lunch",
+				}, time.Now())
+
+				return keyboardTexts(keyboard.InlineKeyboard[1:2])
+			},
+			expected: struct {
+				rows [][]string
+			}{rows: [][]string{{"Изменить название", "Изменить описание"}}},
+		},
+		{
+			name: "intrusive settings keyboard exposes inline toggle",
+			action: func() [][]string {
+				return keyboardTexts(telegramui.IntrusiveSettingsKeyboard(false).InlineKeyboard)
+			},
+			expected: struct {
+				rows [][]string
+			}{rows: [][]string{{"Выключено"}, {"Сохранить"}}},
 		},
 		{
 			name: "repeat draft screen exposes repeat choices",
@@ -416,7 +468,7 @@ func TestSettingsHistoryAndStatusTexts(t *testing.T) {
 			action: telegramui.RemindersText,
 			expected: struct {
 				text string
-			}{text: "Напоминания\n\nВыберите список напоминаний."},
+			}{text: "<b>Напоминания</b>\n\n<i>Выберите список напоминаний.</i>"},
 		},
 		{
 			name: "history text renders completed reminder",
@@ -429,7 +481,7 @@ func TestSettingsHistoryAndStatusTexts(t *testing.T) {
 			},
 			expected: struct {
 				text string
-			}{text: "Прошедшие напоминания\n\nВыберите напоминание из списка."},
+			}{text: "<b>Прошедшие напоминания</b>\n\n<i>Выберите напоминание из списка.</i>"},
 		},
 		{
 			name: "settings text renders enabled intrusive settings",
@@ -443,8 +495,8 @@ func TestSettingsHistoryAndStatusTexts(t *testing.T) {
 			expected: struct {
 				text string
 			}{
-				text: "Настройки\n\nЯзык: русский\nЧасовой пояс: Europe/Moscow\n" +
-					"Настойчивые напоминания: включены\nИнтервал: 45m0s",
+				text: "<b>Настройки</b>\n\nЯзык: русский\nЧасовой пояс: Europe/Moscow\n" +
+					"Настойчивые напоминания: включены\nИнтервал: каждые 45 минут",
 			},
 		},
 		{
@@ -457,7 +509,20 @@ func TestSettingsHistoryAndStatusTexts(t *testing.T) {
 			},
 			expected: struct {
 				text string
-			}{text: "Настойчивые напоминания\n\nСостояние: выключены\nИнтервал: 30m0s"},
+			}{
+				text: "<b>Настойчивые напоминания</b>\n\nСостояние: выключены\nИнтервал: каждые 30 минут\n\n" +
+					"<i>Вы можете ввести желаемый интервал напоминания с клавиатуры. " +
+					"Лучше использовать формат 1h30m. Просто отправьте его в чат.</i>",
+			},
+		},
+		{
+			name: "intrusive interval text renders hour and minutes",
+			action: func() string {
+				return telegramui.IntrusiveIntervalValueText(80 * time.Minute)
+			},
+			expected: struct {
+				text string
+			}{text: "раз в 1 час 20 минут"},
 		},
 		{
 			name: "failed status text is localized",
@@ -487,7 +552,7 @@ func TestSettingsHistoryAndStatusTexts(t *testing.T) {
 			},
 			expected: struct {
 				text string
-			}{text: "Повторять: каждые 5 дн.\n"},
+			}{text: "Повторять: каждые 5 дн."},
 		},
 		{
 			name: "custom dates repeat text renders selected count",
@@ -499,7 +564,7 @@ func TestSettingsHistoryAndStatusTexts(t *testing.T) {
 			},
 			expected: struct {
 				text string
-			}{text: "Повторять: выбрано дат: 1\n"},
+			}{text: "Повторять: выбрано дат: 1"},
 		},
 	}
 
@@ -525,13 +590,13 @@ func TestTimezoneControls(t *testing.T) {
 		}
 	}{
 		{
-			name: "moscow button text shows positive utc offset",
+			name: "first timezone button starts unique utc offsets",
 			action: func() string {
 				return telegramui.TimezoneButtonText(telegramui.TimezoneByIndex(0), now)
 			},
 			expected: struct {
 				text string
-			}{text: "Москва (+3)"},
+			}{text: "UTC (-11)"},
 		},
 		{
 			name: "next callback advances timezone index",
@@ -567,7 +632,7 @@ func TestTimezoneControls(t *testing.T) {
 			},
 			expected: struct {
 				text string
-			}{text: "settings:timezone:prev:11"},
+			}{text: "settings:timezone:prev:23"},
 		},
 		{
 			name: "large timezone index wraps through options",
@@ -576,27 +641,54 @@ func TestTimezoneControls(t *testing.T) {
 			},
 			expected: struct {
 				text string
-			}{text: "Екатеринбург (+5)"},
+			}{text: "UTC (-8)"},
 		},
 		{
-			name: "timezone lookup finds configured city index",
+			name: "unknown timezone lookup returns moscow index",
 			action: func() string {
 				return telegramui.TimezoneSelectCallback(telegramui.TimezoneIndex("Asia/Novosibirsk"))
 			},
 			expected: struct {
 				text string
-			}{text: "settings:timezone:select:5"},
+			}{text: "settings:timezone:select:14"},
 		},
 		{
-			name: "timezone keyboard exposes arrows and selected city",
+			name: "kaliningrad is placed before moscow in timezone options",
 			action: func() string {
-				rows := keyboardTexts(telegramui.TimezoneKeyboard(0, now).Keyboard)
+				return telegramui.TimezoneButtonText(telegramui.TimezoneByIndex(13), now)
+			},
+			expected: struct {
+				text string
+			}{text: "UTC (+2)"},
+		},
+		{
+			name: "moscow is standard timezone option",
+			action: func() string {
+				return telegramui.TimezoneButtonText(telegramui.TimezoneByIndex(14), now)
+			},
+			expected: struct {
+				text string
+			}{text: "UTC (+3)"},
+		},
+		{
+			name: "fixed utc timezone lookup keeps unique offset",
+			action: func() string {
+				return telegramui.TimezoneSelectCallback(telegramui.TimezoneIndex("Etc/GMT+5"))
+			},
+			expected: struct {
+				text string
+			}{text: "settings:timezone:select:6"},
+		},
+		{
+			name: "timezone keyboard exposes arrows and standard moscow city",
+			action: func() string {
+				rows := keyboardTexts(telegramui.TimezoneKeyboard(telegramui.TimezoneIndex(""), now).Keyboard)
 
 				return rows[0][0] + rows[0][1] + rows[0][2]
 			},
 			expected: struct {
 				text string
-			}{text: "<-Москва (+3)->"},
+			}{text: "<-UTC (+3)->"},
 		},
 	}
 
