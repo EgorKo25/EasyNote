@@ -397,7 +397,7 @@ func TestMenuAndActionKeyboards(t *testing.T) {
 			},
 			expected: struct {
 				rows [][]string
-			}{rows: [][]string{{"Выключено"}}},
+			}{rows: [][]string{{"Выключено"}, {"Назад"}}},
 		},
 		{
 			name: "repeat draft screen exposes repeat choices",
@@ -595,7 +595,7 @@ func TestTimezoneControls(t *testing.T) {
 			},
 			expected: struct {
 				text string
-			}{text: "UTC-11 (-11)"},
+			}{text: "UTC (-11)"},
 		},
 		{
 			name: "next callback advances timezone index",
@@ -640,7 +640,7 @@ func TestTimezoneControls(t *testing.T) {
 			},
 			expected: struct {
 				text string
-			}{text: "UTC-08 (-8)"},
+			}{text: "UTC (-8)"},
 		},
 		{
 			name: "unknown timezone lookup returns moscow index",
@@ -658,7 +658,7 @@ func TestTimezoneControls(t *testing.T) {
 			},
 			expected: struct {
 				text string
-			}{text: "Калининград (+2)"},
+			}{text: "UTC (+2)"},
 		},
 		{
 			name: "moscow is standard timezone option",
@@ -667,7 +667,7 @@ func TestTimezoneControls(t *testing.T) {
 			},
 			expected: struct {
 				text string
-			}{text: "Москва (+3)"},
+			}{text: "UTC (+3)"},
 		},
 		{
 			name: "fixed utc timezone lookup keeps unique offset",
@@ -687,7 +687,7 @@ func TestTimezoneControls(t *testing.T) {
 			},
 			expected: struct {
 				text string
-			}{text: "<-Москва (+3)->"},
+			}{text: "<-UTC (+3)->"},
 		},
 	}
 

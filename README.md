@@ -125,7 +125,9 @@ Active reminders opened from the reply-keyboard list show inline details actions
 
 Intrusive reminder settings use an inline `Включено` / `Выключено` toggle and edit the existing settings message after manual interval input. Intervals can be entered as plain minutes or Go duration values such as `1m` and `1h30m`, are persisted from 1 to 120 minutes, and are displayed as user-facing text such as `каждые 30 минут` or `раз в 1 час 20 минут`.
 
-Settings have an explicit `Сохранить` button that returns to the main menu. Timezone selection contains 24 unique UTC hour offsets; `Калининград` is UTC+2, `Москва` is UTC+3, and Moscow is the default.
+Settings have an explicit `Сохранить` button that returns to the main menu. Timezone selection contains 24 unique UTC hour offsets shown uniformly as `UTC (+N)` / `UTC (-N)`; the UTC+3 option uses Moscow internally as the default timezone. Reminder drafts and reminder details load the user's timezone before formatting or calculating reminder time.
+
+Reminder lists keep their reply `Назад` navigation available while reminder-title buttons still open reminder details.
 
 Reminder notifications keep the main reply keyboard available by briefly sending and deleting a main-menu message before the inline reminder notification. The notification itself uses only inline `Готово` and `Отменить` actions and is deleted after either action.
 
@@ -223,6 +225,7 @@ For a manual deployment from a pull request branch, run the same workflow manual
   <li>Reminder notifications refresh the reply keyboard through a temporary main-menu message and keep inline actions on the notification itself.</li>
   <li>Reminder creation returned to inline keyboards; draft prompts ask only for missing title/time fields, title/description buttons show input-waiting state, internal reminder IDs are hidden, and reminder time is typed as HH:MM.</li>
   <li>Intrusive reminder settings use an inline toggle, edit the existing message after manual input, persist 1-120 minute intervals, and accept minute or duration values such as 1m and 1h30m.</li>
+  <li>Reminder-list back navigation stays available, intrusive settings expose Back, and timezone buttons use uniform UTC (+N) labels while reminder creation/details load the user's timezone.</li>
   <li>Manual PR deployment can publish and deploy an image tagged as X.Y.Z.&lt;short_sha&gt;.</li>
 </ul>
 
