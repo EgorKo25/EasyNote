@@ -8,13 +8,15 @@ The Telegram main menu message was restored because Telegram cannot attach reply
 
 The main menu stats block no longer uses a Markdown code block; it is rendered with Telegram HTML formatting and counts `canceled`, `skipped`, and `failed` reminders as missed tasks.
 
-Reminder delivery now refreshes the reply main keyboard through a temporary main-menu message, deletes that temporary message, and then sends the reminder itself with inline `Готово` and `Отменить` actions only.
+Reminder delivery now refreshes the reply main keyboard through a visible main-menu message and then sends the reminder itself with inline `Готово` and `Отменить` actions only. The sender keeps the last main-menu message id in memory per chat and deletes that previous menu before sending the next reminder.
 
 Reminder creation returned to inline keyboards because the previous reply-keyboard editor made field editing and time selection harder to use. Filled draft fields still switch to `Изменить ...`, field buttons wait for user input again, and user input messages are deleted after handling.
 
-Reminder creation text was reorganized around centered title, description text, start date, and repeat state. Service prompts are rendered in italic.
+Reminder creation text was returned to the sectioned layout with bold labels for `Название`, `Описание`, `Дата начала напоминаний`, and `Повторять`. Service prompts are rendered in italic.
 
-The reminder draft no longer shows the extra template label. It centers the title with a minimum left padding, removes the `Описание:` label, shows the default description text `Здесь может быть описание вашей задачи. Описание не задано.`, keeps start time on one line, and renders `Повторять:` after the start time.
+The reminder draft no longer shows the extra template label. Empty title, description, and start date are rendered as empty field values under their labels.
+
+The main draft inline keyboard is ordered as date/time, title/description, repeat, and save/cancel.
 
 The `Название` and `Описание` draft buttons now switch the message into input-waiting mode by editing the existing message text, avoiding a delete/send blink. While the bot waits for input, the buttons show `Введите название` / `Введите описание`; after input they show `Изменить название` / `Изменить описание`.
 
@@ -22,7 +24,7 @@ Active reminders opened from the reply-keyboard list now show the inline reminde
 
 Delivered reminder actions now remove the notification message after `Готово` or `Отменить`.
 
-Intrusive reminder settings now use an inline `Включено` / `Выключено` toggle and accept manual interval input directly from chat, from 1 minute to 2 hours. Plain numbers are treated as minutes, and Go duration values such as `1m` and `1h30m` are supported.
+Intrusive reminder settings now use an inline `Включено` / `Выключено` toggle plus a `Сохранить` action and accept manual interval input directly from chat, from 1 minute to 2 hours. Plain numbers are treated as minutes, and Go duration values such as `1m` and `1h30m` are supported.
 
 Intrusive reminder settings now edit the existing settings message after manual input instead of deleting and sending a new message. Interval values are rendered as user-facing text, for example `каждые 30 минут` or `раз в 1 час 20 минут`.
 

@@ -508,10 +508,10 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 			expected: struct {
 				expectedText string
 			}{
-				expectedText: "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀<b>Pay rent</b>\n\n" +
-					"Before lunch\n\n" +
-					"Время начала напоминания: 02.06.2026, Вт 09:30\n\n" +
-					"Повторять: нет\n\n" +
+				expectedText: "<b>Название:</b>\nPay rent\n\n" +
+					"<b>Описание:</b>\nBefore lunch\n\n" +
+					"<b>Дата начала напоминаний:</b>\n02.06.2026, Вт 09:30\n\n" +
+					"<b>Повторять:</b>\nнет\n\n" +
 					"<i>Проверьте шаблон и сохраните напоминание.</i>",
 			},
 		},
@@ -531,10 +531,10 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 			expected: struct {
 				expectedText string
 			}{
-				expectedText: "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀<b>Pay rent</b>\n\n" +
-					"Before lunch\n\n" +
-					"Время начала напоминания: 02.06.2026, Вт 00:00\n\n" +
-					"Повторять: выбрано дат: 2\n\n" +
+				expectedText: "<b>Название:</b>\nPay rent\n\n" +
+					"<b>Описание:</b>\nBefore lunch\n\n" +
+					"<b>Дата начала напоминаний:</b>\n02.06.2026, Вт 00:00\n\n" +
+					"<b>Повторять:</b>\nвыбрано дат: 2\n\n" +
 					"<i>Выберите дату и введите время напоминания.</i>",
 			},
 		},
@@ -555,10 +555,10 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 			expected: struct {
 				expectedText string
 			}{
-				expectedText: "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀<b>Название</b>\n\n" +
-					"Здесь может быть описание вашей задачи. Описание не задано.\n\n" +
-					"Время начала напоминания: Дата и время не заданы\n\n" +
-					"Повторять: нет\n\n" +
+				expectedText: "<b>Название:</b>\n\n\n" +
+					"<b>Описание:</b>\n\n\n" +
+					"<b>Дата начала напоминаний:</b>\n\n\n" +
+					"<b>Повторять:</b>\nнет\n\n" +
 					"<i>Введите название и время напоминания.</i>",
 			},
 		},
@@ -603,7 +603,7 @@ func TestReminderUIBuildsExpectedKeyboards(t *testing.T) {
 			expected: struct {
 				rowCount        int
 				firstButtonText string
-			}{rowCount: 4, firstButtonText: "Изменить дату"},
+			}{rowCount: 4, firstButtonText: "Дата и время"},
 		},
 		{
 			name: "filled one time draft keyboard offers changing date",
@@ -615,7 +615,7 @@ func TestReminderUIBuildsExpectedKeyboards(t *testing.T) {
 			expected: struct {
 				rowCount        int
 				firstButtonText string
-			}{rowCount: 4, firstButtonText: "Изменить дату"},
+			}{rowCount: 4, firstButtonText: "Дата и время"},
 		},
 		{
 			name: "empty recurring draft keyboard explains start date time",
@@ -749,6 +749,7 @@ func TestSenderSendsReminder(t *testing.T) {
 		name     string
 		cfg      config.Telegram
 		reminder database.ScheduledReminder
+		state    func(sender *Sender)
 		before   func(caller *telegoapimock.MockCaller)
 		expected struct {
 			expectedErr error
@@ -764,7 +765,7 @@ func TestSenderSendsReminder(t *testing.T) {
 			before: func(caller *telegoapimock.MockCaller) {
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(testTelegramResponse(t, telego.Message{MessageID: 1}), nil).
-					Times(3)
+					Times(2)
 			},
 		},
 		{
@@ -778,7 +779,7 @@ func TestSenderSendsReminder(t *testing.T) {
 			before: func(caller *telegoapimock.MockCaller) {
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(testTelegramResponse(t, telego.Message{MessageID: 2}), nil).
-					Times(3)
+					Times(2)
 			},
 		},
 		{
@@ -792,7 +793,7 @@ func TestSenderSendsReminder(t *testing.T) {
 			before: func(caller *telegoapimock.MockCaller) {
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(testTelegramResponse(t, telego.Message{MessageID: 3}), nil).
-					Times(3)
+					Times(2)
 			},
 		},
 		{
@@ -806,7 +807,7 @@ func TestSenderSendsReminder(t *testing.T) {
 			before: func(caller *telegoapimock.MockCaller) {
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(testTelegramResponse(t, telego.Message{MessageID: 4}), nil).
-					Times(3)
+					Times(2)
 			},
 		},
 		{
@@ -820,7 +821,23 @@ func TestSenderSendsReminder(t *testing.T) {
 			before: func(caller *telegoapimock.MockCaller) {
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(testTelegramResponse(t, telego.Message{MessageID: 7}), nil).
-					Times(4)
+					Times(3)
+			},
+		},
+		{
+			name: "previous main menu message is deleted from memory before new reminder is sent",
+			reminder: database.ScheduledReminder{
+				ID:             8,
+				TelegramChatID: 100,
+				Title:          "Pay rent",
+			},
+			state: func(sender *Sender) {
+				sender.setMainMenuMessageID(100, 55)
+			},
+			before: func(caller *telegoapimock.MockCaller) {
+				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(testTelegramResponse(t, telego.Message{MessageID: 8}), nil).
+					Times(3)
 			},
 		},
 		{
@@ -832,9 +849,6 @@ func TestSenderSendsReminder(t *testing.T) {
 			},
 			before: func(caller *telegoapimock.MockCaller) {
 				gomock.InOrder(
-					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
-						Return(testTelegramResponse(t, telego.Message{MessageID: 5}), nil).
-						Times(1),
 					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 						Return(testTelegramResponse(t, telego.Message{MessageID: 5}), nil).
 						Times(1),
@@ -856,9 +870,6 @@ func TestSenderSendsReminder(t *testing.T) {
 			},
 			before: func(caller *telegoapimock.MockCaller) {
 				gomock.InOrder(
-					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
-						Return(testTelegramResponse(t, telego.Message{MessageID: 6}), nil).
-						Times(1),
 					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 						Return(testTelegramResponse(t, telego.Message{MessageID: 6}), nil).
 						Times(1),
@@ -893,6 +904,10 @@ func TestSenderSendsReminder(t *testing.T) {
 			require.NoError(t, err)
 
 			sender := &Sender{bot: bot, cfg: test.cfg}
+			if test.state != nil {
+				test.state(sender)
+			}
+
 			_, err = sender.SendReminder(t.Context(), test.reminder)
 
 			if test.expected.expectedErr != nil {
