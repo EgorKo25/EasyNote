@@ -11,15 +11,16 @@ import (
 
 func MainKeyboard() *telego.ReplyKeyboardMarkup {
 	return tu.Keyboard(
-		tu.KeyboardRow(tu.KeyboardButton(ButtonCreateReminder)),
-		tu.KeyboardRow(tu.KeyboardButton(ButtonReminders)),
-		tu.KeyboardRow(tu.KeyboardButton(ButtonSettings)),
+		tu.KeyboardRow(tu.KeyboardButton("➕ "+ButtonCreateReminder)),
+		tu.KeyboardRow(tu.KeyboardButton("⏰ "+ButtonReminders), tu.KeyboardButton(ButtonShoppingLists)),
+		tu.KeyboardRow(tu.KeyboardButton(ButtonHolidays), tu.KeyboardButton("⚙️ "+ButtonSettings)),
 	).WithResizeKeyboard()
 }
 
 func CreateKeyboard() *telego.ReplyKeyboardMarkup {
 	return tu.Keyboard(
 		tu.KeyboardRow(tu.KeyboardButton(ButtonCreateReminderKind)),
+		tu.KeyboardRow(tu.KeyboardButton(ButtonCreateHolidayKind), tu.KeyboardButton(ButtonCreateShoppingKind)),
 		tu.KeyboardRow(tu.KeyboardButton(ButtonBack)),
 	).WithResizeKeyboard()
 }
@@ -51,6 +52,17 @@ func DraftKeyboard(draft Draft, now time.Time) *telego.InlineKeyboardMarkup {
 }
 
 func draftMainKeyboard(draft Draft) *telego.InlineKeyboardMarkup {
+	switch draft.Kind {
+	case DraftKindHoliday:
+		return holidayDraftMainKeyboard(draft)
+	case DraftKindShopping:
+		return shoppingDraftMainKeyboard()
+	default:
+		return reminderDraftMainKeyboard(draft)
+	}
+}
+
+func reminderDraftMainKeyboard(draft Draft) *telego.InlineKeyboardMarkup {
 	titleButtonText := draftTitleButtonText(draft)
 	descriptionButtonText := draftDescriptionButtonText(draft)
 
@@ -60,11 +72,11 @@ func draftMainKeyboard(draft Draft) *telego.InlineKeyboardMarkup {
 	}
 
 	return tu.InlineKeyboard(
-		tu.InlineKeyboardRow(tu.InlineKeyboardButton(dateButtonText).WithCallbackData(CallbackDraftDate)),
 		tu.InlineKeyboardRow(
 			tu.InlineKeyboardButton(titleButtonText).WithCallbackData(CallbackDraftTitle),
 			tu.InlineKeyboardButton(descriptionButtonText).WithCallbackData(CallbackDraftDescription),
 		),
+		tu.InlineKeyboardRow(tu.InlineKeyboardButton(dateButtonText).WithCallbackData(CallbackDraftDate)),
 		tu.InlineKeyboardRow(
 			tu.InlineKeyboardButton(ButtonDraftRepeat).WithCallbackData(CallbackDraftRepeat),
 		),
@@ -75,7 +87,45 @@ func draftMainKeyboard(draft Draft) *telego.InlineKeyboardMarkup {
 	)
 }
 
+func holidayDraftMainKeyboard(draft Draft) *telego.InlineKeyboardMarkup {
+	return tu.InlineKeyboard(
+		tu.InlineKeyboardRow(tu.InlineKeyboardButton(draftTitleButtonText(draft)).WithCallbackData(CallbackDraftTitle)),
+		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton(draftDescriptionButtonText(draft)).WithCallbackData(CallbackDraftDescription),
+		),
+		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton(ButtonDraftEditDateTime).WithCallbackData(CallbackDraftDate),
+		),
+		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton(ButtonBack).WithCallbackData(CallbackDraftCancel),
+			tu.InlineKeyboardButton(ButtonDraftSave).WithCallbackData(CallbackDraftSave),
+		),
+	)
+}
+
+func shoppingDraftMainKeyboard() *telego.InlineKeyboardMarkup {
+	return tu.InlineKeyboard(
+		tu.InlineKeyboardRow(tu.InlineKeyboardButton(ButtonShoppingAddItem).WithCallbackData(CallbackShoppingAddItem)),
+		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton(ButtonBack).WithCallbackData(CallbackDraftCancel),
+			tu.InlineKeyboardButton(ButtonDraftSave).WithCallbackData(CallbackDraftSave),
+		),
+	)
+}
+
 func draftTitleButtonText(draft Draft) string {
+	if draft.Kind == DraftKindHoliday {
+		if draft.WaitingFor == FieldTitle {
+			return ButtonHolidayEnterName
+		}
+
+		if draft.Title != "" {
+			return ButtonHolidayEditName
+		}
+
+		return ButtonHolidayName
+	}
+
 	if draft.WaitingFor == FieldTitle {
 		return ButtonDraftEnterTitle
 	}
@@ -88,6 +138,18 @@ func draftTitleButtonText(draft Draft) string {
 }
 
 func draftDescriptionButtonText(draft Draft) string {
+	if draft.Kind == DraftKindHoliday {
+		if draft.WaitingFor == FieldDescription {
+			return ButtonHolidayEnterPerson
+		}
+
+		if draft.Description != "" {
+			return ButtonHolidayEditPerson
+		}
+
+		return ButtonHolidayPerson
+	}
+
 	if draft.WaitingFor == FieldDescription {
 		return ButtonDraftEnterDescription
 	}
@@ -127,8 +189,8 @@ func DraftReplyKeyboard(draft Draft, now time.Time) *telego.ReplyKeyboardMarkup 
 		dateButtonText := "Изменить дату"
 
 		return tu.Keyboard(
-			tu.KeyboardRow(tu.KeyboardButton(dateButtonText), tu.KeyboardButton(ButtonDraftRepeat)),
 			tu.KeyboardRow(tu.KeyboardButton(titleButtonText), tu.KeyboardButton(descriptionButtonText)),
+			tu.KeyboardRow(tu.KeyboardButton(dateButtonText), tu.KeyboardButton(ButtonDraftRepeat)),
 			tu.KeyboardRow(tu.KeyboardButton(ButtonDraftSave)),
 			tu.KeyboardRow(tu.KeyboardButton(ButtonDraftCancel)),
 		).WithResizeKeyboard()
@@ -298,6 +360,58 @@ func ReminderDetailsKeyboard(reminder database.ReminderView) *telego.InlineKeybo
 	)
 }
 
+func HolidayListKeyboard(holidays []database.HolidayView) *telego.ReplyKeyboardMarkup {
+	rows := make([][]telego.KeyboardButton, 0, len(holidays)+2)
+	for _, holiday := range holidays {
+		rows = append(rows, tu.KeyboardRow(tu.KeyboardButton(HolidayButtonText(holiday))))
+	}
+
+	rows = append(rows, tu.KeyboardRow(tu.KeyboardButton(ButtonPreviousPage), tu.KeyboardButton(ButtonNextPage)))
+	rows = append(rows, tu.KeyboardRow(tu.KeyboardButton(ButtonBack)))
+
+	return tu.Keyboard(rows...).WithResizeKeyboard()
+}
+
+func HolidayDetailsKeyboard(holiday database.HolidayView) *telego.InlineKeyboardMarkup {
+	return tu.InlineKeyboard(
+		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton("Изменить").
+				WithCallbackData(fmt.Sprintf("%s%d", CallbackHolidayEditPrefix, holiday.ID)),
+			tu.InlineKeyboardButton("Удалить").
+				WithCallbackData(fmt.Sprintf("%s%d", CallbackHolidayDeletePrefix, holiday.ID)),
+		),
+		tu.InlineKeyboardRow(tu.InlineKeyboardButton(ButtonBack).WithCallbackData(CallbackHolidayBackList)),
+	)
+}
+
+func ShoppingListKeyboard(lists []database.ShoppingListView) *telego.ReplyKeyboardMarkup {
+	rows := make([][]telego.KeyboardButton, 0, len(lists)+2)
+	for _, list := range lists {
+		rows = append(rows, tu.KeyboardRow(tu.KeyboardButton(ShoppingListButtonText(list))))
+	}
+
+	rows = append(rows, tu.KeyboardRow(tu.KeyboardButton(ButtonPreviousPage), tu.KeyboardButton(ButtonNextPage)))
+	rows = append(rows, tu.KeyboardRow(tu.KeyboardButton(ButtonBack)))
+
+	return tu.Keyboard(rows...).WithResizeKeyboard()
+}
+
+func ShoppingListDetailsKeyboard(list database.ShoppingListView) *telego.InlineKeyboardMarkup {
+	rows := make([][]telego.InlineKeyboardButton, 0, len(list.Items)+1)
+	for _, item := range list.Items {
+		rows = append(rows, tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton(ShoppingItemButtonText(item)).
+				WithCallbackData(fmt.Sprintf("%s%d", CallbackShoppingItemPrefix, item.ID)),
+		))
+	}
+
+	rows = append(rows, tu.InlineKeyboardRow(
+		tu.InlineKeyboardButton(ButtonBack).WithCallbackData(CallbackShoppingBackList),
+	))
+
+	return tu.InlineKeyboard(rows...)
+}
+
 func ReminderCreatedKeyboard() *telego.InlineKeyboardMarkup {
 	return tu.InlineKeyboard(
 		tu.InlineKeyboardRow(
@@ -348,6 +462,22 @@ func IntrusiveSettingsKeyboard(enabled bool) *telego.InlineKeyboardMarkup {
 
 func ReminderButtonText(reminder database.ReminderView) string {
 	return reminder.Title
+}
+
+func HolidayButtonText(holiday database.HolidayView) string {
+	return fmt.Sprintf("%s - %s", holiday.PersonName, holiday.Name)
+}
+
+func ShoppingListButtonText(list database.ShoppingListView) string {
+	return fmt.Sprintf("Список #%d", list.ID)
+}
+
+func ShoppingItemButtonText(item database.ShoppingListItem) string {
+	if item.Done {
+		return "✓ " + item.Text
+	}
+
+	return item.Text
 }
 
 func TimezoneIndex(timezone string) int {

@@ -6,7 +6,7 @@ Telegram reminder bot for routine tasks.
 
 The source of truth for the application version is `CHANGELIST.md`.
 
-Current version: `1.3.2`.
+Current version: `1.4.0`.
 
 ## Tests
 
@@ -115,7 +115,13 @@ scheduler:
 
 The main menu is a reply-keyboard message with a compact formatted stats block for completed, pending, and missed tasks. Missed tasks include canceled, skipped, and failed reminders.
 
-Reminder creation uses inline keyboards again. The draft message is rendered as labeled sections: title, description, reminder start date, and repeat state. Draft buttons are ordered as date/time, title/description, repeat, and save/cancel. While the bot waits for title or description input, those buttons change to `Введите название` or `Введите описание`; after input they change to `Изменить ...`.
+The main menu reply keyboard is ordered as `➕ Создать`, `⏰ Напоминания` / `🛒 Списки`, and `🎉 Праздники` / `⚙️ Настройки`.
+
+Reminder creation uses inline keyboards again. The draft message is rendered as labeled sections: title, description, reminder start date, and repeat state. Draft buttons are ordered as title/description, date/time, repeat, and save/cancel. While the bot waits for title or description input, those buttons change to `Введите название` or `Введите описание`; after input they change to `Изменить ...`.
+
+Holiday creation starts from `Создать` -> `Праздник`. The bot renders the prepared congratulation template, asks for holiday name, person name, date, and reminder time, calculates age from the selected date, and stores the holiday with a linked reminder. The `🎉 Праздники` menu shows two holidays per page and opens holiday details with `Изменить`, `Удалить`, and `Назад` actions.
+
+Shopping list creation starts from `Создать` -> `Список покупок`. The editor renders `Необходимо купить` with numbered items, adds items as the user sends them, and stores the list in PostgreSQL. The `🛒 Списки` menu shows two lists per page; opening a list renders each item as an inline button. Pressing an item persists its checked state and shows it with a check mark and strikethrough text.
 
 The draft screen shows service prompts in italic. The prompt only asks for missing required fields: title, time, or both.
 
@@ -129,7 +135,7 @@ Settings have an explicit `Сохранить` button that returns to the main m
 
 Reminder lists keep their reply `Назад` navigation available while reminder-title buttons still open reminder details.
 
-Reminder notifications keep the main reply keyboard available by sending a visible main-menu message before the inline reminder notification. The sender stores the latest main-menu message id in memory and deletes the previous one before the next reminder for that chat. The notification itself uses only inline `Готово` and `Отменить` actions and is deleted after either action.
+Reminder notifications keep the main reply keyboard available by sending a visible `Напоминаю:` message before the inline reminder notification. The sender stores the latest main-menu message id in memory and deletes the previous one before the next reminder for that chat. The notification itself uses only inline `Готово` and `Отменить` actions and is deleted after either action.
 
 After reply-keyboard commands and user text inputs are handled, the bot deletes those user messages from the dialog and logs deletion failures without interrupting the command.
 
@@ -212,12 +218,22 @@ docker compose up -d --no-deps app
 
 PostgreSQL is not restarted by the beta CD job.
 
-For a manual deployment from a pull request branch, run the same workflow manually on the PR branch and enable `deploy_from_pr`. The image tag is built as `X.Y.Z.<short_sha>`, for example `1.3.2.a1b2c3d`, and that exact tag is deployed.
+For a manual deployment from a pull request branch, run the same workflow manually on the PR branch and enable `deploy_from_pr`. The image tag is built as `X.Y.Z.<short_sha>`, for example `1.4.0.a1b2c3d`, and that exact tag is deployed.
 
 ## Changelist
 
 <div style="max-height: 420px; overflow-y: auto; border: 1px solid #d0d7de; border-radius: 6px; padding: 16px;">
-<p><strong>version: 1.3.2</strong></p>
+<p><strong>version: 1.4.0</strong></p>
+
+<h2>v1.4.0 - Holidays and shopping lists</h2>
+<ul>
+  <li>Creation now supports reminders, holidays, and shopping lists.</li>
+  <li>Holiday drafts collect holiday name, person name, date, and time, calculate age, and save a linked reminder.</li>
+  <li>The main menu now exposes 🎉 Праздники with paginated holiday details, edit, delete, and back actions.</li>
+  <li>Shopping lists persist numbered items and checked state; opened lists render each item as an inline toggle button.</li>
+  <li>The main menu keyboard was reordered and reminder draft date/time moved below title/description.</li>
+  <li>The reply-keyboard refresh message before notifications now says Напоминаю:.</li>
+</ul>
 
 <h2>v1.3.2 - Telegram UI recovery and PR deployment</h2>
 <ul>

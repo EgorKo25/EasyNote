@@ -99,6 +99,65 @@ func TestTextRendering(t *testing.T) {
 			}{text: "<b>Pay rent</b>\n\nBefore lunch\n\n02.06.2026 09:30"},
 		},
 		{
+			name: "holiday draft renders template with person and holiday",
+			action: func() string {
+				return telegramui.DraftText(telegramui.Draft{
+					Kind:        telegramui.DraftKindHoliday,
+					Title:       "днем рождения",
+					Description: "Олега",
+					Date:        time.Date(2026, 6, 2, 0, 0, 0, 0, location),
+					Hour:        10,
+					Minute:      15,
+				}, location)
+			},
+			expected: struct {
+				text string
+			}{text: "Поздравьте <b>Олега</b> с <b>днем рождения</b>.\n\n<b>Дата:</b> 02.06.2026\n\n<b>Время:</b> 10:15"},
+		},
+		{
+			name: "shopping draft renders numbered items",
+			action: func() string {
+				return telegramui.DraftText(telegramui.Draft{
+					Kind: telegramui.DraftKindShopping,
+					ShoppingItems: []database.ShoppingListItem{
+						{Text: "Milk"},
+						{Text: "Bread"},
+					},
+				}, location)
+			},
+			expected: struct {
+				text string
+			}{text: "<b>Необходимо купить:</b>\n\n<b>1.</b> Milk\n<b>2.</b> Bread"},
+		},
+		{
+			name: "holiday view renders age",
+			action: func() string {
+				return telegramui.HolidayViewText(database.HolidayView{
+					Name:       "днем рождения",
+					PersonName: "Олега",
+					RemindAt:   time.Date(2026, 6, 2, 7, 15, 0, 0, time.UTC),
+					Age:        30,
+				}, location)
+			},
+			expected: struct {
+				text string
+			}{text: "Поздравьте <b>Олега</b> с <b>днем рождения</b>.\n\n<b>Дата и время:</b> 02.06.2026 10:15\n\nВозраст: 30"},
+		},
+		{
+			name: "shopping view renders done items struck through",
+			action: func() string {
+				return telegramui.ShoppingListViewText(database.ShoppingListView{
+					Items: []database.ShoppingListItem{
+						{Text: "Milk", Done: true},
+						{Text: "Bread"},
+					},
+				})
+			},
+			expected: struct {
+				text string
+			}{text: "<b>Необходимо купить:</b>\n\n<b>1.</b> <s>Milk</s>\n<b>2.</b> Bread"},
+		},
+		{
 			name: "empty reminder list text explains empty state",
 			action: func() string {
 				return telegramui.ReminderListText(nil)
@@ -106,6 +165,42 @@ func TestTextRendering(t *testing.T) {
 			expected: struct {
 				text string
 			}{text: "<b>Активные напоминания</b>\n\n<i>Активных напоминаний пока нет.</i>"},
+		},
+		{
+			name: "holiday list text renders non empty state",
+			action: func() string {
+				return telegramui.HolidaysText([]database.HolidayView{{ID: 1}})
+			},
+			expected: struct {
+				text string
+			}{text: "<b>Праздники</b>\n\n<i>Выберите праздник из списка.</i>"},
+		},
+		{
+			name: "empty holiday list text explains empty state",
+			action: func() string {
+				return telegramui.HolidaysText(nil)
+			},
+			expected: struct {
+				text string
+			}{text: "<b>Праздники</b>\n\n<i>Сохраненных праздников пока нет.</i>"},
+		},
+		{
+			name: "shopping list text renders non empty state",
+			action: func() string {
+				return telegramui.ShoppingListsText([]database.ShoppingListView{{ID: 1}})
+			},
+			expected: struct {
+				text string
+			}{text: "<b>Списки покупок</b>\n\n<i>Выберите список.</i>"},
+		},
+		{
+			name: "empty shopping list text explains empty state",
+			action: func() string {
+				return telegramui.ShoppingListsText(nil)
+			},
+			expected: struct {
+				text string
+			}{text: "<b>Списки покупок</b>\n\n<i>Сохраненных списков пока нет.</i>"},
 		},
 		{
 			name: "telegramui.Draft waiting for title changes next step",
@@ -154,7 +249,7 @@ func TestKeyboardRendering(t *testing.T) {
 			expected: struct {
 				rows      int
 				firstText string
-			}{rows: 4, firstText: "Дата и время"},
+			}{rows: 4, firstText: "Название"},
 		},
 		{
 			name: "filled recurring telegramui.Draft asks to change start date time",
@@ -167,7 +262,7 @@ func TestKeyboardRendering(t *testing.T) {
 			expected: struct {
 				rows      int
 				firstText string
-			}{rows: 4, firstText: "Изменить дату и время начала"},
+			}{rows: 4, firstText: "Название"},
 		},
 		{
 			name: "date choice screen has quick choices",
@@ -215,6 +310,31 @@ func TestKeyboardRendering(t *testing.T) {
 				rows      int
 				firstText string
 			}{rows: 2, firstText: "<-"},
+		},
+		{
+			name: "reply date keyboard exposes quick date choices",
+			action: func() any {
+				return telegramui.DraftReplyKeyboard(telegramui.Draft{Screen: telegramui.ScreenDate}, now)
+			},
+			expected: struct {
+				rows      int
+				firstText string
+			}{rows: 3, firstText: "Сегодня"},
+		},
+		{
+			name: "reply time keyboard exposes time presets",
+			action: func() any {
+				return telegramui.DraftReplyKeyboard(telegramui.Draft{
+					Date:   time.Date(2026, 6, 2, 0, 0, 0, 0, time.Local),
+					Hour:   9,
+					Minute: 30,
+					Screen: telegramui.ScreenTime,
+				}, now)
+			},
+			expected: struct {
+				rows      int
+				firstText string
+			}{rows: 4, firstText: "09:00"},
 		},
 	}
 
@@ -328,7 +448,11 @@ func TestMenuAndActionKeyboards(t *testing.T) {
 			},
 			expected: struct {
 				rows [][]string
-			}{rows: [][]string{{"Создать"}, {"Напоминания"}, {"Настройки"}}},
+			}{rows: [][]string{
+				{"➕ Создать"},
+				{"⏰ Напоминания", "🛒 Списки"},
+				{"🎉 Праздники", "⚙️ Настройки"},
+			}},
 		},
 		{
 			name: "reminders keyboard exposes active and past lists",
@@ -347,6 +471,82 @@ func TestMenuAndActionKeyboards(t *testing.T) {
 			expected: struct {
 				rows [][]string
 			}{rows: [][]string{{"Назад", "Удалить"}, {"Главное меню"}}},
+		},
+		{
+			name: "create keyboard exposes reminder holiday and shopping kinds",
+			action: func() [][]string {
+				return keyboardTexts(telegramui.CreateKeyboard().Keyboard)
+			},
+			expected: struct {
+				rows [][]string
+			}{rows: [][]string{{"Напоминание"}, {"Праздник", "Список покупок"}, {"Назад"}}},
+		},
+		{
+			name: "holiday draft keyboard exposes requested editing actions",
+			action: func() [][]string {
+				keyboard := telegramui.DraftKeyboard(telegramui.Draft{Kind: telegramui.DraftKindHoliday}, time.Now())
+
+				return keyboardTexts(keyboard.InlineKeyboard)
+			},
+			expected: struct {
+				rows [][]string
+			}{rows: [][]string{
+				{"Название праздника"},
+				{"Имя"},
+				{"Изменить дату и время"},
+				{"Назад", "Сохранить"},
+			}},
+		},
+		{
+			name: "shopping draft keyboard exposes add back and save",
+			action: func() [][]string {
+				keyboard := telegramui.DraftKeyboard(telegramui.Draft{Kind: telegramui.DraftKindShopping}, time.Now())
+
+				return keyboardTexts(keyboard.InlineKeyboard)
+			},
+			expected: struct {
+				rows [][]string
+			}{rows: [][]string{{"Добавить в список"}, {"Назад", "Сохранить"}}},
+		},
+		{
+			name: "holiday details keyboard exposes edit delete and back",
+			action: func() [][]string {
+				return keyboardTexts(telegramui.HolidayDetailsKeyboard(database.HolidayView{ID: 7}).InlineKeyboard)
+			},
+			expected: struct {
+				rows [][]string
+			}{rows: [][]string{{"Изменить", "Удалить"}, {"Назад"}}},
+		},
+		{
+			name: "holiday list keyboard renders holiday buttons",
+			action: func() [][]string {
+				return keyboardTexts(telegramui.HolidayListKeyboard([]database.HolidayView{{
+					Name: "днем рождения", PersonName: "Олега",
+				}}).Keyboard)
+			},
+			expected: struct {
+				rows [][]string
+			}{rows: [][]string{{"Олега - днем рождения"}, {"<-", "->"}, {"Назад"}}},
+		},
+		{
+			name: "shopping list keyboard renders list buttons",
+			action: func() [][]string {
+				return keyboardTexts(telegramui.ShoppingListKeyboard([]database.ShoppingListView{{ID: 9}}).Keyboard)
+			},
+			expected: struct {
+				rows [][]string
+			}{rows: [][]string{{"Список #9"}, {"<-", "->"}, {"Назад"}}},
+		},
+		{
+			name: "shopping details keyboard renders items as buttons",
+			action: func() [][]string {
+				return keyboardTexts(telegramui.ShoppingListDetailsKeyboard(database.ShoppingListView{
+					Items: []database.ShoppingListItem{{ID: 1, Text: "Milk"}, {ID: 2, Text: "Bread", Done: true}},
+				}).InlineKeyboard)
+			},
+			expected: struct {
+				rows [][]string
+			}{rows: [][]string{{"Milk"}, {"✓ Bread"}, {"Назад"}}},
 		},
 		{
 			name: "created reminder keyboard exposes navigation actions",
@@ -371,7 +571,7 @@ func TestMenuAndActionKeyboards(t *testing.T) {
 			action: func() [][]string {
 				keyboard := telegramui.DraftKeyboard(telegramui.Draft{WaitingFor: telegramui.FieldTitle}, time.Now())
 
-				return keyboardTexts(keyboard.InlineKeyboard[1:2])
+				return keyboardTexts(keyboard.InlineKeyboard[:1])
 			},
 			expected: struct {
 				rows [][]string
@@ -385,7 +585,7 @@ func TestMenuAndActionKeyboards(t *testing.T) {
 					Description: "Before lunch",
 				}, time.Now())
 
-				return keyboardTexts(keyboard.InlineKeyboard[1:2])
+				return keyboardTexts(keyboard.InlineKeyboard[:1])
 			},
 			expected: struct {
 				rows [][]string
