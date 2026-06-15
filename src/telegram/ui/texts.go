@@ -25,11 +25,38 @@ func RemindersText() string {
 	return "<b>Напоминания</b>\n\n<i>Выберите список напоминаний.</i>"
 }
 
+func HolidaysText(holidays []database.HolidayView) string {
+	if len(holidays) == 0 {
+		return "<b>Праздники</b>\n\n<i>Сохраненных праздников пока нет.</i>"
+	}
+
+	return "<b>Праздники</b>\n\n<i>Выберите праздник из списка.</i>"
+}
+
+func ShoppingListsText(lists []database.ShoppingListView) string {
+	if len(lists) == 0 {
+		return "<b>Списки покупок</b>\n\n<i>Сохраненных списков пока нет.</i>"
+	}
+
+	return "<b>Списки покупок</b>\n\n<i>Выберите список.</i>"
+}
+
 func CreateText() string {
 	return "<b>Создать</b>\n\n<i>Выберите тип.</i>"
 }
 
 func DraftText(draft Draft, location *time.Location) string {
+	switch draft.Kind {
+	case DraftKindHoliday:
+		return HolidayDraftText(draft, location)
+	case DraftKindShopping:
+		return ShoppingDraftText(draft)
+	default:
+		return ReminderDraftText(draft, location)
+	}
+}
+
+func ReminderDraftText(draft Draft, location *time.Location) string {
 	dateText := ""
 	title := html.EscapeString(draft.Title)
 	description := html.EscapeString(draft.Description)
@@ -79,6 +106,53 @@ func DraftText(draft Draft, location *time.Location) string {
 	)
 }
 
+func HolidayDraftText(draft Draft, location *time.Location) string {
+	holidayName := html.EscapeString(draft.Title)
+	personName := html.EscapeString(draft.Description)
+	dateText := ""
+	timeText := ""
+
+	remindAt := draft.RemindAt(location)
+	if !remindAt.IsZero() {
+		dateText = remindAt.In(location).Format("02.01.2006")
+		timeText = remindAt.In(location).Format("15:04")
+	}
+
+	notice := ""
+	if draft.Notice != "" {
+		notice = "\n\n<i>" + html.EscapeString(draft.Notice) + "</i>"
+	}
+
+	return fmt.Sprintf(
+		"Поздравьте <b>%s</b> с <b>%s</b>.\n\n"+
+			"<b>Дата:</b> %s\n\n"+
+			"<b>Время:</b> %s%s",
+		personName,
+		holidayName,
+		dateText,
+		timeText,
+		notice,
+	)
+}
+
+func ShoppingDraftText(draft Draft) string {
+	items := make([]string, 0, len(draft.ShoppingItems))
+	for index, item := range draft.ShoppingItems {
+		items = append(items, fmt.Sprintf("<b>%d.</b> %s", index+1, html.EscapeString(item.Text)))
+	}
+
+	if len(items) == 0 {
+		items = append(items, "<b>1.</b> ...")
+	}
+
+	notice := ""
+	if draft.Notice != "" {
+		notice = "\n\n<i>" + html.EscapeString(draft.Notice) + "</i>"
+	}
+
+	return "<b>Необходимо купить:</b>\n\n" + strings.Join(items, "\n") + notice
+}
+
 func draftNextStep(draft Draft, location *time.Location) string {
 	if prompt := draftWaitingPrompt(draft.WaitingFor); prompt != "" {
 		return prompt
@@ -100,6 +174,8 @@ func draftWaitingPrompt(field Field) string {
 		return "Введите название напоминания сообщением."
 	case FieldDescription:
 		return "Введите описание напоминания сообщением."
+	case FieldShoppingItem:
+		return "Введите пункт списка сообщением."
 	default:
 		return ""
 	}
@@ -147,6 +223,35 @@ func ReminderViewText(reminder database.ReminderView, location *time.Location) s
 		description,
 		reminder.RemindAt.In(location).Format("02.01.2006 15:04"),
 	)
+}
+
+func HolidayViewText(holiday database.HolidayView, location *time.Location) string {
+	ageText := ""
+	if holiday.Age > 0 {
+		ageText = fmt.Sprintf("\n\nВозраст: %d", holiday.Age)
+	}
+
+	return fmt.Sprintf(
+		"Поздравьте <b>%s</b> с <b>%s</b>.\n\n<b>Дата и время:</b> %s%s",
+		html.EscapeString(holiday.PersonName),
+		html.EscapeString(holiday.Name),
+		holiday.RemindAt.In(location).Format("02.01.2006 15:04"),
+		ageText,
+	)
+}
+
+func ShoppingListViewText(list database.ShoppingListView) string {
+	items := make([]string, 0, len(list.Items))
+	for index, item := range list.Items {
+		text := html.EscapeString(item.Text)
+		if item.Done {
+			text = "<s>" + text + "</s>"
+		}
+
+		items = append(items, fmt.Sprintf("<b>%d.</b> %s", index+1, text))
+	}
+
+	return "<b>Необходимо купить:</b>\n\n" + strings.Join(items, "\n")
 }
 
 func ReminderListText(reminders []database.ReminderView) string {

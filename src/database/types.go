@@ -6,6 +6,8 @@ import (
 )
 
 var ErrReminderNotFound = errors.New("reminder not found")
+var ErrHolidayNotFound = errors.New("holiday not found")
+var ErrShoppingListNotFound = errors.New("shopping list not found")
 
 type Note struct {
 	ID int64
@@ -153,4 +155,32 @@ type ReminderDelivery struct {
 	MessageID      int
 	NextSendAt     time.Time
 	IntrusiveUntil time.Time
+}
+
+type HolidayView struct {
+	ID             int64
+	TelegramChatID int64
+	ReminderID     int64
+	Name           string
+	PersonName     string
+	HolidayDate    time.Time
+	RemindAt       time.Time
+	Age            int
+	CreatedAt      time.Time
+}
+
+type ShoppingListView struct {
+	ID             int64
+	TelegramChatID int64
+	CreatedAt      time.Time
+	Items          []ShoppingListItem
+}
+
+type ShoppingListItem struct {
+	ID        int64
+	ListID    int64
+	Text      string
+	Done      bool
+	Position  int
+	CreatedAt time.Time
 }

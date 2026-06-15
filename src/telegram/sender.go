@@ -102,7 +102,7 @@ func (s *Sender) refreshMainKeyboard(ctx context.Context, reminder database.Sche
 	}
 
 	menuMessage, err := s.bot.SendMessage(ctx,
-		tu.Message(tu.ID(reminder.TelegramChatID), "Главное меню").WithReplyMarkup(telegramui.MainKeyboard()),
+		tu.Message(tu.ID(reminder.TelegramChatID), "Напоминаю:").WithReplyMarkup(telegramui.MainKeyboard()),
 	)
 	if err != nil {
 		return fmt.Errorf("send telegram main menu keyboard message: %w", err)

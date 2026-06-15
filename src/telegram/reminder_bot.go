@@ -68,9 +68,11 @@ type reminderListState struct {
 type reminderListKind string
 
 const (
-	reminderPageSize                     = 2
-	reminderListActive  reminderListKind = "active"
-	reminderListHistory reminderListKind = "history"
+	reminderPageSize                      = 2
+	reminderListActive   reminderListKind = "active"
+	reminderListHistory  reminderListKind = "history"
+	reminderListHoliday  reminderListKind = "holiday"
+	reminderListShopping reminderListKind = "shopping"
 )
 
 type chatMenu string
@@ -80,6 +82,8 @@ const (
 	chatMenuCreate       chatMenu = "create"
 	chatMenuReminders    chatMenu = "reminders"
 	chatMenuReminderList chatMenu = "reminder_list"
+	chatMenuHolidays     chatMenu = "holidays"
+	chatMenuShopping     chatMenu = "shopping"
 	chatMenuSettings     chatMenu = "settings"
 	chatMenuTimezone     chatMenu = "timezone"
 	chatMenuIntrusive    chatMenu = "intrusive"
@@ -151,12 +155,55 @@ type ReminderRepository interface {
 		limit int,
 		offset int,
 	) ([]database.ReminderView, error)
+	CreateHoliday(
+		ctx context.Context,
+		telegramChatID int64,
+		name string,
+		personName string,
+		holidayDate time.Time,
+		remindAt time.Time,
+		age int,
+	) (database.HolidayView, error)
+	UpdateHoliday(
+		ctx context.Context,
+		telegramChatID int64,
+		holidayID int64,
+		name string,
+		personName string,
+		holidayDate time.Time,
+		remindAt time.Time,
+		age int,
+	) (database.HolidayView, error)
+	FindHolidaysByChat(
+		ctx context.Context,
+		telegramChatID int64,
+		limit int,
+		offset int,
+	) ([]database.HolidayView, error)
+	HolidayByID(ctx context.Context, telegramChatID int64, holidayID int64) (database.HolidayView, error)
+	DeleteHoliday(ctx context.Context, telegramChatID int64, holidayID int64) error
+	CreateShoppingList(
+		ctx context.Context,
+		telegramChatID int64,
+		items []database.ShoppingListItem,
+	) (database.ShoppingListView, error)
+	FindShoppingListsByChat(
+		ctx context.Context,
+		telegramChatID int64,
+		limit int,
+		offset int,
+	) ([]database.ShoppingListView, error)
+	ShoppingListByID(ctx context.Context, telegramChatID int64, listID int64) (database.ShoppingListView, error)
+	ToggleShoppingListItem(ctx context.Context, telegramChatID int64, itemID int64) (database.ShoppingListView, error)
 }
 
 type reminderDraft struct {
+	id            int64
+	kind          telegramui.DraftKind
 	title         string
 	description   string
 	notice        string
+	shoppingItems []database.ShoppingListItem
 	date          time.Time
 	hour          int
 	minute        int
@@ -310,16 +357,31 @@ func (b *ReminderBot) runTopLevelMessageCommand(ctx context.Context, chatID int6
 	switch text {
 	case "/start", telegramui.ButtonStart:
 		return b.sendStart(ctx, chatID), true
-	case telegramui.ButtonCreateReminder:
+	case telegramui.ButtonCreateReminder, "➕ " + telegramui.ButtonCreateReminder:
 		return b.sendCreate(ctx, chatID), true
-	case telegramui.ButtonCreateReminderKind:
-		return b.startReminderDraft(ctx, chatID), true
-	case telegramui.ButtonReminders:
+	case telegramui.ButtonReminders, "⏰ " + telegramui.ButtonReminders:
 		return b.sendReminders(ctx, chatID), true
-	case telegramui.ButtonSettings:
+	case telegramui.ButtonShoppingLists:
+		return b.sendShoppingListPage(ctx, chatID, 0), true
+	case telegramui.ButtonHolidays:
+		return b.sendHolidayListPage(ctx, chatID, 0), true
+	case telegramui.ButtonSettings, "⚙️ " + telegramui.ButtonSettings:
 		return b.sendSettings(ctx, chatID), true
 	case telegramui.ButtonBack:
 		return b.handleBackMessage(ctx, chatID), true
+	default:
+		return b.runCreateKindMessageCommand(ctx, chatID, text)
+	}
+}
+
+func (b *ReminderBot) runCreateKindMessageCommand(ctx context.Context, chatID int64, text string) (error, bool) {
+	switch text {
+	case telegramui.ButtonCreateReminderKind:
+		return b.startReminderDraft(ctx, chatID), true
+	case telegramui.ButtonCreateHolidayKind:
+		return b.startHolidayDraft(ctx, chatID), true
+	case telegramui.ButtonCreateShoppingKind:
+		return b.startShoppingDraft(ctx, chatID), true
 	default:
 		return nil, false
 	}
@@ -361,17 +423,29 @@ func (b *ReminderBot) runReminderListMessageCommand(ctx context.Context, chatID 
 
 func (b *ReminderBot) runDraftFieldMessageCommand(ctx context.Context, chatID int64, text string) (error, bool) {
 	switch text {
-	case telegramui.ButtonDraftTitle, telegramui.ButtonDraftEnterTitle, telegramui.ButtonDraftEditTitle:
+	case telegramui.ButtonDraftTitle,
+		telegramui.ButtonDraftEnterTitle,
+		telegramui.ButtonDraftEditTitle,
+		telegramui.ButtonHolidayName,
+		telegramui.ButtonHolidayEnterName,
+		telegramui.ButtonHolidayEditName:
 		b.setDraftWaitingFor(chatID, telegramui.FieldTitle)
 
 		return b.editDraftText(ctx, chatID), true
 	case telegramui.ButtonDraftDescription,
 		telegramui.ButtonDraftEnterDescription,
-		telegramui.ButtonDraftEditDescription:
+		telegramui.ButtonDraftEditDescription,
+		telegramui.ButtonHolidayPerson,
+		telegramui.ButtonHolidayEnterPerson,
+		telegramui.ButtonHolidayEditPerson:
 		b.setDraftWaitingFor(chatID, telegramui.FieldDescription)
 
 		return b.editDraftText(ctx, chatID), true
-	case telegramui.ButtonDraftDate, "Изменить дату":
+	case telegramui.ButtonShoppingAddItem:
+		b.setDraftWaitingFor(chatID, telegramui.FieldShoppingItem)
+
+		return b.editDraftText(ctx, chatID), true
+	case telegramui.ButtonDraftDate, telegramui.ButtonDraftEditDateTime, "Изменить дату":
 		b.setDraftScreen(chatID, telegramui.ScreenDate)
 
 		return b.replaceDraft(ctx, chatID), true
@@ -522,15 +596,85 @@ func (b *ReminderBot) handleCallback(ctx context.Context, query telego.CallbackQ
 		return err
 	}
 
-	if b.applyDraftDateCallback(chatID, query.Data) {
-		if b.draft(chatID).screen != telegramui.ScreenCalendar {
-			return b.replaceDraft(ctx, chatID)
-		}
+	if handled, err := b.handleDraftValueCallback(ctx, chatID, messageID, query.Data); handled {
+		return err
+	}
 
-		return b.editDraft(ctx, chatID, messageID)
+	if handled, err := b.handleHolidayCallback(ctx, chatID, messageID, query.Data); handled {
+		return err
+	}
+
+	if handled, err := b.handleShoppingCallback(ctx, chatID, messageID, query.Data); handled {
+		return err
 	}
 
 	return b.handleReminderCallback(ctx, chatID, messageID, query.Data)
+}
+
+func (b *ReminderBot) handleDraftValueCallback(
+	ctx context.Context,
+	chatID int64,
+	messageID int,
+	data string,
+) (bool, error) {
+	if !b.applyDraftDateCallback(chatID, data) {
+		return false, nil
+	}
+
+	if b.draft(chatID).screen != telegramui.ScreenCalendar {
+		return true, b.replaceDraft(ctx, chatID)
+	}
+
+	return true, b.editDraft(ctx, chatID, messageID)
+}
+
+func (b *ReminderBot) handleHolidayCallback(
+	ctx context.Context,
+	chatID int64,
+	messageID int,
+	data string,
+) (bool, error) {
+	switch {
+	case data == telegramui.CallbackHolidayBackList:
+		return true, b.sendHolidayListPage(ctx, chatID, b.reminderListState(chatID).offset)
+	case strings.HasPrefix(data, telegramui.CallbackHolidayEditPrefix):
+		holidayID, err := strconv.ParseInt(strings.TrimPrefix(data, telegramui.CallbackHolidayEditPrefix), 10, 64)
+		if err != nil {
+			return true, fmt.Errorf("parse holiday id: %w", err)
+		}
+
+		return true, b.startHolidayDraftForEdit(ctx, chatID, messageID, holidayID)
+	case strings.HasPrefix(data, telegramui.CallbackHolidayDeletePrefix):
+		holidayID, err := strconv.ParseInt(strings.TrimPrefix(data, telegramui.CallbackHolidayDeletePrefix), 10, 64)
+		if err != nil {
+			return true, fmt.Errorf("parse holiday id: %w", err)
+		}
+
+		return true, b.deleteHoliday(ctx, chatID, holidayID)
+	default:
+		return false, nil
+	}
+}
+
+func (b *ReminderBot) handleShoppingCallback(
+	ctx context.Context,
+	chatID int64,
+	messageID int,
+	data string,
+) (bool, error) {
+	switch {
+	case data == telegramui.CallbackShoppingBackList:
+		return true, b.sendShoppingListPage(ctx, chatID, b.reminderListState(chatID).offset)
+	case strings.HasPrefix(data, telegramui.CallbackShoppingItemPrefix):
+		itemID, err := strconv.ParseInt(strings.TrimPrefix(data, telegramui.CallbackShoppingItemPrefix), 10, 64)
+		if err != nil {
+			return true, fmt.Errorf("parse shopping item id: %w", err)
+		}
+
+		return true, b.toggleShoppingListItem(ctx, chatID, messageID, itemID)
+	default:
+		return false, nil
+	}
 }
 
 func (b *ReminderBot) handleReminderCallback(ctx context.Context, chatID int64, messageID int, data string) error {
@@ -660,6 +804,10 @@ func (b *ReminderBot) handleDraftNavigationCallback(
 		b.setDraftWaitingFor(chatID, telegramui.FieldDescription)
 
 		return true, b.editDraft(ctx, chatID, messageID)
+	case telegramui.CallbackShoppingAddItem:
+		b.setDraftWaitingFor(chatID, telegramui.FieldShoppingItem)
+
+		return true, b.editDraft(ctx, chatID, messageID)
 	case telegramui.CallbackDraftDate:
 		b.setDraftScreen(chatID, telegramui.ScreenDate)
 
@@ -770,6 +918,66 @@ func (b *ReminderBot) startReminderDraftInMessage(ctx context.Context, chatID in
 	return b.replaceDraft(ctx, chatID)
 }
 
+func (b *ReminderBot) startHolidayDraft(ctx context.Context, chatID int64) error {
+	if err := b.loadChatLocation(ctx, chatID); err != nil {
+		return err
+	}
+
+	draft := newReminderDraft(b.now(chatID))
+	draft.kind = telegramui.DraftKindHoliday
+
+	b.mu.Lock()
+	b.draftByChat[chatID] = draft
+	b.mu.Unlock()
+
+	return b.replaceDraft(ctx, chatID)
+}
+
+func (b *ReminderBot) startShoppingDraft(ctx context.Context, chatID int64) error {
+	draft := reminderDraft{kind: telegramui.DraftKindShopping}
+
+	b.mu.Lock()
+	b.draftByChat[chatID] = draft
+	b.mu.Unlock()
+
+	return b.replaceDraft(ctx, chatID)
+}
+
+func (b *ReminderBot) startHolidayDraftForEdit(
+	ctx context.Context,
+	chatID int64,
+	messageID int,
+	holidayID int64,
+) error {
+	if err := b.loadChatLocation(ctx, chatID); err != nil {
+		return err
+	}
+
+	holiday, err := b.repository.HolidayByID(ctx, chatID, holidayID)
+	if err != nil {
+		return fmt.Errorf("load holiday for edit: %w", err)
+	}
+
+	remindAt := holiday.RemindAt.In(b.location(chatID))
+	draft := reminderDraft{
+		id:            holiday.ID,
+		kind:          telegramui.DraftKindHoliday,
+		title:         holiday.Name,
+		description:   holiday.PersonName,
+		date:          remindAt,
+		hour:          remindAt.Hour(),
+		minute:        remindAt.Minute(),
+		screen:        telegramui.ScreenMain,
+		calendarMonth: telegramui.FirstDayOfMonth(remindAt),
+	}
+
+	b.mu.Lock()
+	b.draftByChat[chatID] = draft
+	b.mu.Unlock()
+
+	return b.editDraft(ctx, chatID, messageID)
+}
+
 func (b *ReminderBot) replaceDraft(ctx context.Context, chatID int64) error {
 	b.setChatMenu(chatID, chatMenuCreate)
 
@@ -794,6 +1002,46 @@ func (b *ReminderBot) editDraft(ctx context.Context, chatID int64, messageID int
 		telegramui.DraftText(uiDraft(draft), b.location(chatID)),
 		telegramui.DraftKeyboard(uiDraft(draft), b.now(chatID)),
 	)
+}
+
+func (b *ReminderBot) sendHolidayListPage(ctx context.Context, chatID int64, offset int) error {
+	if err := b.loadChatLocation(ctx, chatID); err != nil {
+		return err
+	}
+
+	offset = normalizePageOffset(offset)
+
+	holidays, err := b.repository.FindHolidaysByChat(ctx, chatID, reminderPageSize, offset)
+	if err != nil {
+		return fmt.Errorf("load holidays: %w", err)
+	}
+
+	if len(holidays) == 0 && offset > 0 {
+		return b.sendHolidayListPage(ctx, chatID, offset-reminderPageSize)
+	}
+
+	b.setReminderListState(chatID, reminderListState{kind: reminderListHoliday, offset: offset})
+	b.setChatMenu(chatID, chatMenuHolidays)
+
+	return b.replaceUI(ctx, chatID, telegramui.HolidaysText(holidays), telegramui.HolidayListKeyboard(holidays))
+}
+
+func (b *ReminderBot) sendShoppingListPage(ctx context.Context, chatID int64, offset int) error {
+	offset = normalizePageOffset(offset)
+
+	lists, err := b.repository.FindShoppingListsByChat(ctx, chatID, reminderPageSize, offset)
+	if err != nil {
+		return fmt.Errorf("load shopping lists: %w", err)
+	}
+
+	if len(lists) == 0 && offset > 0 {
+		return b.sendShoppingListPage(ctx, chatID, offset-reminderPageSize)
+	}
+
+	b.setReminderListState(chatID, reminderListState{kind: reminderListShopping, offset: offset})
+	b.setChatMenu(chatID, chatMenuShopping)
+
+	return b.replaceUI(ctx, chatID, telegramui.ShoppingListsText(lists), telegramui.ShoppingListKeyboard(lists))
 }
 
 func (b *ReminderBot) editDraftText(ctx context.Context, chatID int64) error {
@@ -895,6 +1143,10 @@ func (b *ReminderBot) sendShiftedReminderPage(ctx context.Context, chatID int64,
 	switch list.kind {
 	case reminderListHistory:
 		return b.sendReminderHistoryPage(ctx, chatID, list.offset+shift)
+	case reminderListHoliday:
+		return b.sendHolidayListPage(ctx, chatID, list.offset+shift)
+	case reminderListShopping:
+		return b.sendShoppingListPage(ctx, chatID, list.offset+shift)
 	default:
 		return b.sendReminderListPage(ctx, chatID, list.offset+shift)
 	}
@@ -1150,6 +1402,8 @@ func (b *ReminderBot) handleBackMessage(ctx context.Context, chatID int64) error
 		return b.sendSettings(ctx, chatID)
 	case chatMenuReminderList:
 		return b.sendReminders(ctx, chatID)
+	case chatMenuHolidays, chatMenuShopping:
+		return b.sendStart(ctx, chatID)
 	default:
 		return b.sendStart(ctx, chatID)
 	}
@@ -1204,12 +1458,8 @@ func (b *ReminderBot) handleSelectedReplyMessage(ctx context.Context, chatID int
 		return false, nil
 	}
 
-	if b.chatMenu(chatID) == chatMenuReminderList {
-		if reminderListCommandText(text) {
-			return false, nil
-		}
-
-		return true, b.viewReminderByReply(ctx, chatID, text)
+	if handled, err := b.handleListReplyMessage(ctx, chatID, text); handled || err != nil {
+		return handled, err
 	}
 
 	if b.applyDraftTimeTextByMessage(chatID, text) {
@@ -1217,6 +1467,31 @@ func (b *ReminderBot) handleSelectedReplyMessage(ctx context.Context, chatID int
 	}
 
 	return false, nil
+}
+
+func (b *ReminderBot) handleListReplyMessage(ctx context.Context, chatID int64, text string) (bool, error) {
+	switch b.chatMenu(chatID) {
+	case chatMenuReminderList:
+		if reminderListCommandText(text) {
+			return false, nil
+		}
+
+		return true, b.viewReminderByReply(ctx, chatID, text)
+	case chatMenuHolidays:
+		if reminderListCommandText(text) {
+			return false, nil
+		}
+
+		return true, b.viewHolidayByReply(ctx, chatID, text)
+	case chatMenuShopping:
+		if reminderListCommandText(text) {
+			return false, nil
+		}
+
+		return true, b.viewShoppingListByReply(ctx, chatID, text)
+	default:
+		return false, nil
+	}
 }
 
 func reminderListCommandText(text string) bool {
@@ -1276,6 +1551,59 @@ func (b *ReminderBot) viewReminderByReply(ctx context.Context, chatID int64, tex
 	return b.sendShiftedReminderPage(ctx, chatID, 0)
 }
 
+func (b *ReminderBot) viewHolidayByReply(ctx context.Context, chatID int64, text string) error {
+	if err := b.loadChatLocation(ctx, chatID); err != nil {
+		return err
+	}
+
+	list := b.reminderListState(chatID)
+
+	holidays, err := b.repository.FindHolidaysByChat(ctx, chatID, reminderPageSize, list.offset)
+	if err != nil {
+		return fmt.Errorf("load holidays: %w", err)
+	}
+
+	for _, holiday := range holidays {
+		if telegramui.HolidayButtonText(holiday) == text {
+			return b.replaceUI(
+				ctx,
+				chatID,
+				telegramui.HolidayViewText(holiday, b.location(chatID)),
+				telegramui.HolidayDetailsKeyboard(holiday),
+			)
+		}
+	}
+
+	return b.sendHolidayListPage(ctx, chatID, list.offset)
+}
+
+func (b *ReminderBot) viewShoppingListByReply(ctx context.Context, chatID int64, text string) error {
+	listState := b.reminderListState(chatID)
+
+	lists, err := b.repository.FindShoppingListsByChat(ctx, chatID, reminderPageSize, listState.offset)
+	if err != nil {
+		return fmt.Errorf("load shopping lists: %w", err)
+	}
+
+	for _, list := range lists {
+		if telegramui.ShoppingListButtonText(list) == text {
+			selectedList, loadErr := b.repository.ShoppingListByID(ctx, chatID, list.ID)
+			if loadErr != nil {
+				return fmt.Errorf("load shopping list: %w", loadErr)
+			}
+
+			return b.replaceUI(
+				ctx,
+				chatID,
+				telegramui.ShoppingListViewText(selectedList),
+				telegramui.ShoppingListDetailsKeyboard(selectedList),
+			)
+		}
+	}
+
+	return b.sendShoppingListPage(ctx, chatID, listState.offset)
+}
+
 func (b *ReminderBot) loadReminderPage(
 	ctx context.Context,
 	chatID int64,
@@ -1300,6 +1628,22 @@ func (b *ReminderBot) loadReminderPage(
 
 func (b *ReminderBot) saveDraft(ctx context.Context, chatID int64, messageID int) error {
 	draft := b.draft(chatID)
+	switch draft.kind {
+	case telegramui.DraftKindHoliday:
+		return b.saveHolidayDraft(ctx, chatID, messageID, draft)
+	case telegramui.DraftKindShopping:
+		return b.saveShoppingDraft(ctx, chatID, messageID, draft)
+	default:
+		return b.saveReminderDraft(ctx, chatID, messageID, draft)
+	}
+}
+
+func (b *ReminderBot) saveReminderDraft(
+	ctx context.Context,
+	chatID int64,
+	messageID int,
+	draft reminderDraft,
+) error {
 	remindAt := b.draftReminderTime(chatID, draft)
 
 	if b.setDraftValidationNotice(chatID, draft, remindAt) {
@@ -1319,6 +1663,91 @@ func (b *ReminderBot) saveDraft(ctx context.Context, chatID int64, messageID int
 		messageID,
 		"<i>Напоминание сохранено.</i>\n\n"+telegramui.ReminderViewText(reminder, b.location(chatID)),
 		telegramui.ReminderCreatedKeyboard(),
+	)
+}
+
+func (b *ReminderBot) saveHolidayDraft(
+	ctx context.Context,
+	chatID int64,
+	messageID int,
+	draft reminderDraft,
+) error {
+	remindAt := draft.remindAt(b.location(chatID))
+
+	if b.setHolidayDraftValidationNotice(chatID, draft, remindAt) {
+		return b.replaceDraft(ctx, chatID)
+	}
+
+	age := holidayAge(draft.date, remindAt)
+
+	var (
+		holiday database.HolidayView
+		err     error
+	)
+
+	if draft.id == 0 {
+		holiday, err = b.repository.CreateHoliday(
+			ctx,
+			chatID,
+			draft.title,
+			draft.description,
+			draft.date,
+			remindAt,
+			age,
+		)
+	} else {
+		holiday, err = b.repository.UpdateHoliday(
+			ctx,
+			chatID,
+			draft.id,
+			draft.title,
+			draft.description,
+			draft.date,
+			remindAt,
+			age,
+		)
+	}
+
+	if err != nil {
+		return fmt.Errorf("save holiday: %w", err)
+	}
+
+	b.deleteDraft(chatID)
+
+	return b.editUI(
+		ctx,
+		chatID,
+		messageID,
+		"<i>Праздник сохранен.</i>\n\n"+telegramui.HolidayViewText(holiday, b.location(chatID)),
+		telegramui.HolidayDetailsKeyboard(holiday),
+	)
+}
+
+func (b *ReminderBot) saveShoppingDraft(
+	ctx context.Context,
+	chatID int64,
+	messageID int,
+	draft reminderDraft,
+) error {
+	if len(draft.shoppingItems) == 0 {
+		b.setDraftNotice(chatID, "Добавьте хотя бы один пункт списка.")
+
+		return b.replaceDraft(ctx, chatID)
+	}
+
+	list, err := b.repository.CreateShoppingList(ctx, chatID, draft.shoppingItems)
+	if err != nil {
+		return fmt.Errorf("create shopping list: %w", err)
+	}
+
+	b.deleteDraft(chatID)
+
+	return b.editUI(
+		ctx,
+		chatID,
+		messageID,
+		"<i>Список покупок сохранен.</i>\n\n"+telegramui.ShoppingListViewText(list),
+		telegramui.ShoppingListDetailsKeyboard(list),
 	)
 }
 
@@ -1372,6 +1801,31 @@ func (b *ReminderBot) setDraftValidationNotice(chatID int64, draft reminderDraft
 	}
 
 	return false
+}
+
+func (b *ReminderBot) setHolidayDraftValidationNotice(chatID int64, draft reminderDraft, remindAt time.Time) bool {
+	if draft.title == "" || draft.description == "" || remindAt.IsZero() {
+		b.setDraftNotice(chatID, "Чтобы сохранить праздник, добавьте название, имя, дату и время.")
+
+		return true
+	}
+
+	if !remindAt.After(b.now(chatID)) {
+		b.setDraftTimeNotice(chatID, "Это время уже прошло. Выберите будущую дату и время.")
+
+		return true
+	}
+
+	return false
+}
+
+func holidayAge(holidayDate time.Time, remindAt time.Time) int {
+	age := remindAt.Year() - holidayDate.Year()
+	if age < 0 {
+		return 0
+	}
+
+	return age
 }
 
 func (b *ReminderBot) viewReminder(ctx context.Context, chatID int64, messageID int, data string) error {
@@ -1433,6 +1887,34 @@ func (b *ReminderBot) deleteReminder(ctx context.Context, chatID int64, messageI
 		chatID,
 		"<i>Напоминание удалено.</i>\n\n\n"+telegramui.ReminderListText(reminders),
 		telegramui.ReminderListKeyboard(reminders),
+	)
+}
+
+func (b *ReminderBot) deleteHoliday(ctx context.Context, chatID int64, holidayID int64) error {
+	if err := b.repository.DeleteHoliday(ctx, chatID, holidayID); err != nil {
+		return fmt.Errorf("delete holiday: %w", err)
+	}
+
+	return b.sendHolidayListPage(ctx, chatID, b.reminderListState(chatID).offset)
+}
+
+func (b *ReminderBot) toggleShoppingListItem(
+	ctx context.Context,
+	chatID int64,
+	messageID int,
+	itemID int64,
+) error {
+	list, err := b.repository.ToggleShoppingListItem(ctx, chatID, itemID)
+	if err != nil {
+		return fmt.Errorf("toggle shopping list item: %w", err)
+	}
+
+	return b.editUI(
+		ctx,
+		chatID,
+		messageID,
+		telegramui.ShoppingListViewText(list),
+		telegramui.ShoppingListDetailsKeyboard(list),
 	)
 }
 
@@ -1524,7 +2006,7 @@ func (b *ReminderBot) editUI(
 }
 
 func hasTelegramHTML(text string) bool {
-	return strings.Contains(text, "<b>") || strings.Contains(text, "<i>")
+	return strings.Contains(text, "<b>") || strings.Contains(text, "<i>") || strings.Contains(text, "<s>")
 }
 
 func (b *ReminderBot) applyDraftText(ctx context.Context, chatID int64, text string) bool {
@@ -1548,6 +2030,11 @@ func (b *ReminderBot) applyDraftText(ctx context.Context, chatID int64, text str
 		draft.title = text
 	case telegramui.FieldDescription:
 		draft.description = text
+	case telegramui.FieldShoppingItem:
+		draft.shoppingItems = append(draft.shoppingItems, database.ShoppingListItem{
+			Text:     strings.TrimSpace(text),
+			Position: len(draft.shoppingItems) + 1,
+		})
 	case telegramui.FieldRepeatInterval:
 		b.mu.Unlock()
 
@@ -2313,9 +2800,11 @@ func newReminderDraft(now time.Time) reminderDraft {
 
 func uiDraft(draft reminderDraft) telegramui.Draft {
 	return telegramui.Draft{
+		Kind:          draft.kind,
 		Title:         draft.title,
 		Description:   draft.description,
 		Notice:        draft.notice,
+		ShoppingItems: draft.shoppingItems,
 		Date:          draft.date,
 		Hour:          draft.hour,
 		Minute:        draft.minute,
