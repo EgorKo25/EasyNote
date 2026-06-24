@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -15,69 +16,33 @@ func (d *Database) CreateHoliday(
 	ctx context.Context,
 	request database.HolidayRequest,
 ) (database.HolidayView, error) {
-	transaction, err := d.pool.Begin(ctx)
-	if err != nil {
-		return database.HolidayView{}, fmt.Errorf("begin create holiday transaction: %w", err)
-	}
-
-	defer rollbackTransaction(ctx, transaction, "create holiday")
-
-	holidayName := strings.TrimSpace(request.HolidayName)
-	recipientName := strings.TrimSpace(request.RecipientName)
-
-	var noteID int64
-	if err = transaction.QueryRow(
-		ctx,
-		"INSERT INTO notes (telegram_chat_id, title, description) VALUES ($1, $2, $3) RETURNING id",
-		request.TelegramChatID,
-		fmt.Sprintf("Поздравьте %s с %s.", recipientName, holidayName),
-		"",
-	).Scan(&noteID); err != nil {
-		return database.HolidayView{}, fmt.Errorf("create holiday note: %w", err)
-	}
-
-	var reminderID int64
-	if err = transaction.QueryRow(
-		ctx,
-		"INSERT INTO reminders (note_id, remind_at) VALUES ($1, $2) RETURNING id",
-		noteID,
-		request.RemindAt,
-	).Scan(&reminderID); err != nil {
-		return database.HolidayView{}, fmt.Errorf("create holiday reminder: %w", err)
-	}
-
 	query := `
-		INSERT INTO holidays (telegram_chat_id, reminder_id, holiday_name, recipient_name, holiday_date)
+		INSERT INTO holidays (telegram_chat_id, holiday_name, recipient_name, holiday_date, remind_at)
 		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id, telegram_chat_id, reminder_id, holiday_name, recipient_name, holiday_date, created_at
+		RETURNING id, telegram_chat_id, holiday_name, recipient_name, holiday_date, remind_at, status, created_at
 	`
 
 	var holiday database.HolidayView
-	if err = transaction.QueryRow(
+	if err := d.pool.QueryRow(
 		ctx,
 		query,
 		request.TelegramChatID,
-		reminderID,
-		holidayName,
-		recipientName,
+		strings.TrimSpace(request.HolidayName),
+		strings.TrimSpace(request.RecipientName),
 		request.HolidayDate,
+		request.RemindAt,
 	).Scan(
 		&holiday.ID,
 		&holiday.TelegramChatID,
-		&holiday.ReminderID,
 		&holiday.HolidayName,
 		&holiday.RecipientName,
 		&holiday.HolidayDate,
+		&holiday.RemindAt,
+		&holiday.Status,
 		&holiday.CreatedAt,
 	); err != nil {
 		return database.HolidayView{}, fmt.Errorf("create holiday: %w", err)
 	}
-
-	if err = transaction.Commit(ctx); err != nil {
-		return database.HolidayView{}, fmt.Errorf("commit create holiday transaction: %w", err)
-	}
-
-	holiday.RemindAt = request.RemindAt
 
 	return holiday, nil
 }
@@ -86,84 +51,45 @@ func (d *Database) UpdateHoliday(
 	ctx context.Context,
 	request database.HolidayUpdateRequest,
 ) (database.HolidayView, error) {
-	transaction, err := d.pool.Begin(ctx)
-	if err != nil {
-		return database.HolidayView{}, fmt.Errorf("begin update holiday transaction: %w", err)
-	}
-
-	defer rollbackTransaction(ctx, transaction, "update holiday")
-
-	holidayName := strings.TrimSpace(request.HolidayName)
-	recipientName := strings.TrimSpace(request.RecipientName)
-
-	holiday, err := d.holidayByIDTx(ctx, transaction, request.TelegramChatID, request.ID)
-	if err != nil {
-		return database.HolidayView{}, err
-	}
-
-	noteQuery := `
-		UPDATE notes n
-		SET title = $2,
-			description = $3
-		FROM reminders r
-		WHERE r.note_id = n.id
-			AND r.id = $1
-	`
-
-	if _, err = transaction.Exec(
-		ctx,
-		noteQuery,
-		holiday.ReminderID,
-		fmt.Sprintf("Поздравьте %s с %s.", recipientName, holidayName),
-		"",
-	); err != nil {
-		return database.HolidayView{}, fmt.Errorf("update holiday note: %w", err)
-	}
-
-	if _, err = transaction.Exec(
-		ctx,
-		"UPDATE reminders SET remind_at = $1 WHERE id = $2",
-		request.RemindAt,
-		holiday.ReminderID,
-	); err != nil {
-		return database.HolidayView{}, fmt.Errorf("update holiday reminder: %w", err)
-	}
-
 	query := `
 		UPDATE holidays
 		SET holiday_name = $3,
 			recipient_name = $4,
-			holiday_date = $5
+			holiday_date = $5,
+			remind_at = $6,
+			last_sent_at = NULL
 		WHERE telegram_chat_id = $1
 			AND id = $2
-		RETURNING id, telegram_chat_id, reminder_id, holiday_name, recipient_name, holiday_date, created_at
+			AND status = 'active'
+		RETURNING id, telegram_chat_id, holiday_name, recipient_name, holiday_date, remind_at, status, created_at
 	`
 
-	if err = transaction.QueryRow(
+	var holiday database.HolidayView
+	if err := d.pool.QueryRow(
 		ctx,
 		query,
 		request.TelegramChatID,
 		request.ID,
-		holidayName,
-		recipientName,
+		strings.TrimSpace(request.HolidayName),
+		strings.TrimSpace(request.RecipientName),
 		request.HolidayDate,
+		request.RemindAt,
 	).Scan(
 		&holiday.ID,
 		&holiday.TelegramChatID,
-		&holiday.ReminderID,
 		&holiday.HolidayName,
 		&holiday.RecipientName,
 		&holiday.HolidayDate,
+		&holiday.RemindAt,
+		&holiday.Status,
 		&holiday.CreatedAt,
 	); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return database.HolidayView{}, fmt.Errorf("%w: %d", database.ErrHolidayNotFound, request.ID)
+		}
+
 		return database.HolidayView{}, fmt.Errorf("update holiday: %w", err)
 	}
-
-	if err = transaction.Commit(ctx); err != nil {
-		return database.HolidayView{}, fmt.Errorf("commit update holiday transaction: %w", err)
-	}
-
-	holiday.RemindAt = request.RemindAt
 
 	return holiday, nil
 }
@@ -175,19 +101,11 @@ func (d *Database) FindHolidaysByChat(
 	offset int,
 ) ([]database.HolidayView, error) {
 	query := `
-		SELECT
-			h.id,
-			h.telegram_chat_id,
-			h.reminder_id,
-			h.holiday_name,
-			h.recipient_name,
-			h.holiday_date,
-			r.remind_at,
-			h.created_at
-		FROM holidays h
-		JOIN reminders r ON r.id = h.reminder_id
-		WHERE h.telegram_chat_id = $1
-		ORDER BY r.remind_at, h.id
+		SELECT id, telegram_chat_id, holiday_name, recipient_name, holiday_date, remind_at, status, created_at
+		FROM holidays
+		WHERE telegram_chat_id = $1
+			AND status = 'active'
+		ORDER BY remind_at, id
 		LIMIT $2 OFFSET $3
 	`
 
@@ -205,81 +123,23 @@ func (d *Database) HolidayByID(
 	telegramChatID int64,
 	holidayID int64,
 ) (database.HolidayView, error) {
-	holiday, err := d.holidayByIDTx(ctx, d.pool, telegramChatID, holidayID)
-	if err != nil {
-		return database.HolidayView{}, err
-	}
-
-	return holiday, nil
-}
-
-func (d *Database) DeleteHoliday(ctx context.Context, telegramChatID int64, holidayID int64) error {
-	transaction, err := d.pool.Begin(ctx)
-	if err != nil {
-		return fmt.Errorf("begin delete holiday transaction: %w", err)
-	}
-
-	defer rollbackTransaction(ctx, transaction, "delete holiday")
-
-	holiday, err := d.holidayByIDTx(ctx, transaction, telegramChatID, holidayID)
-	if err != nil {
-		return err
-	}
-
-	if _, err = transaction.Exec(
-		ctx,
-		"UPDATE reminders SET status = 'canceled' WHERE id = $1",
-		holiday.ReminderID,
-	); err != nil {
-		return fmt.Errorf("cancel holiday reminder: %w", err)
-	}
-
-	if _, err = transaction.Exec(ctx, "DELETE FROM holidays WHERE id = $1", holidayID); err != nil {
-		return fmt.Errorf("delete holiday: %w", err)
-	}
-
-	if err = transaction.Commit(ctx); err != nil {
-		return fmt.Errorf("commit delete holiday transaction: %w", err)
-	}
-
-	return nil
-}
-
-type holidayQueryer interface {
-	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
-}
-
-func (d *Database) holidayByIDTx(
-	ctx context.Context,
-	queryer holidayQueryer,
-	telegramChatID int64,
-	holidayID int64,
-) (database.HolidayView, error) {
 	query := `
-		SELECT
-			h.id,
-			h.telegram_chat_id,
-			h.reminder_id,
-			h.holiday_name,
-			h.recipient_name,
-			h.holiday_date,
-			r.remind_at,
-			h.created_at
-		FROM holidays h
-		JOIN reminders r ON r.id = h.reminder_id
-		WHERE h.telegram_chat_id = $1
-			AND h.id = $2
+		SELECT id, telegram_chat_id, holiday_name, recipient_name, holiday_date, remind_at, status, created_at
+		FROM holidays
+		WHERE telegram_chat_id = $1
+			AND id = $2
+			AND status = 'active'
 	`
 
 	var holiday database.HolidayView
-	if err := queryer.QueryRow(ctx, query, telegramChatID, holidayID).Scan(
+	if err := d.pool.QueryRow(ctx, query, telegramChatID, holidayID).Scan(
 		&holiday.ID,
 		&holiday.TelegramChatID,
-		&holiday.ReminderID,
 		&holiday.HolidayName,
 		&holiday.RecipientName,
 		&holiday.HolidayDate,
 		&holiday.RemindAt,
+		&holiday.Status,
 		&holiday.CreatedAt,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -292,6 +152,94 @@ func (d *Database) holidayByIDTx(
 	return holiday, nil
 }
 
+func (d *Database) DeleteHoliday(ctx context.Context, telegramChatID int64, holidayID int64) error {
+	query := `
+		UPDATE holidays
+		SET status = 'canceled'
+		WHERE telegram_chat_id = $1
+			AND id = $2
+			AND status = 'active'
+	`
+
+	if affectedRows, err := d.pool.Exec(ctx, query, telegramChatID, holidayID); err != nil {
+		return fmt.Errorf("delete holiday: %w", err)
+	} else if affectedRows.RowsAffected() == 0 {
+		return fmt.Errorf("%w: %d", database.ErrHolidayNotFound, holidayID)
+	}
+
+	return nil
+}
+
+func (d *Database) FindHolidaysReadyToSend(
+	ctx context.Context,
+	now time.Time,
+	limit int,
+) ([]*database.ScheduledHoliday, error) {
+	transaction, err := d.pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin find holidays ready to send transaction: %w", err)
+	}
+
+	defer rollbackTransaction(ctx, transaction, "find holidays ready to send")
+
+	query := `
+		WITH due AS (
+			SELECT id
+			FROM holidays
+			WHERE remind_at <= $1
+				AND status = 'active'
+			ORDER BY remind_at, id
+			LIMIT $2
+			FOR UPDATE SKIP LOCKED
+		)
+		SELECT
+			h.id,
+			h.telegram_chat_id,
+			h.holiday_name,
+			h.recipient_name,
+			h.remind_at,
+			COALESCE(s.timezone, 'Europe/Moscow')
+		FROM holidays h
+		JOIN due d ON d.id = h.id
+		LEFT JOIN user_settings s ON s.telegram_chat_id = h.telegram_chat_id
+		ORDER BY h.remind_at, h.id
+	`
+
+	rows, err := transaction.Query(ctx, query, now, limit)
+	if err != nil {
+		return nil, fmt.Errorf("query holidays ready to send: %w", err)
+	}
+	defer rows.Close()
+
+	holidays := make([]*database.ScheduledHoliday, 0)
+
+	for rows.Next() {
+		var holiday database.ScheduledHoliday
+		if err = rows.Scan(
+			&holiday.ID,
+			&holiday.TelegramChatID,
+			&holiday.HolidayName,
+			&holiday.RecipientName,
+			&holiday.RemindAt,
+			&holiday.Timezone,
+		); err != nil {
+			return nil, fmt.Errorf("scan scheduled holiday: %w", err)
+		}
+
+		holidays = append(holidays, &holiday)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate scheduled holidays: %w", err)
+	}
+
+	if err = transaction.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit find holidays ready to send transaction: %w", err)
+	}
+
+	return holidays, nil
+}
+
 func scanHolidays(rows pgx.Rows) ([]database.HolidayView, error) {
 	holidays := make([]database.HolidayView, 0)
 
@@ -300,11 +248,11 @@ func scanHolidays(rows pgx.Rows) ([]database.HolidayView, error) {
 		if err := rows.Scan(
 			&holiday.ID,
 			&holiday.TelegramChatID,
-			&holiday.ReminderID,
 			&holiday.HolidayName,
 			&holiday.RecipientName,
 			&holiday.HolidayDate,
 			&holiday.RemindAt,
+			&holiday.Status,
 			&holiday.CreatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan holiday: %w", err)

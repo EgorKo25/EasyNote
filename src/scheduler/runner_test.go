@@ -551,6 +551,10 @@ func TestRunnerProcessesReadyReminders(t *testing.T) {
 			planner := mocks.NewMockPlanner(ctrl)
 			testClock := clock.NewMock()
 			testClock.Set(baseTime)
+			storage.EXPECT().
+				FindHolidaysReadyToSend(gomock.Any(), gomock.Any(), gomock.Any()).
+				Return(nil, nil).
+				AnyTimes()
 
 			if testCase.before != nil {
 				testCase.before(ctrl, storage, sender, planner, testCase.readyForTimers)
@@ -579,6 +583,117 @@ func TestRunnerProcessesReadyReminders(t *testing.T) {
 			}
 
 			require.NoErrorf(t, err, "case %q returned unexpected error", testCase.name)
+		})
+	}
+}
+
+func TestRunnerProcessesDueHolidays(t *testing.T) {
+	t.Parallel()
+
+	baseTime := time.Date(2026, time.June, 5, 10, 0, 0, 0, time.UTC)
+	holiday := database.ScheduledHoliday{
+		ID:             10,
+		TelegramChatID: 100,
+		HolidayName:    "Birthday",
+		RecipientName:  "Oleg",
+		RemindAt:       baseTime,
+		Timezone:       "UTC",
+	}
+
+	type expected struct {
+		expectedErrText string
+	}
+
+	testCases := []struct {
+		name     string
+		before   func(*mocks.MockSender, *mocks.MockPlanner)
+		expected expected
+	}{
+		{
+			name: "sent holiday is completed with sent time",
+			before: func(sender *mocks.MockSender, planner *mocks.MockPlanner) {
+				gomock.InOrder(
+					sender.EXPECT().SendHoliday(gomock.Any(), holiday).Return(501, nil).Times(1),
+					planner.EXPECT().CompleteHoliday(gomock.Any(), holiday.ID, gomock.Any()).Return(nil).Times(1),
+				)
+			},
+		},
+		{
+			name: "nil telegram message still completes holiday without sent time",
+			before: func(sender *mocks.MockSender, planner *mocks.MockPlanner) {
+				gomock.InOrder(
+					sender.EXPECT().SendHoliday(gomock.Any(), holiday).Return(0, nil).Times(1),
+					planner.EXPECT().CompleteHoliday(gomock.Any(), holiday.ID, nil).Return(nil).Times(1),
+				)
+			},
+		},
+		{
+			name: "send error after retries completes holiday without sent time",
+			before: func(sender *mocks.MockSender, planner *mocks.MockPlanner) {
+				gomock.InOrder(
+					sender.EXPECT().SendHoliday(gomock.Any(), holiday).Return(0, errSendReminder).Times(2),
+					planner.EXPECT().CompleteHoliday(gomock.Any(), holiday.ID, nil).Return(nil).Times(1),
+				)
+			},
+		},
+		{
+			name: "second retry success completes holiday with sent time",
+			before: func(sender *mocks.MockSender, planner *mocks.MockPlanner) {
+				gomock.InOrder(
+					sender.EXPECT().SendHoliday(gomock.Any(), holiday).Return(0, errSendReminder).Times(1),
+					sender.EXPECT().SendHoliday(gomock.Any(), holiday).Return(502, nil).Times(1),
+					planner.EXPECT().CompleteHoliday(gomock.Any(), holiday.ID, gomock.Any()).Return(nil).Times(1),
+				)
+			},
+		},
+		{
+			name: "context cancellation from sender is returned",
+			before: func(sender *mocks.MockSender, _ *mocks.MockPlanner) {
+				sender.EXPECT().SendHoliday(gomock.Any(), holiday).Return(0, context.Canceled).Times(2)
+			},
+			expected: expected{
+				expectedErrText: "send holiday 10: retry holiday send: retry attempts exhausted: send holiday: context canceled",
+			},
+		},
+		{
+			name: "planner completion error is returned",
+			before: func(sender *mocks.MockSender, planner *mocks.MockPlanner) {
+				gomock.InOrder(
+					sender.EXPECT().SendHoliday(gomock.Any(), holiday).Return(503, nil).Times(1),
+					planner.EXPECT().CompleteHoliday(gomock.Any(), holiday.ID, gomock.Any()).
+						Return(errCompleteOccurrence).
+						Times(1),
+				)
+			},
+			expected: expected{expectedErrText: "complete holiday 10: complete reminder"},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctrl := gomock.NewController(t)
+			sender := mocks.NewMockSender(ctrl)
+			planner := mocks.NewMockPlanner(ctrl)
+			testCase.before(sender, planner)
+
+			runner := NewRunner(
+				mocks.NewMockStorage(ctrl),
+				sender,
+				planner,
+				config.Scheduler{SendRetryCount: 2, SendRetryInterval: time.Millisecond},
+			)
+
+			err := runner.sendDueHoliday(t.Context(), holiday, baseTime)
+
+			if testCase.expected.expectedErrText != "" {
+				require.EqualError(t, err, testCase.expected.expectedErrText)
+
+				return
+			}
+
+			require.NoError(t, err)
 		})
 	}
 }

@@ -197,6 +197,35 @@ func TestPlannerCompletesOccurrenceLifecycle(t *testing.T) {
 			},
 		},
 		{
+			name: "active holiday occurrence is moved to next year",
+			action: func(ctx context.Context, schedule *planner.Planner) error {
+				return schedule.CompleteHoliday(ctx, 10, &sentAt)
+			},
+			before: func(storage *plannerMocks.MockStorage, transaction *plannerMocks.MockTransactionStorage) {
+				holiday := database.Holiday{
+					ID: 10, TelegramChatID: 100, HolidayName: "Birthday", RecipientName: "Oleg",
+					RemindAt: base, Status: database.HolidayStatusActive,
+				}
+
+				gomock.InOrder(
+					storage.EXPECT().
+						WithinTransaction(gomock.Any(), gomock.Any()).
+						DoAndReturn(func(ctx context.Context, action func(context.Context, planner.TransactionStorage) error) error {
+							return action(ctx, transaction)
+						}).
+						Times(1),
+					transaction.EXPECT().
+						LoadHolidayForUpdate(gomock.Any(), int64(10)).
+						Return(holiday, nil).
+						Times(1),
+					transaction.EXPECT().
+						MarkHolidayOccurrence(gomock.Any(), holiday, gomock.Any()).
+						Return(nil).
+						Times(1),
+				)
+			},
+		},
+		{
 			name: "already completed occurrence is idempotent and creates nothing",
 			action: func(ctx context.Context, schedule *planner.Planner) error {
 				return schedule.CompleteOccurrence(ctx, 5, database.ReminderStatusSent, &sentAt)

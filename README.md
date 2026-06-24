@@ -123,7 +123,7 @@ The main menu reply keyboard is ordered as `➕ Создать`, `⏰ Напом
 
 Reminder creation uses inline keyboards again. The draft message is rendered as labeled sections: title, description, reminder start date, and repeat state. Draft buttons are ordered as title/description, date/time, repeat, and save/cancel. While the bot waits for title or description input, those buttons change to `Введите название` or `Введите описание`; after input they change to `Изменить ...`.
 
-Holiday creation starts from `Создать` -> `Праздник`. The bot renders the prepared congratulation template, asks for holiday name, person name, date, and reminder time, and stores the holiday with a linked reminder. The `🎉 Праздники` menu shows two holidays per page and opens holiday details with `Изменить`, `Удалить`, and `Назад` actions.
+Holiday creation starts from `Создать` -> `Праздник`. The bot renders the prepared congratulation template, asks for holiday name, recipient name, date, and reminder time, and stores the holiday separately from regular notes and reminders. The scheduler sends due holidays through the planner, so holidays do not appear in active or past reminder lists. The `🎉 Праздники` menu shows two holidays per page and opens holiday details with `Изменить`, `Удалить`, and `Назад` actions.
 
 Shopping list creation starts from `Создать` -> `Список покупок`. The editor renders `Необходимо купить` with numbered items, adds items as the user sends them, and stores the list in PostgreSQL. The `🛒 Списки` menu shows two lists per page; opening a list renders each item as an inline button. Pressing an item persists its checked state and shows it with a check mark and strikethrough text.
 
@@ -232,7 +232,7 @@ For a manual deployment from a pull request branch, run the same workflow manual
 <h2>v1.4.0 - Holidays and shopping lists</h2>
 <ul>
   <li>Creation now supports reminders, holidays, and shopping lists.</li>
-  <li>Holiday drafts collect holiday name, person name, date, and time, and save a linked reminder.</li>
+  <li>Holiday drafts collect holiday name, recipient name, date, and time, and save holidays separately from regular reminders.</li>
   <li>The main menu now exposes 🎉 Праздники with paginated holiday details, edit, delete, and back actions.</li>
   <li>Shopping lists persist numbered items and checked state; opened lists render each item as an inline toggle button.</li>
   <li>The main menu keyboard was reordered and reminder draft date/time moved below title/description.</li>

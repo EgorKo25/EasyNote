@@ -52,6 +52,35 @@ func (tx plannerTransactionStorage) LoadOccurrenceForUpdate(
 	return reminder, nil
 }
 
+func (tx plannerTransactionStorage) LoadHolidayForUpdate(
+	ctx context.Context,
+	holidayID int64,
+) (database.Holiday, error) {
+	query := `
+		SELECT id, telegram_chat_id, holiday_name, recipient_name, holiday_date, remind_at, status, last_sent_at, created_at
+		FROM holidays
+		WHERE id = $1
+		FOR UPDATE
+	`
+
+	var holiday database.Holiday
+	if err := tx.QueryRow(ctx, query, holidayID).Scan(
+		&holiday.ID,
+		&holiday.TelegramChatID,
+		&holiday.HolidayName,
+		&holiday.RecipientName,
+		&holiday.HolidayDate,
+		&holiday.RemindAt,
+		&holiday.Status,
+		&holiday.LastSentAt,
+		&holiday.CreatedAt,
+	); err != nil {
+		return database.Holiday{}, fmt.Errorf("load holiday for update: %w", err)
+	}
+
+	return holiday, nil
+}
+
 func (tx plannerTransactionStorage) LoadRuleForUpdate(
 	ctx context.Context,
 	ruleID int64,
@@ -143,6 +172,28 @@ func (tx plannerTransactionStorage) MarkOccurrence(
 		return fmt.Errorf("mark occurrence %s: %w", status, err)
 	} else if affectedRows.RowsAffected() == 0 {
 		return errMarkReminderStatus
+	}
+
+	return nil
+}
+
+func (tx plannerTransactionStorage) MarkHolidayOccurrence(
+	ctx context.Context,
+	holiday database.Holiday,
+	sentAt *time.Time,
+) error {
+	query := `
+		UPDATE holidays
+		SET remind_at = $2,
+			last_sent_at = $3
+		WHERE id = $1
+			AND status = 'active'
+	`
+
+	if affectedRows, err := tx.Exec(ctx, query, holiday.ID, holiday.RemindAt.AddDate(1, 0, 0), sentAt); err != nil {
+		return fmt.Errorf("mark holiday occurrence: %w", err)
+	} else if affectedRows.RowsAffected() == 0 {
+		return fmt.Errorf("mark holiday occurrence: %w", database.ErrHolidayNotFound)
 	}
 
 	return nil
