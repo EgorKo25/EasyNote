@@ -66,6 +66,7 @@ type ScheduledReminder struct {
 
 	IntrusiveEnabled  bool
 	IntrusiveInterval time.Duration
+	Timezone          string
 	TelegramMessageID *int
 }
 
@@ -159,8 +160,8 @@ type ReminderDelivery struct {
 
 type HolidayRequest struct {
 	TelegramChatID int64
-	Name           string
-	PersonName     string
+	HolidayName    string
+	RecipientName  string
 	HolidayDate    time.Time
 	RemindAt       time.Time
 }
@@ -175,8 +176,8 @@ type HolidayView struct {
 	ID             int64
 	TelegramChatID int64
 	ReminderID     int64
-	Name           string
-	PersonName     string
+	HolidayName    string
+	RecipientName  string
 	HolidayDate    time.Time
 	RemindAt       time.Time
 	CreatedAt      time.Time

@@ -131,9 +131,9 @@ The draft screen shows service prompts in italic. The prompt only asks for missi
 
 Reminder time is entered as text while the time screen is open, in `HH:MM` format.
 
-Active reminders opened from the reply-keyboard list show inline details actions, including `Удалить`. Reminder list buttons hide internal reminder IDs.
+Active reminders opened from the reply-keyboard list show inline details actions, including `Изменить` and `Удалить`. Editing opens the reminder draft with the current title, description, date, and time. Reminder list buttons hide internal reminder IDs.
 
-Intrusive reminder settings use an inline `Включено` / `Выключено` toggle, a `Сохранить` button that returns to settings, and edit the existing settings message after manual interval input. Intervals can be entered as plain minutes or Go duration values such as `1m` and `1h30m`, are persisted from 1 to 120 minutes, and are displayed as user-facing text such as `каждые 30 минут` or `раз в 1 час 20 минут`.
+Intrusive reminder settings use an inline `Включено` / `Выключено` toggle, a `Сохранить` button that returns to settings, and edit the existing settings message after manual interval input. Intervals can be entered as plain minutes or Go duration values such as `1m` and `1h30m`, are persisted from 1 to 120 minutes, and are displayed as user-facing text such as `каждые 30 минут` or `раз в 1 час 20 минут`. Intrusive delivery stops at 12:00 in the user's local timezone after the reminder time, and the last intrusive message is deleted when the scheduler stops that mode.
 
 Settings have an explicit `Сохранить` button that returns to the main menu. Timezone selection contains 24 unique UTC hour offsets shown uniformly as `UTC (+N)` / `UTC (-N)`; the UTC+3 option uses Moscow internally as the default timezone. Reminder drafts and reminder details load the user's timezone before formatting or calculating reminder time.
 

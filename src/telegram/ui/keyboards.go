@@ -353,6 +353,10 @@ func ReminderListKeyboard(reminders []database.ReminderView) *telego.ReplyKeyboa
 func ReminderDetailsKeyboard(reminder database.ReminderView) *telego.InlineKeyboardMarkup {
 	return tu.InlineKeyboard(
 		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton("Изменить").
+				WithCallbackData(fmt.Sprintf("%s%d", CallbackReminderEditPrefix, reminder.ID)),
+		),
+		tu.InlineKeyboardRow(
 			tu.InlineKeyboardButton("Назад").WithCallbackData(CallbackReminderBackList),
 			tu.InlineKeyboardButton("Удалить").WithCallbackData(fmt.Sprintf("%s%d", CallbackDeletePrefix, reminder.ID)),
 		),
@@ -465,7 +469,7 @@ func ReminderButtonText(reminder database.ReminderView) string {
 }
 
 func HolidayButtonText(holiday database.HolidayView) string {
-	return fmt.Sprintf("%s - %s", holiday.PersonName, holiday.Name)
+	return fmt.Sprintf("%s - %s", holiday.RecipientName, holiday.HolidayName)
 }
 
 func ShoppingListButtonText(list database.ShoppingListView) string {

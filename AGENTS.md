@@ -13,6 +13,9 @@
 - Ask for the user's permission before changing any system applications, utilities, or files outside the repository.
 - Do not change the linter configuration.
 - Do not add `nolint` directives to production files. `nolint` is allowed only in test files.
+- After completing and pushing any task that belongs to a pull request, check the pull request CI status and report whether every required check passed.
+- Final report matrices must always be written in Russian.
+- Do not extract a helper that only wraps one or two function calls or only moves a small linear fragment out of the caller when it is used fewer than three times. Keep the logic inline unless the helper owns a real domain responsibility, establishes a real dependency boundary, or is required as a callback.
 
 ## Token Efficiency And No Background Reasoning
 

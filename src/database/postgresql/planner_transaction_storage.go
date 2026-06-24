@@ -12,21 +12,19 @@ import (
 	"github.com/EgorKo25/EasyNote/src/planner"
 )
 
-type TransactionStorager = planner.TransactionStorage
-
 var (
 	errMarkReminderStatus      = errors.New("reminder status was not updated")
 	errMarkCustomDateGenerated = errors.New("custom reminder date was not marked as generated")
 	errUpdateRuleStatus        = errors.New("reminder rule status was not updated")
 )
 
-func newTransactionStorage(tx pgx.Tx) TransactionStorager {
-	return transactionStorage{tx}
+func newPlannerTransactionStorage(tx pgx.Tx) planner.TransactionStorage {
+	return plannerTransactionStorage{tx}
 }
 
-type transactionStorage struct{ pgx.Tx }
+type plannerTransactionStorage struct{ pgx.Tx }
 
-func (tx transactionStorage) LoadOccurrenceForUpdate(
+func (tx plannerTransactionStorage) LoadOccurrenceForUpdate(
 	ctx context.Context,
 	reminderID int64,
 ) (database.Reminder, error) {
@@ -54,7 +52,10 @@ func (tx transactionStorage) LoadOccurrenceForUpdate(
 	return reminder, nil
 }
 
-func (tx transactionStorage) LoadRuleForUpdate(ctx context.Context, ruleID int64) (database.ReminderRule, error) {
+func (tx plannerTransactionStorage) LoadRuleForUpdate(
+	ctx context.Context,
+	ruleID int64,
+) (database.ReminderRule, error) {
 	query := `
 		SELECT id, type, interval_days, weekdays_mask, status, created_at, updated_at
 		FROM reminder_rules
@@ -78,7 +79,7 @@ func (tx transactionStorage) LoadRuleForUpdate(ctx context.Context, ruleID int64
 	return rule, nil
 }
 
-func (tx transactionStorage) LoadCustomDatesForUpdate(
+func (tx plannerTransactionStorage) LoadCustomDatesForUpdate(
 	ctx context.Context,
 	ruleID int64,
 ) ([]database.CustomReminderDate, error) {
@@ -114,7 +115,7 @@ func (tx transactionStorage) LoadCustomDatesForUpdate(
 	return dates, nil
 }
 
-func (tx transactionStorage) MarkOccurrence(
+func (tx plannerTransactionStorage) MarkOccurrence(
 	ctx context.Context,
 	reminderID int64,
 	status database.ReminderStatus,
@@ -147,7 +148,7 @@ func (tx transactionStorage) MarkOccurrence(
 	return nil
 }
 
-func (tx transactionStorage) CreateNextOccurrence(
+func (tx plannerTransactionStorage) CreateNextOccurrence(
 	ctx context.Context,
 	noteID int64,
 	ruleID int64,
@@ -178,7 +179,7 @@ func (tx transactionStorage) CreateNextOccurrence(
 	return reminder, nil
 }
 
-func (tx transactionStorage) MarkCustomDateGenerated(
+func (tx plannerTransactionStorage) MarkCustomDateGenerated(
 	ctx context.Context,
 	ruleID int64,
 	remindDate time.Time,
@@ -200,7 +201,7 @@ func (tx transactionStorage) MarkCustomDateGenerated(
 	return nil
 }
 
-func (tx transactionStorage) UpdateRuleStatus(
+func (tx plannerTransactionStorage) UpdateRuleStatus(
 	ctx context.Context,
 	ruleID int64,
 	status database.ReminderRuleStatus,

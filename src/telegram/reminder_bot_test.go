@@ -1461,10 +1461,10 @@ func TestReminderBotRunsReplyMessageCommands(t *testing.T) {
 					service.EXPECT().
 						FindHolidaysByChat(gomock.Any(), chatID, reminderPageSize, 0).
 						Return([]database.HolidayView{{
-							ID:         2,
-							Name:       "днем рождения",
-							PersonName: "Олега",
-							RemindAt:   time.Date(2099, 6, 2, 10, 0, 0, 0, time.UTC),
+							ID:            2,
+							HolidayName:   "днем рождения",
+							RecipientName: "Олега",
+							RemindAt:      time.Date(2099, 6, 2, 10, 0, 0, 0, time.UTC),
 						}}, nil).
 						Times(1),
 				)
@@ -2122,11 +2122,11 @@ func TestReminderBotHandlesHolidayAndShoppingViews(t *testing.T) {
 	chatID := int64(430)
 	messageID := 91
 	holiday := database.HolidayView{
-		ID:          7,
-		Name:        "днем рождения",
-		PersonName:  "Олега",
-		HolidayDate: time.Date(2099, 6, 2, 0, 0, 0, 0, time.UTC),
-		RemindAt:    time.Date(2099, 6, 2, 10, 15, 0, 0, time.UTC),
+		ID:            7,
+		HolidayName:   "днем рождения",
+		RecipientName: "Олега",
+		HolidayDate:   time.Date(2099, 6, 2, 0, 0, 0, 0, time.UTC),
+		RemindAt:      time.Date(2099, 6, 2, 10, 15, 0, 0, time.UTC),
 	}
 	shoppingList := database.ShoppingListView{
 		ID: 9,
@@ -3020,6 +3020,29 @@ func TestReminderBotHandlesReminderCallbacks(t *testing.T) {
 			},
 		},
 		{
+			name: "edit reminder callback opens draft with current reminder values",
+			data: telegramui.CallbackReminderEditPrefix + "10",
+			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
+				gomock.InOrder(
+					repository.EXPECT().
+						UserSettings(gomock.Any(), chatID).
+						Return(database.UserSettings{Timezone: "UTC"}, nil).
+						Times(1),
+					service.EXPECT().
+						ReminderByID(gomock.Any(), chatID, int64(10)).
+						Return(reminder, nil).
+						Times(1),
+					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+						Return(testTelegramResponse(t, telego.Message{MessageID: messageID}), nil).
+						Times(1),
+				)
+			},
+			expected: struct {
+				expectedErrText string
+				draftExists     bool
+			}{draftExists: true},
+		},
+		{
 			name: "missing viewed reminder returns list view",
 			data: telegramui.CallbackViewPrefix + "99",
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
@@ -3867,6 +3890,33 @@ func TestReminderBotSavesDraft(t *testing.T) {
 			},
 		},
 		{
+			name: "existing reminder draft updates active reminder",
+			draft: reminderDraft{
+				id:          16,
+				title:       "Pay rent",
+				description: "Card",
+				date:        futureDate,
+				hour:        8,
+				minute:      45,
+			},
+			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
+				gomock.InOrder(
+					service.EXPECT().
+						UpdateReminder(gomock.Any(), chatID, int64(16), "Pay rent", "Card", gomock.Any()).
+						Return(database.ReminderView{
+							ID:          16,
+							Title:       "Pay rent",
+							Description: "Card",
+							RemindAt:    futureDate.Add(8*time.Hour + 45*time.Minute),
+						}, nil).
+						Times(1),
+					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+						Return(testTelegramResponse(t, telego.Message{MessageID: messageID}), nil).
+						Times(1),
+				)
+			},
+		},
+		{
 			name: "valid holiday draft creates holiday reminder",
 			draft: reminderDraft{
 				kind:        telegramui.DraftKindHoliday,
@@ -3881,17 +3931,17 @@ func TestReminderBotSavesDraft(t *testing.T) {
 					service.EXPECT().
 						CreateHoliday(gomock.Any(), database.HolidayRequest{
 							TelegramChatID: chatID,
-							Name:           "Днем рождения",
-							PersonName:     "Олега",
+							HolidayName:    "Днем рождения",
+							RecipientName:  "Олега",
 							HolidayDate:    futureDate,
 							RemindAt:       time.Date(2099, 6, 2, 10, 15, 0, 0, time.Local),
 						}).
 						Return(database.HolidayView{
-							ID:          31,
-							Name:        "Днем рождения",
-							PersonName:  "Олега",
-							HolidayDate: futureDate,
-							RemindAt:    futureDate.Add(10*time.Hour + 15*time.Minute),
+							ID:            31,
+							HolidayName:   "Днем рождения",
+							RecipientName: "Олега",
+							HolidayDate:   futureDate,
+							RemindAt:      futureDate.Add(10*time.Hour + 15*time.Minute),
 						}, nil).
 						Times(1),
 					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -3947,18 +3997,18 @@ func TestReminderBotSavesDraft(t *testing.T) {
 							ID: 31,
 							HolidayRequest: database.HolidayRequest{
 								TelegramChatID: chatID,
-								Name:           "годовщиной",
-								PersonName:     "Анну",
+								HolidayName:    "годовщиной",
+								RecipientName:  "Анну",
 								HolidayDate:    futureDate,
 								RemindAt:       time.Date(2099, 6, 2, 11, 0, 0, 0, time.Local),
 							},
 						}).
 						Return(database.HolidayView{
-							ID:          31,
-							Name:        "годовщиной",
-							PersonName:  "Анну",
-							HolidayDate: futureDate,
-							RemindAt:    futureDate.Add(11 * time.Hour),
+							ID:            31,
+							HolidayName:   "годовщиной",
+							RecipientName: "Анну",
+							HolidayDate:   futureDate,
+							RemindAt:      futureDate.Add(11 * time.Hour),
 						}, nil).
 						Times(1),
 					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).

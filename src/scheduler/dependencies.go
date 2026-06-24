@@ -19,6 +19,7 @@ type Storage interface {
 
 type Sender interface {
 	SendReminder(ctx context.Context, reminder database.ScheduledReminder) (int, error)
+	DeleteReminderMessage(ctx context.Context, reminder database.ScheduledReminder) error
 }
 
 type Planner interface {

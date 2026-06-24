@@ -57,6 +57,15 @@ type ReminderCommandRepository interface {
 		limit int,
 		offset int,
 	) ([]database.ReminderView, error)
+	ReminderByID(ctx context.Context, telegramChatID int64, reminderID int64) (database.ReminderView, error)
+	UpdateReminder(
+		ctx context.Context,
+		telegramChatID int64,
+		reminderID int64,
+		title string,
+		description string,
+		remindAt time.Time,
+	) (database.ReminderView, error)
 	CancelReminder(ctx context.Context, telegramChatID int64, reminderID int64) error
 	CreateHoliday(ctx context.Context, request database.HolidayRequest) (database.HolidayView, error)
 	UpdateHoliday(ctx context.Context, request database.HolidayUpdateRequest) (database.HolidayView, error)
@@ -175,12 +184,53 @@ func (s *ReminderService) DeleteReminder(ctx context.Context, telegramChatID int
 	return nil
 }
 
+func (s *ReminderService) ReminderByID(
+	ctx context.Context,
+	telegramChatID int64,
+	reminderID int64,
+) (database.ReminderView, error) {
+	reminder, err := s.repository.ReminderByID(ctx, telegramChatID, reminderID)
+	if err != nil {
+		return database.ReminderView{}, fmt.Errorf("load reminder by id: %w", err)
+	}
+
+	return reminder, nil
+}
+
+func (s *ReminderService) UpdateReminder(
+	ctx context.Context,
+	telegramChatID int64,
+	reminderID int64,
+	title string,
+	description string,
+	remindAt time.Time,
+) (database.ReminderView, error) {
+	title = strings.TrimSpace(title)
+	if title == "" {
+		return database.ReminderView{}, fmt.Errorf("update reminder: %w", ErrReminderTitleEmpty)
+	}
+
+	reminder, err := s.repository.UpdateReminder(
+		ctx,
+		telegramChatID,
+		reminderID,
+		title,
+		strings.TrimSpace(description),
+		remindAt,
+	)
+	if err != nil {
+		return database.ReminderView{}, fmt.Errorf("update reminder: %w", err)
+	}
+
+	return reminder, nil
+}
+
 func (s *ReminderService) CreateHoliday(
 	ctx context.Context,
 	request database.HolidayRequest,
 ) (database.HolidayView, error) {
-	request.Name = strings.TrimSpace(request.Name)
-	request.PersonName = strings.TrimSpace(request.PersonName)
+	request.HolidayName = strings.TrimSpace(request.HolidayName)
+	request.RecipientName = strings.TrimSpace(request.RecipientName)
 
 	holiday, err := s.repository.CreateHoliday(ctx, request)
 	if err != nil {
@@ -194,8 +244,8 @@ func (s *ReminderService) UpdateHoliday(
 	ctx context.Context,
 	request database.HolidayUpdateRequest,
 ) (database.HolidayView, error) {
-	request.Name = strings.TrimSpace(request.Name)
-	request.PersonName = strings.TrimSpace(request.PersonName)
+	request.HolidayName = strings.TrimSpace(request.HolidayName)
+	request.RecipientName = strings.TrimSpace(request.RecipientName)
 
 	holiday, err := s.repository.UpdateHoliday(ctx, request)
 	if err != nil {
