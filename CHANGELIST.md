@@ -10,7 +10,7 @@ Holiday drafts render the congratulation template, collect holiday name, recipie
 
 Active reminder details now include an edit action that opens the reminder draft with the current title, description, date, and time.
 
-Intrusive reminders now stop at 12:00 in the user's local timezone after the reminder time. When that cutoff is reached, the scheduler deletes the last intrusive reminder message and completes the reminder as skipped.
+Intrusive reminders now stop at 00:00 on the next local calendar day after the reminder time. When that cutoff is reached, the scheduler deletes the last intrusive reminder message and completes the reminder as skipped.
 
 Shopping list drafts render numbered items under `Необходимо купить`, append new items as the user adds them, and persist lists with item state in PostgreSQL. The main menu now has a `🛒 Списки` section with two-items-per-page navigation. Opening a list shows each item as an inline button; pressing an item toggles its persisted checked state and shows the item with a check mark and strikethrough text.
 

@@ -212,15 +212,12 @@ func intrusiveReminderCutoff(reminder database.ScheduledReminder) time.Time {
 		localRemindAt.Year(),
 		localRemindAt.Month(),
 		localRemindAt.Day(),
-		12,
+		0,
 		0,
 		0,
 		0,
 		location,
-	)
-	if !cutoff.After(localRemindAt) {
-		cutoff = cutoff.AddDate(0, 0, 1)
-	}
+	).AddDate(0, 0, 1)
 
 	return cutoff
 }

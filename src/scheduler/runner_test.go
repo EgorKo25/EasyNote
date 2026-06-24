@@ -329,7 +329,7 @@ func TestRunnerProcessesReadyReminders(t *testing.T) {
 							ReminderID:     intrusiveReminder.ID,
 							MessageID:      301,
 							NextSendAt:     baseTime.Add(45 * time.Minute),
-							IntrusiveUntil: time.Date(2026, time.June, 5, 12, 0, 0, 0, time.UTC),
+							IntrusiveUntil: time.Date(2026, time.June, 6, 0, 0, 0, 0, time.UTC),
 						}).
 						Return(nil).
 						Times(1),
@@ -370,7 +370,7 @@ func TestRunnerProcessesReadyReminders(t *testing.T) {
 							ReminderID:     intrusiveReminder.ID,
 							MessageID:      302,
 							NextSendAt:     baseTime.Add(time.Minute),
-							IntrusiveUntil: time.Date(2026, time.June, 5, 12, 0, 0, 0, time.UTC),
+							IntrusiveUntil: time.Date(2026, time.June, 6, 0, 0, 0, 0, time.UTC),
 						}).
 						Return(nil).
 						Times(1),
@@ -381,7 +381,7 @@ func TestRunnerProcessesReadyReminders(t *testing.T) {
 			},
 		},
 		{
-			name: "expired intrusive reminder after user local noon deletes previous message and is completed as skipped",
+			name: "expired intrusive reminder after user local midnight deletes previous message and is completed as skipped",
 			cfg: config.Scheduler{
 				PollInterval:      pollInterval,
 				SendRetryInterval: retryInterval,
