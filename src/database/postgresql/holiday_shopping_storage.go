@@ -28,9 +28,15 @@ func (d *Database) CreateHoliday(
 
 	defer rollbackTransaction(ctx, transaction, "create holiday")
 
-	noteID, err := createHolidayNote(ctx, transaction, telegramChatID, name, personName, age)
-	if err != nil {
-		return database.HolidayView{}, err
+	var noteID int64
+	if err = transaction.QueryRow(
+		ctx,
+		"INSERT INTO notes (telegram_chat_id, title, description) VALUES ($1, $2, $3) RETURNING id",
+		telegramChatID,
+		holidayReminderTitle(name, personName),
+		holidayReminderDescription(age),
+	).Scan(&noteID); err != nil {
+		return database.HolidayView{}, fmt.Errorf("create holiday note: %w", err)
 	}
 
 	var reminderID int64
@@ -43,9 +49,33 @@ func (d *Database) CreateHoliday(
 		return database.HolidayView{}, fmt.Errorf("create holiday reminder: %w", err)
 	}
 
-	holiday, err := insertHoliday(ctx, transaction, telegramChatID, reminderID, name, personName, holidayDate, age)
-	if err != nil {
-		return database.HolidayView{}, err
+	query := `
+		INSERT INTO holidays (telegram_chat_id, reminder_id, name, person_name, holiday_date, age)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id, telegram_chat_id, reminder_id, name, person_name, holiday_date, age, created_at
+	`
+
+	var holiday database.HolidayView
+	if err = transaction.QueryRow(
+		ctx,
+		query,
+		telegramChatID,
+		reminderID,
+		strings.TrimSpace(name),
+		strings.TrimSpace(personName),
+		holidayDate,
+		age,
+	).Scan(
+		&holiday.ID,
+		&holiday.TelegramChatID,
+		&holiday.ReminderID,
+		&holiday.Name,
+		&holiday.PersonName,
+		&holiday.HolidayDate,
+		&holiday.Age,
+		&holiday.CreatedAt,
+	); err != nil {
+		return database.HolidayView{}, fmt.Errorf("create holiday: %w", err)
 	}
 
 	if err = transaction.Commit(ctx); err != nil {
@@ -79,8 +109,23 @@ func (d *Database) UpdateHoliday(
 		return database.HolidayView{}, err
 	}
 
-	if err = updateHolidayNote(ctx, transaction, holiday.ReminderID, name, personName, age); err != nil {
-		return database.HolidayView{}, err
+	noteQuery := `
+		UPDATE notes n
+		SET title = $2,
+			description = $3
+		FROM reminders r
+		WHERE r.note_id = n.id
+			AND r.id = $1
+	`
+
+	if _, err = transaction.Exec(
+		ctx,
+		noteQuery,
+		holiday.ReminderID,
+		holidayReminderTitle(name, personName),
+		holidayReminderDescription(age),
+	); err != nil {
+		return database.HolidayView{}, fmt.Errorf("update holiday note: %w", err)
 	}
 
 	if _, err = transaction.Exec(
@@ -234,9 +279,22 @@ func (d *Database) CreateShoppingList(
 	}
 
 	for index, item := range items {
-		insertedItem, insertErr := insertShoppingListItem(ctx, transaction, list.ID, item.Text, index+1)
-		if insertErr != nil {
-			return database.ShoppingListView{}, insertErr
+		query := `
+			INSERT INTO shopping_list_items (list_id, text, position)
+			VALUES ($1, $2, $3)
+			RETURNING id, list_id, text, done, position, created_at
+		`
+
+		var insertedItem database.ShoppingListItem
+		if err = transaction.QueryRow(ctx, query, list.ID, strings.TrimSpace(item.Text), index+1).Scan(
+			&insertedItem.ID,
+			&insertedItem.ListID,
+			&insertedItem.Text,
+			&insertedItem.Done,
+			&insertedItem.Position,
+			&insertedItem.CreatedAt,
+		); err != nil {
+			return database.ShoppingListView{}, fmt.Errorf("create shopping list item: %w", err)
 		}
 
 		list.Items = append(list.Items, insertedItem)
@@ -408,100 +466,6 @@ func scanHolidays(rows pgx.Rows) ([]database.HolidayView, error) {
 	return holidays, nil
 }
 
-func createHolidayNote(
-	ctx context.Context,
-	transaction pgx.Tx,
-	telegramChatID int64,
-	name string,
-	personName string,
-	age int,
-) (int64, error) {
-	var noteID int64
-	if err := transaction.QueryRow(
-		ctx,
-		"INSERT INTO notes (telegram_chat_id, title, description) VALUES ($1, $2, $3) RETURNING id",
-		telegramChatID,
-		holidayReminderTitle(name, personName),
-		holidayReminderDescription(age),
-	).Scan(&noteID); err != nil {
-		return 0, fmt.Errorf("create holiday note: %w", err)
-	}
-
-	return noteID, nil
-}
-
-func updateHolidayNote(
-	ctx context.Context,
-	transaction pgx.Tx,
-	reminderID int64,
-	name string,
-	personName string,
-	age int,
-) error {
-	query := `
-		UPDATE notes n
-		SET title = $2,
-			description = $3
-		FROM reminders r
-		WHERE r.note_id = n.id
-			AND r.id = $1
-	`
-
-	if _, err := transaction.Exec(
-		ctx,
-		query,
-		reminderID,
-		holidayReminderTitle(name, personName),
-		holidayReminderDescription(age),
-	); err != nil {
-		return fmt.Errorf("update holiday note: %w", err)
-	}
-
-	return nil
-}
-
-func insertHoliday(
-	ctx context.Context,
-	transaction pgx.Tx,
-	telegramChatID int64,
-	reminderID int64,
-	name string,
-	personName string,
-	holidayDate time.Time,
-	age int,
-) (database.HolidayView, error) {
-	query := `
-		INSERT INTO holidays (telegram_chat_id, reminder_id, name, person_name, holiday_date, age)
-		VALUES ($1, $2, $3, $4, $5, $6)
-		RETURNING id, telegram_chat_id, reminder_id, name, person_name, holiday_date, age, created_at
-	`
-
-	var holiday database.HolidayView
-	if err := transaction.QueryRow(
-		ctx,
-		query,
-		telegramChatID,
-		reminderID,
-		strings.TrimSpace(name),
-		strings.TrimSpace(personName),
-		holidayDate,
-		age,
-	).Scan(
-		&holiday.ID,
-		&holiday.TelegramChatID,
-		&holiday.ReminderID,
-		&holiday.Name,
-		&holiday.PersonName,
-		&holiday.HolidayDate,
-		&holiday.Age,
-		&holiday.CreatedAt,
-	); err != nil {
-		return database.HolidayView{}, fmt.Errorf("create holiday: %w", err)
-	}
-
-	return holiday, nil
-}
-
 func holidayReminderTitle(name string, personName string) string {
 	return fmt.Sprintf("Поздравьте %s с %s.", strings.TrimSpace(personName), strings.TrimSpace(name))
 }
@@ -512,34 +476,6 @@ func holidayReminderDescription(age int) string {
 	}
 
 	return fmt.Sprintf("Возраст: %d", age)
-}
-
-func insertShoppingListItem(
-	ctx context.Context,
-	transaction pgx.Tx,
-	listID int64,
-	text string,
-	position int,
-) (database.ShoppingListItem, error) {
-	query := `
-		INSERT INTO shopping_list_items (list_id, text, position)
-		VALUES ($1, $2, $3)
-		RETURNING id, list_id, text, done, position, created_at
-	`
-
-	var item database.ShoppingListItem
-	if err := transaction.QueryRow(ctx, query, listID, strings.TrimSpace(text), position).Scan(
-		&item.ID,
-		&item.ListID,
-		&item.Text,
-		&item.Done,
-		&item.Position,
-		&item.CreatedAt,
-	); err != nil {
-		return database.ShoppingListItem{}, fmt.Errorf("create shopping list item: %w", err)
-	}
-
-	return item, nil
 }
 
 func (d *Database) shoppingListByID(
