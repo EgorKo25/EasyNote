@@ -1452,13 +1452,13 @@ func TestReminderBotRunsReplyMessageCommands(t *testing.T) {
 		{
 			name: "holidays command loads first holiday page",
 			text: telegramui.ButtonHolidays,
-			before: func(_ *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
+			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
 					repository.EXPECT().
 						UserSettings(gomock.Any(), chatID).
 						Return(database.UserSettings{Timezone: "UTC"}, nil).
 						Times(1),
-					repository.EXPECT().
+					service.EXPECT().
 						FindHolidaysByChat(gomock.Any(), chatID, reminderPageSize, 0).
 						Return([]database.HolidayView{{
 							ID:         2,
@@ -1478,8 +1478,8 @@ func TestReminderBotRunsReplyMessageCommands(t *testing.T) {
 		{
 			name: "shopping lists command loads first shopping page",
 			text: telegramui.ButtonShoppingLists,
-			before: func(_ *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
-				repository.EXPECT().
+			before: func(service *telegrammocks.MockReminderService, _ *telegrammocks.MockReminderRepository) {
+				service.EXPECT().
 					FindShoppingListsByChat(gomock.Any(), chatID, reminderPageSize, 0).
 					Return([]database.ShoppingListView{{ID: 3}}, nil).
 					Times(1)
@@ -2139,7 +2139,7 @@ func TestReminderBotHandlesHolidayAndShoppingViews(t *testing.T) {
 	tests := []struct {
 		name   string
 		action func(ctx context.Context, bot *ReminderBot) (bool, error)
-		before func(repository *telegrammocks.MockReminderRepository)
+		before func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository)
 		state  func(bot *ReminderBot)
 	}{
 		{
@@ -2147,13 +2147,13 @@ func TestReminderBotHandlesHolidayAndShoppingViews(t *testing.T) {
 			action: func(ctx context.Context, bot *ReminderBot) (bool, error) {
 				return true, bot.viewHolidayByReply(ctx, chatID, telegramui.HolidayButtonText(holiday))
 			},
-			before: func(repository *telegrammocks.MockReminderRepository) {
+			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
 					repository.EXPECT().
 						UserSettings(gomock.Any(), chatID).
 						Return(database.UserSettings{Timezone: "UTC"}, nil).
 						Times(1),
-					repository.EXPECT().
+					service.EXPECT().
 						FindHolidaysByChat(gomock.Any(), chatID, reminderPageSize, 0).
 						Return([]database.HolidayView{holiday}, nil).
 						Times(1),
@@ -2168,13 +2168,13 @@ func TestReminderBotHandlesHolidayAndShoppingViews(t *testing.T) {
 			action: func(ctx context.Context, bot *ReminderBot) (bool, error) {
 				return true, bot.viewShoppingListByReply(ctx, chatID, telegramui.ShoppingListButtonText(shoppingList))
 			},
-			before: func(repository *telegrammocks.MockReminderRepository) {
+			before: func(service *telegrammocks.MockReminderService, _ *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
-					repository.EXPECT().
+					service.EXPECT().
 						FindShoppingListsByChat(gomock.Any(), chatID, reminderPageSize, 0).
 						Return([]database.ShoppingListView{shoppingList}, nil).
 						Times(1),
-					repository.EXPECT().
+					service.EXPECT().
 						ShoppingListByID(gomock.Any(), chatID, shoppingList.ID).
 						Return(shoppingList, nil).
 						Times(1),
@@ -2194,13 +2194,13 @@ func TestReminderBotHandlesHolidayAndShoppingViews(t *testing.T) {
 					telegramui.CallbackHolidayEditPrefix+strconv.FormatInt(holiday.ID, 10),
 				)
 			},
-			before: func(repository *telegrammocks.MockReminderRepository) {
+			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
 					repository.EXPECT().
 						UserSettings(gomock.Any(), chatID).
 						Return(database.UserSettings{Timezone: "UTC"}, nil).
 						Times(1),
-					repository.EXPECT().
+					service.EXPECT().
 						HolidayByID(gomock.Any(), chatID, holiday.ID).
 						Return(holiday, nil).
 						Times(1),
@@ -2218,9 +2218,9 @@ func TestReminderBotHandlesHolidayAndShoppingViews(t *testing.T) {
 					telegramui.CallbackHolidayDeletePrefix+strconv.FormatInt(holiday.ID, 10),
 				)
 			},
-			before: func(repository *telegrammocks.MockReminderRepository) {
+			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
-					repository.EXPECT().
+					service.EXPECT().
 						DeleteHoliday(gomock.Any(), chatID, holiday.ID).
 						Return(nil).
 						Times(1),
@@ -2228,7 +2228,7 @@ func TestReminderBotHandlesHolidayAndShoppingViews(t *testing.T) {
 						UserSettings(gomock.Any(), chatID).
 						Return(database.UserSettings{Timezone: "UTC"}, nil).
 						Times(1),
-					repository.EXPECT().
+					service.EXPECT().
 						FindHolidaysByChat(gomock.Any(), chatID, reminderPageSize, 0).
 						Return([]database.HolidayView{holiday}, nil).
 						Times(1),
@@ -2243,13 +2243,13 @@ func TestReminderBotHandlesHolidayAndShoppingViews(t *testing.T) {
 			action: func(ctx context.Context, bot *ReminderBot) (bool, error) {
 				return bot.handleHolidayCallback(ctx, chatID, messageID, telegramui.CallbackHolidayBackList)
 			},
-			before: func(repository *telegrammocks.MockReminderRepository) {
+			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
 					repository.EXPECT().
 						UserSettings(gomock.Any(), chatID).
 						Return(database.UserSettings{Timezone: "UTC"}, nil).
 						Times(1),
-					repository.EXPECT().
+					service.EXPECT().
 						FindHolidaysByChat(gomock.Any(), chatID, reminderPageSize, 0).
 						Return([]database.HolidayView{holiday}, nil).
 						Times(1),
@@ -2269,8 +2269,8 @@ func TestReminderBotHandlesHolidayAndShoppingViews(t *testing.T) {
 					telegramui.CallbackShoppingItemPrefix+"1",
 				)
 			},
-			before: func(repository *telegrammocks.MockReminderRepository) {
-				repository.EXPECT().
+			before: func(service *telegrammocks.MockReminderService, _ *telegrammocks.MockReminderRepository) {
+				service.EXPECT().
 					ToggleShoppingListItem(gomock.Any(), chatID, int64(1)).
 					Return(shoppingList, nil).
 					Times(1)
@@ -2282,8 +2282,8 @@ func TestReminderBotHandlesHolidayAndShoppingViews(t *testing.T) {
 			action: func(ctx context.Context, bot *ReminderBot) (bool, error) {
 				return bot.handleShoppingCallback(ctx, chatID, messageID, telegramui.CallbackShoppingBackList)
 			},
-			before: func(repository *telegrammocks.MockReminderRepository) {
-				repository.EXPECT().
+			before: func(service *telegrammocks.MockReminderService, _ *telegrammocks.MockReminderRepository) {
+				service.EXPECT().
 					FindShoppingListsByChat(gomock.Any(), chatID, reminderPageSize, 0).
 					Return([]database.ShoppingListView{shoppingList}, nil).
 					Times(1)
@@ -2300,8 +2300,9 @@ func TestReminderBotHandlesHolidayAndShoppingViews(t *testing.T) {
 
 			ctrl := gomock.NewController(t)
 			caller := telegoapimock.NewMockCaller(ctrl)
+			service := telegrammocks.NewMockReminderService(ctrl)
 			repository := telegrammocks.NewMockReminderRepository(ctrl)
-			test.before(repository)
+			test.before(service, repository)
 
 			caller.EXPECT().
 				Call(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -2313,6 +2314,7 @@ func TestReminderBotHandlesHolidayAndShoppingViews(t *testing.T) {
 
 			bot := &ReminderBot{
 				bot:            botAPI,
+				service:        service,
 				repository:     repository,
 				draftByChat:    make(map[int64]reminderDraft),
 				uiByChat:       make(map[int64]int),
@@ -3874,10 +3876,16 @@ func TestReminderBotSavesDraft(t *testing.T) {
 				hour:        10,
 				minute:      15,
 			},
-			before: func(caller *telegoapimock.MockCaller, _ *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
+			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, _ *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
-					repository.EXPECT().
-						CreateHoliday(gomock.Any(), chatID, "Днем рождения", "Олега", futureDate, gomock.Any(), 0).
+					service.EXPECT().
+						CreateHoliday(gomock.Any(), database.HolidayRequest{
+							TelegramChatID: chatID,
+							Name:           "Днем рождения",
+							PersonName:     "Олега",
+							HolidayDate:    futureDate,
+							RemindAt:       time.Date(2099, 6, 2, 10, 15, 0, 0, time.Local),
+						}).
 						Return(database.HolidayView{
 							ID:          31,
 							Name:        "Днем рождения",
@@ -3901,9 +3909,9 @@ func TestReminderBotSavesDraft(t *testing.T) {
 					{Text: "Хлеб", Position: 2},
 				},
 			},
-			before: func(caller *telegoapimock.MockCaller, _ *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
+			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, _ *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
-					repository.EXPECT().
+					service.EXPECT().
 						CreateShoppingList(gomock.Any(), chatID, []database.ShoppingListItem{
 							{Text: "Молоко", Position: 1},
 							{Text: "Хлеб", Position: 2},
@@ -3932,10 +3940,19 @@ func TestReminderBotSavesDraft(t *testing.T) {
 				date:        futureDate,
 				hour:        11,
 			},
-			before: func(caller *telegoapimock.MockCaller, _ *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
+			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, _ *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
-					repository.EXPECT().
-						UpdateHoliday(gomock.Any(), chatID, int64(31), "годовщиной", "Анну", futureDate, gomock.Any(), 0).
+					service.EXPECT().
+						UpdateHoliday(gomock.Any(), database.HolidayUpdateRequest{
+							ID: 31,
+							HolidayRequest: database.HolidayRequest{
+								TelegramChatID: chatID,
+								Name:           "годовщиной",
+								PersonName:     "Анну",
+								HolidayDate:    futureDate,
+								RemindAt:       time.Date(2099, 6, 2, 11, 0, 0, 0, time.Local),
+							},
+						}).
 						Return(database.HolidayView{
 							ID:          31,
 							Name:        "годовщиной",
@@ -4323,76 +4340,6 @@ func TestReminderBotConfigurationHelpers(t *testing.T) {
 			t.Parallel()
 
 			test.action(t)
-		})
-	}
-}
-
-func TestHolidayAge(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name        string
-		holidayDate time.Time
-		remindAt    time.Time
-		expected    struct {
-			age int
-		}
-	}{
-		{
-			name:        "same year birthday has zero age",
-			holidayDate: time.Date(2026, 6, 2, 0, 0, 0, 0, time.UTC),
-			remindAt:    time.Date(2026, 6, 2, 10, 0, 0, 0, time.UTC),
-			expected: struct {
-				age int
-			}{},
-		},
-		{
-			name:        "next year birthday increments age by one",
-			holidayDate: time.Date(2025, 6, 2, 0, 0, 0, 0, time.UTC),
-			remindAt:    time.Date(2026, 6, 2, 10, 0, 0, 0, time.UTC),
-			expected: struct {
-				age int
-			}{age: 1},
-		},
-		{
-			name:        "adult birthday calculates full year difference",
-			holidayDate: time.Date(1996, 6, 2, 0, 0, 0, 0, time.UTC),
-			remindAt:    time.Date(2026, 6, 2, 10, 0, 0, 0, time.UTC),
-			expected: struct {
-				age int
-			}{age: 30},
-		},
-		{
-			name:        "old birthday calculates large age",
-			holidayDate: time.Date(1956, 6, 2, 0, 0, 0, 0, time.UTC),
-			remindAt:    time.Date(2026, 6, 2, 10, 0, 0, 0, time.UTC),
-			expected: struct {
-				age int
-			}{age: 70},
-		},
-		{
-			name:        "future source date does not return negative age",
-			holidayDate: time.Date(2030, 6, 2, 0, 0, 0, 0, time.UTC),
-			remindAt:    time.Date(2026, 6, 2, 10, 0, 0, 0, time.UTC),
-			expected: struct {
-				age int
-			}{},
-		},
-		{
-			name:        "zero source date returns large calendar difference",
-			holidayDate: time.Time{},
-			remindAt:    time.Date(2026, 6, 2, 10, 0, 0, 0, time.UTC),
-			expected: struct {
-				age int
-			}{age: 2025},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-
-			require.Equal(t, test.expected.age, holidayAge(test.holidayDate, test.remindAt))
 		})
 	}
 }

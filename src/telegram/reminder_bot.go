@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"html"
 	"strconv"
 	"strings"
 	"sync"
@@ -131,6 +132,29 @@ type ReminderService interface {
 		status database.ReminderStatus,
 		sentAt *time.Time,
 	) error
+	CreateHoliday(ctx context.Context, request database.HolidayRequest) (database.HolidayView, error)
+	UpdateHoliday(ctx context.Context, request database.HolidayUpdateRequest) (database.HolidayView, error)
+	FindHolidaysByChat(
+		ctx context.Context,
+		telegramChatID int64,
+		limit int,
+		offset int,
+	) ([]database.HolidayView, error)
+	HolidayByID(ctx context.Context, telegramChatID int64, holidayID int64) (database.HolidayView, error)
+	DeleteHoliday(ctx context.Context, telegramChatID int64, holidayID int64) error
+	CreateShoppingList(
+		ctx context.Context,
+		telegramChatID int64,
+		items []database.ShoppingListItem,
+	) (database.ShoppingListView, error)
+	FindShoppingListsByChat(
+		ctx context.Context,
+		telegramChatID int64,
+		limit int,
+		offset int,
+	) ([]database.ShoppingListView, error)
+	ShoppingListByID(ctx context.Context, telegramChatID int64, listID int64) (database.ShoppingListView, error)
+	ToggleShoppingListItem(ctx context.Context, telegramChatID int64, itemID int64) (database.ShoppingListView, error)
 }
 
 type ReminderRepository interface {
@@ -155,46 +179,6 @@ type ReminderRepository interface {
 		limit int,
 		offset int,
 	) ([]database.ReminderView, error)
-	CreateHoliday(
-		ctx context.Context,
-		telegramChatID int64,
-		name string,
-		personName string,
-		holidayDate time.Time,
-		remindAt time.Time,
-		age int,
-	) (database.HolidayView, error)
-	UpdateHoliday(
-		ctx context.Context,
-		telegramChatID int64,
-		holidayID int64,
-		name string,
-		personName string,
-		holidayDate time.Time,
-		remindAt time.Time,
-		age int,
-	) (database.HolidayView, error)
-	FindHolidaysByChat(
-		ctx context.Context,
-		telegramChatID int64,
-		limit int,
-		offset int,
-	) ([]database.HolidayView, error)
-	HolidayByID(ctx context.Context, telegramChatID int64, holidayID int64) (database.HolidayView, error)
-	DeleteHoliday(ctx context.Context, telegramChatID int64, holidayID int64) error
-	CreateShoppingList(
-		ctx context.Context,
-		telegramChatID int64,
-		items []database.ShoppingListItem,
-	) (database.ShoppingListView, error)
-	FindShoppingListsByChat(
-		ctx context.Context,
-		telegramChatID int64,
-		limit int,
-		offset int,
-	) ([]database.ShoppingListView, error)
-	ShoppingListByID(ctx context.Context, telegramChatID int64, listID int64) (database.ShoppingListView, error)
-	ToggleShoppingListItem(ctx context.Context, telegramChatID int64, itemID int64) (database.ShoppingListView, error)
 }
 
 type reminderDraft struct {
@@ -953,7 +937,7 @@ func (b *ReminderBot) startHolidayDraftForEdit(
 		return err
 	}
 
-	holiday, err := b.repository.HolidayByID(ctx, chatID, holidayID)
+	holiday, err := b.service.HolidayByID(ctx, chatID, holidayID)
 	if err != nil {
 		return fmt.Errorf("load holiday for edit: %w", err)
 	}
@@ -1011,7 +995,7 @@ func (b *ReminderBot) sendHolidayListPage(ctx context.Context, chatID int64, off
 
 	offset = normalizePageOffset(offset)
 
-	holidays, err := b.repository.FindHolidaysByChat(ctx, chatID, reminderPageSize, offset)
+	holidays, err := b.service.FindHolidaysByChat(ctx, chatID, reminderPageSize, offset)
 	if err != nil {
 		return fmt.Errorf("load holidays: %w", err)
 	}
@@ -1029,7 +1013,7 @@ func (b *ReminderBot) sendHolidayListPage(ctx context.Context, chatID int64, off
 func (b *ReminderBot) sendShoppingListPage(ctx context.Context, chatID int64, offset int) error {
 	offset = normalizePageOffset(offset)
 
-	lists, err := b.repository.FindShoppingListsByChat(ctx, chatID, reminderPageSize, offset)
+	lists, err := b.service.FindShoppingListsByChat(ctx, chatID, reminderPageSize, offset)
 	if err != nil {
 		return fmt.Errorf("load shopping lists: %w", err)
 	}
@@ -1558,7 +1542,7 @@ func (b *ReminderBot) viewHolidayByReply(ctx context.Context, chatID int64, text
 
 	list := b.reminderListState(chatID)
 
-	holidays, err := b.repository.FindHolidaysByChat(ctx, chatID, reminderPageSize, list.offset)
+	holidays, err := b.service.FindHolidaysByChat(ctx, chatID, reminderPageSize, list.offset)
 	if err != nil {
 		return fmt.Errorf("load holidays: %w", err)
 	}
@@ -1568,7 +1552,12 @@ func (b *ReminderBot) viewHolidayByReply(ctx context.Context, chatID int64, text
 			return b.replaceUI(
 				ctx,
 				chatID,
-				telegramui.HolidayViewText(holiday, b.location(chatID)),
+				fmt.Sprintf(
+					"Поздравьте <b>%s</b> с <b>%s</b>.\n\n<b>Дата и время:</b> %s",
+					html.EscapeString(holiday.PersonName),
+					html.EscapeString(holiday.Name),
+					holiday.RemindAt.In(b.location(chatID)).Format("02.01.2006 15:04"),
+				),
 				telegramui.HolidayDetailsKeyboard(holiday),
 			)
 		}
@@ -1580,14 +1569,14 @@ func (b *ReminderBot) viewHolidayByReply(ctx context.Context, chatID int64, text
 func (b *ReminderBot) viewShoppingListByReply(ctx context.Context, chatID int64, text string) error {
 	listState := b.reminderListState(chatID)
 
-	lists, err := b.repository.FindShoppingListsByChat(ctx, chatID, reminderPageSize, listState.offset)
+	lists, err := b.service.FindShoppingListsByChat(ctx, chatID, reminderPageSize, listState.offset)
 	if err != nil {
 		return fmt.Errorf("load shopping lists: %w", err)
 	}
 
 	for _, list := range lists {
 		if telegramui.ShoppingListButtonText(list) == text {
-			selectedList, loadErr := b.repository.ShoppingListByID(ctx, chatID, list.ID)
+			selectedList, loadErr := b.service.ShoppingListByID(ctx, chatID, list.ID)
 			if loadErr != nil {
 				return fmt.Errorf("load shopping list: %w", loadErr)
 			}
@@ -1678,34 +1667,26 @@ func (b *ReminderBot) saveHolidayDraft(
 		return b.replaceDraft(ctx, chatID)
 	}
 
-	age := holidayAge(draft.date, remindAt)
-
 	var (
 		holiday database.HolidayView
 		err     error
 	)
 
+	request := database.HolidayRequest{
+		TelegramChatID: chatID,
+		Name:           draft.title,
+		PersonName:     draft.description,
+		HolidayDate:    draft.date,
+		RemindAt:       remindAt,
+	}
+
 	if draft.id == 0 {
-		holiday, err = b.repository.CreateHoliday(
-			ctx,
-			chatID,
-			draft.title,
-			draft.description,
-			draft.date,
-			remindAt,
-			age,
-		)
+		holiday, err = b.service.CreateHoliday(ctx, request)
 	} else {
-		holiday, err = b.repository.UpdateHoliday(
-			ctx,
-			chatID,
-			draft.id,
-			draft.title,
-			draft.description,
-			draft.date,
-			remindAt,
-			age,
-		)
+		holiday, err = b.service.UpdateHoliday(ctx, database.HolidayUpdateRequest{
+			ID:             draft.id,
+			HolidayRequest: request,
+		})
 	}
 
 	if err != nil {
@@ -1718,7 +1699,12 @@ func (b *ReminderBot) saveHolidayDraft(
 		ctx,
 		chatID,
 		messageID,
-		"<i>Праздник сохранен.</i>\n\n"+telegramui.HolidayViewText(holiday, b.location(chatID)),
+		"<i>Праздник сохранен.</i>\n\n"+fmt.Sprintf(
+			"Поздравьте <b>%s</b> с <b>%s</b>.\n\n<b>Дата и время:</b> %s",
+			html.EscapeString(holiday.PersonName),
+			html.EscapeString(holiday.Name),
+			holiday.RemindAt.In(b.location(chatID)).Format("02.01.2006 15:04"),
+		),
 		telegramui.HolidayDetailsKeyboard(holiday),
 	)
 }
@@ -1735,7 +1721,7 @@ func (b *ReminderBot) saveShoppingDraft(
 		return b.replaceDraft(ctx, chatID)
 	}
 
-	list, err := b.repository.CreateShoppingList(ctx, chatID, draft.shoppingItems)
+	list, err := b.service.CreateShoppingList(ctx, chatID, draft.shoppingItems)
 	if err != nil {
 		return fmt.Errorf("create shopping list: %w", err)
 	}
@@ -1819,15 +1805,6 @@ func (b *ReminderBot) setHolidayDraftValidationNotice(chatID int64, draft remind
 	return false
 }
 
-func holidayAge(holidayDate time.Time, remindAt time.Time) int {
-	age := remindAt.Year() - holidayDate.Year()
-	if age < 0 {
-		return 0
-	}
-
-	return age
-}
-
 func (b *ReminderBot) viewReminder(ctx context.Context, chatID int64, messageID int, data string) error {
 	reminderID, err := strconv.ParseInt(strings.TrimPrefix(data, telegramui.CallbackViewPrefix), 10, 64)
 	if err != nil {
@@ -1891,7 +1868,7 @@ func (b *ReminderBot) deleteReminder(ctx context.Context, chatID int64, messageI
 }
 
 func (b *ReminderBot) deleteHoliday(ctx context.Context, chatID int64, holidayID int64) error {
-	if err := b.repository.DeleteHoliday(ctx, chatID, holidayID); err != nil {
+	if err := b.service.DeleteHoliday(ctx, chatID, holidayID); err != nil {
 		return fmt.Errorf("delete holiday: %w", err)
 	}
 
@@ -1904,7 +1881,7 @@ func (b *ReminderBot) toggleShoppingListItem(
 	messageID int,
 	itemID int64,
 ) error {
-	list, err := b.repository.ToggleShoppingListItem(ctx, chatID, itemID)
+	list, err := b.service.ToggleShoppingListItem(ctx, chatID, itemID)
 	if err != nil {
 		return fmt.Errorf("toggle shopping list item: %w", err)
 	}

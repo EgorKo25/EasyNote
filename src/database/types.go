@@ -157,6 +157,20 @@ type ReminderDelivery struct {
 	IntrusiveUntil time.Time
 }
 
+type HolidayRequest struct {
+	TelegramChatID int64
+	Name           string
+	PersonName     string
+	HolidayDate    time.Time
+	RemindAt       time.Time
+}
+
+type HolidayUpdateRequest struct {
+	HolidayRequest
+
+	ID int64
+}
+
 type HolidayView struct {
 	ID             int64
 	TelegramChatID int64
@@ -165,7 +179,6 @@ type HolidayView struct {
 	PersonName     string
 	HolidayDate    time.Time
 	RemindAt       time.Time
-	Age            int
 	CreatedAt      time.Time
 }
 

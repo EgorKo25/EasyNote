@@ -21,9 +21,11 @@ func upAddHolidaysAndShoppingLists(ctx context.Context, tx *sql.Tx) error {
 		name TEXT NOT NULL CHECK (length(trim(name)) > 0),
 		person_name TEXT NOT NULL CHECK (length(trim(person_name)) > 0),
 		holiday_date DATE NOT NULL,
-		age INT NOT NULL DEFAULT 0 CHECK (age >= 0),
 		created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 	);
+
+	CREATE UNIQUE INDEX holidays_reminder_id_idx
+		ON holidays (reminder_id);
 
 	CREATE INDEX holidays_chat_created_idx
 		ON holidays (telegram_chat_id, created_at DESC, id DESC);

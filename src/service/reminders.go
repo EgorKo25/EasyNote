@@ -58,6 +58,29 @@ type ReminderCommandRepository interface {
 		offset int,
 	) ([]database.ReminderView, error)
 	CancelReminder(ctx context.Context, telegramChatID int64, reminderID int64) error
+	CreateHoliday(ctx context.Context, request database.HolidayRequest) (database.HolidayView, error)
+	UpdateHoliday(ctx context.Context, request database.HolidayUpdateRequest) (database.HolidayView, error)
+	FindHolidaysByChat(
+		ctx context.Context,
+		telegramChatID int64,
+		limit int,
+		offset int,
+	) ([]database.HolidayView, error)
+	HolidayByID(ctx context.Context, telegramChatID int64, holidayID int64) (database.HolidayView, error)
+	DeleteHoliday(ctx context.Context, telegramChatID int64, holidayID int64) error
+	CreateShoppingList(
+		ctx context.Context,
+		telegramChatID int64,
+		items []database.ShoppingListItem,
+	) (database.ShoppingListView, error)
+	FindShoppingListsByChat(
+		ctx context.Context,
+		telegramChatID int64,
+		limit int,
+		offset int,
+	) ([]database.ShoppingListView, error)
+	ShoppingListByID(ctx context.Context, telegramChatID int64, listID int64) (database.ShoppingListView, error)
+	ToggleShoppingListItem(ctx context.Context, telegramChatID int64, itemID int64) (database.ShoppingListView, error)
 }
 
 func (s *ReminderService) CreateReminder(
@@ -150,6 +173,124 @@ func (s *ReminderService) DeleteReminder(ctx context.Context, telegramChatID int
 	}
 
 	return nil
+}
+
+func (s *ReminderService) CreateHoliday(
+	ctx context.Context,
+	request database.HolidayRequest,
+) (database.HolidayView, error) {
+	request.Name = strings.TrimSpace(request.Name)
+	request.PersonName = strings.TrimSpace(request.PersonName)
+
+	holiday, err := s.repository.CreateHoliday(ctx, request)
+	if err != nil {
+		return database.HolidayView{}, fmt.Errorf("create holiday: %w", err)
+	}
+
+	return holiday, nil
+}
+
+func (s *ReminderService) UpdateHoliday(
+	ctx context.Context,
+	request database.HolidayUpdateRequest,
+) (database.HolidayView, error) {
+	request.Name = strings.TrimSpace(request.Name)
+	request.PersonName = strings.TrimSpace(request.PersonName)
+
+	holiday, err := s.repository.UpdateHoliday(ctx, request)
+	if err != nil {
+		return database.HolidayView{}, fmt.Errorf("update holiday: %w", err)
+	}
+
+	return holiday, nil
+}
+
+func (s *ReminderService) FindHolidaysByChat(
+	ctx context.Context,
+	telegramChatID int64,
+	limit int,
+	offset int,
+) ([]database.HolidayView, error) {
+	holidays, err := s.repository.FindHolidaysByChat(ctx, telegramChatID, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("find holidays by chat: %w", err)
+	}
+
+	return holidays, nil
+}
+
+func (s *ReminderService) HolidayByID(
+	ctx context.Context,
+	telegramChatID int64,
+	holidayID int64,
+) (database.HolidayView, error) {
+	holiday, err := s.repository.HolidayByID(ctx, telegramChatID, holidayID)
+	if err != nil {
+		return database.HolidayView{}, fmt.Errorf("load holiday by id: %w", err)
+	}
+
+	return holiday, nil
+}
+
+func (s *ReminderService) DeleteHoliday(ctx context.Context, telegramChatID int64, holidayID int64) error {
+	if err := s.repository.DeleteHoliday(ctx, telegramChatID, holidayID); err != nil {
+		return fmt.Errorf("delete holiday: %w", err)
+	}
+
+	return nil
+}
+
+func (s *ReminderService) CreateShoppingList(
+	ctx context.Context,
+	telegramChatID int64,
+	items []database.ShoppingListItem,
+) (database.ShoppingListView, error) {
+	list, err := s.repository.CreateShoppingList(ctx, telegramChatID, items)
+	if err != nil {
+		return database.ShoppingListView{}, fmt.Errorf("create shopping list: %w", err)
+	}
+
+	return list, nil
+}
+
+func (s *ReminderService) FindShoppingListsByChat(
+	ctx context.Context,
+	telegramChatID int64,
+	limit int,
+	offset int,
+) ([]database.ShoppingListView, error) {
+	lists, err := s.repository.FindShoppingListsByChat(ctx, telegramChatID, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("find shopping lists by chat: %w", err)
+	}
+
+	return lists, nil
+}
+
+func (s *ReminderService) ShoppingListByID(
+	ctx context.Context,
+	telegramChatID int64,
+	listID int64,
+) (database.ShoppingListView, error) {
+	list, err := s.repository.ShoppingListByID(ctx, telegramChatID, listID)
+	if err != nil {
+		return database.ShoppingListView{}, fmt.Errorf("load shopping list by id: %w", err)
+	}
+
+	return list, nil
+}
+
+func (s *ReminderService) ToggleShoppingListItem(
+	ctx context.Context,
+	telegramChatID int64,
+	itemID int64,
+) (database.ShoppingListView, error) {
+	list, err := s.repository.ToggleShoppingListItem(ctx, telegramChatID, itemID)
+	if err != nil {
+		return database.ShoppingListView{}, fmt.Errorf("toggle shopping list item: %w", err)
+	}
+
+	return list, nil
 }
 
 func (s *ReminderService) createRecurringReminder(

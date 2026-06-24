@@ -6,7 +6,7 @@ version: 1.4.0
 
 Telegram creation now supports three entry points: regular reminders, holidays, and shopping lists.
 
-Holiday drafts render the congratulation template, collect holiday name, person name, date, and reminder time, calculate age from the selected date, and save a linked reminder. The main menu now has a `🎉 Праздники` section with two-items-per-page navigation, holiday details, edit, delete, and back actions.
+Holiday drafts render the congratulation template, collect holiday name, person name, date, and reminder time, and save a linked reminder. The main menu now has a `🎉 Праздники` section with two-items-per-page navigation, holiday details, edit, delete, and back actions.
 
 Shopping list drafts render numbered items under `Необходимо купить`, append new items as the user adds them, and persist lists with item state in PostgreSQL. The main menu now has a `🛒 Списки` section with two-items-per-page navigation. Opening a list shows each item as an inline button; pressing an item toggles its persisted checked state and shows the item with a check mark and strikethrough text.
 

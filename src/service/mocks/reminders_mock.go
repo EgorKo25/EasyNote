@@ -124,6 +124,65 @@ func (mr *MockReminderCommandRepositoryMockRecorder) CancelReminder(ctx, telegra
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CancelReminder", reflect.TypeOf((*MockReminderCommandRepository)(nil).CancelReminder), ctx, telegramChatID, reminderID)
 }
 
+// CreateHoliday mocks base method.
+func (m *MockReminderCommandRepository) CreateHoliday(ctx context.Context, request database.HolidayRequest) (database.HolidayView, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateHoliday", ctx, request)
+	ret0, _ := ret[0].(database.HolidayView)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateHoliday indicates an expected call of CreateHoliday.
+func (mr *MockReminderCommandRepositoryMockRecorder) CreateHoliday(ctx, request any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateHoliday", reflect.TypeOf((*MockReminderCommandRepository)(nil).CreateHoliday), ctx, request)
+}
+
+// CreateShoppingList mocks base method.
+func (m *MockReminderCommandRepository) CreateShoppingList(ctx context.Context, telegramChatID int64, items []database.ShoppingListItem) (database.ShoppingListView, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateShoppingList", ctx, telegramChatID, items)
+	ret0, _ := ret[0].(database.ShoppingListView)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateShoppingList indicates an expected call of CreateShoppingList.
+func (mr *MockReminderCommandRepositoryMockRecorder) CreateShoppingList(ctx, telegramChatID, items any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateShoppingList", reflect.TypeOf((*MockReminderCommandRepository)(nil).CreateShoppingList), ctx, telegramChatID, items)
+}
+
+// DeleteHoliday mocks base method.
+func (m *MockReminderCommandRepository) DeleteHoliday(ctx context.Context, telegramChatID, holidayID int64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteHoliday", ctx, telegramChatID, holidayID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteHoliday indicates an expected call of DeleteHoliday.
+func (mr *MockReminderCommandRepositoryMockRecorder) DeleteHoliday(ctx, telegramChatID, holidayID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteHoliday", reflect.TypeOf((*MockReminderCommandRepository)(nil).DeleteHoliday), ctx, telegramChatID, holidayID)
+}
+
+// FindHolidaysByChat mocks base method.
+func (m *MockReminderCommandRepository) FindHolidaysByChat(ctx context.Context, telegramChatID int64, limit, offset int) ([]database.HolidayView, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindHolidaysByChat", ctx, telegramChatID, limit, offset)
+	ret0, _ := ret[0].([]database.HolidayView)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FindHolidaysByChat indicates an expected call of FindHolidaysByChat.
+func (mr *MockReminderCommandRepositoryMockRecorder) FindHolidaysByChat(ctx, telegramChatID, limit, offset any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindHolidaysByChat", reflect.TypeOf((*MockReminderCommandRepository)(nil).FindHolidaysByChat), ctx, telegramChatID, limit, offset)
+}
+
 // FindReminderHistoryByChat mocks base method.
 func (m *MockReminderCommandRepository) FindReminderHistoryByChat(ctx context.Context, telegramChatID int64, limit, offset int) ([]database.ReminderView, error) {
 	m.ctrl.T.Helper()
@@ -152,4 +211,79 @@ func (m *MockReminderCommandRepository) FindRemindersByChat(ctx context.Context,
 func (mr *MockReminderCommandRepositoryMockRecorder) FindRemindersByChat(ctx, telegramChatID, limit, offset any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindRemindersByChat", reflect.TypeOf((*MockReminderCommandRepository)(nil).FindRemindersByChat), ctx, telegramChatID, limit, offset)
+}
+
+// FindShoppingListsByChat mocks base method.
+func (m *MockReminderCommandRepository) FindShoppingListsByChat(ctx context.Context, telegramChatID int64, limit, offset int) ([]database.ShoppingListView, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindShoppingListsByChat", ctx, telegramChatID, limit, offset)
+	ret0, _ := ret[0].([]database.ShoppingListView)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FindShoppingListsByChat indicates an expected call of FindShoppingListsByChat.
+func (mr *MockReminderCommandRepositoryMockRecorder) FindShoppingListsByChat(ctx, telegramChatID, limit, offset any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindShoppingListsByChat", reflect.TypeOf((*MockReminderCommandRepository)(nil).FindShoppingListsByChat), ctx, telegramChatID, limit, offset)
+}
+
+// HolidayByID mocks base method.
+func (m *MockReminderCommandRepository) HolidayByID(ctx context.Context, telegramChatID, holidayID int64) (database.HolidayView, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "HolidayByID", ctx, telegramChatID, holidayID)
+	ret0, _ := ret[0].(database.HolidayView)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// HolidayByID indicates an expected call of HolidayByID.
+func (mr *MockReminderCommandRepositoryMockRecorder) HolidayByID(ctx, telegramChatID, holidayID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HolidayByID", reflect.TypeOf((*MockReminderCommandRepository)(nil).HolidayByID), ctx, telegramChatID, holidayID)
+}
+
+// ShoppingListByID mocks base method.
+func (m *MockReminderCommandRepository) ShoppingListByID(ctx context.Context, telegramChatID, listID int64) (database.ShoppingListView, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ShoppingListByID", ctx, telegramChatID, listID)
+	ret0, _ := ret[0].(database.ShoppingListView)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ShoppingListByID indicates an expected call of ShoppingListByID.
+func (mr *MockReminderCommandRepositoryMockRecorder) ShoppingListByID(ctx, telegramChatID, listID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ShoppingListByID", reflect.TypeOf((*MockReminderCommandRepository)(nil).ShoppingListByID), ctx, telegramChatID, listID)
+}
+
+// ToggleShoppingListItem mocks base method.
+func (m *MockReminderCommandRepository) ToggleShoppingListItem(ctx context.Context, telegramChatID, itemID int64) (database.ShoppingListView, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ToggleShoppingListItem", ctx, telegramChatID, itemID)
+	ret0, _ := ret[0].(database.ShoppingListView)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ToggleShoppingListItem indicates an expected call of ToggleShoppingListItem.
+func (mr *MockReminderCommandRepositoryMockRecorder) ToggleShoppingListItem(ctx, telegramChatID, itemID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ToggleShoppingListItem", reflect.TypeOf((*MockReminderCommandRepository)(nil).ToggleShoppingListItem), ctx, telegramChatID, itemID)
+}
+
+// UpdateHoliday mocks base method.
+func (m *MockReminderCommandRepository) UpdateHoliday(ctx context.Context, request database.HolidayUpdateRequest) (database.HolidayView, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateHoliday", ctx, request)
+	ret0, _ := ret[0].(database.HolidayView)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateHoliday indicates an expected call of UpdateHoliday.
+func (mr *MockReminderCommandRepositoryMockRecorder) UpdateHoliday(ctx, request any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateHoliday", reflect.TypeOf((*MockReminderCommandRepository)(nil).UpdateHoliday), ctx, request)
 }
