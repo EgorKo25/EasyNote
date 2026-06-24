@@ -3,6 +3,7 @@
 ## General
 - Do not change production code when the task is to add or update tests.
 - Do not create thin wrapper/helper functions that only forward arguments to another function, add no domain decision, and exist only to split lines or rename a call. Inline that logic at the call site or keep one meaningful function with real responsibility.
+- Strictly forbidden: extracting a single-use function that hides a linear fragment of its only caller and replaces the caller's local values with a long parameter list. A function must not exist merely to move SQL, object construction, formatting, validation, or a sequence of calls out of one call site. Inline such logic. Keep a single-use function only when it owns a clear independent domain or technical responsibility, establishes a real dependency boundary, or is required as a callback. Parameter grouping does not justify the extraction by itself.
 - Tests must be honest. If a test fails because of a defect in production code, leave the failing test as is and report the defect.
 - Always describe what you are going to do before starting test work.
 - Always include a matrix of completed work in the final result for test-related tasks.
@@ -12,6 +13,9 @@
 - Ask for the user's permission before changing any system applications, utilities, or files outside the repository.
 - Do not change the linter configuration.
 - Do not add `nolint` directives to production files. `nolint` is allowed only in test files.
+- After completing and pushing any task that belongs to a pull request, check the pull request CI status and report whether every required check passed.
+- Final report matrices must always be written in Russian.
+- Do not extract a helper that only wraps one or two function calls or only moves a small linear fragment out of the caller when it is used fewer than three times. Keep the logic inline unless the helper owns a real domain responsibility, establishes a real dependency boundary, or is required as a callback.
 
 ## Token Efficiency And No Background Reasoning
 

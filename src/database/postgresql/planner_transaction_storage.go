@@ -12,21 +12,19 @@ import (
 	"github.com/EgorKo25/EasyNote/src/planner"
 )
 
-type TransactionStorager = planner.TransactionStorage
-
 var (
 	errMarkReminderStatus      = errors.New("reminder status was not updated")
 	errMarkCustomDateGenerated = errors.New("custom reminder date was not marked as generated")
 	errUpdateRuleStatus        = errors.New("reminder rule status was not updated")
 )
 
-func newTransactionStorage(tx pgx.Tx) TransactionStorager {
-	return transactionStorage{tx}
+func newPlannerTransactionStorage(tx pgx.Tx) planner.TransactionStorage {
+	return plannerTransactionStorage{tx}
 }
 
-type transactionStorage struct{ pgx.Tx }
+type plannerTransactionStorage struct{ pgx.Tx }
 
-func (tx transactionStorage) LoadOccurrenceForUpdate(
+func (tx plannerTransactionStorage) LoadOccurrenceForUpdate(
 	ctx context.Context,
 	reminderID int64,
 ) (database.Reminder, error) {
@@ -54,7 +52,39 @@ func (tx transactionStorage) LoadOccurrenceForUpdate(
 	return reminder, nil
 }
 
-func (tx transactionStorage) LoadRuleForUpdate(ctx context.Context, ruleID int64) (database.ReminderRule, error) {
+func (tx plannerTransactionStorage) LoadHolidayForUpdate(
+	ctx context.Context,
+	holidayID int64,
+) (database.Holiday, error) {
+	query := `
+		SELECT id, telegram_chat_id, holiday_name, recipient_name, holiday_date, remind_at, status, last_sent_at, created_at
+		FROM holidays
+		WHERE id = $1
+		FOR UPDATE
+	`
+
+	var holiday database.Holiday
+	if err := tx.QueryRow(ctx, query, holidayID).Scan(
+		&holiday.ID,
+		&holiday.TelegramChatID,
+		&holiday.HolidayName,
+		&holiday.RecipientName,
+		&holiday.HolidayDate,
+		&holiday.RemindAt,
+		&holiday.Status,
+		&holiday.LastSentAt,
+		&holiday.CreatedAt,
+	); err != nil {
+		return database.Holiday{}, fmt.Errorf("load holiday for update: %w", err)
+	}
+
+	return holiday, nil
+}
+
+func (tx plannerTransactionStorage) LoadRuleForUpdate(
+	ctx context.Context,
+	ruleID int64,
+) (database.ReminderRule, error) {
 	query := `
 		SELECT id, type, interval_days, weekdays_mask, status, created_at, updated_at
 		FROM reminder_rules
@@ -78,7 +108,7 @@ func (tx transactionStorage) LoadRuleForUpdate(ctx context.Context, ruleID int64
 	return rule, nil
 }
 
-func (tx transactionStorage) LoadCustomDatesForUpdate(
+func (tx plannerTransactionStorage) LoadCustomDatesForUpdate(
 	ctx context.Context,
 	ruleID int64,
 ) ([]database.CustomReminderDate, error) {
@@ -114,7 +144,7 @@ func (tx transactionStorage) LoadCustomDatesForUpdate(
 	return dates, nil
 }
 
-func (tx transactionStorage) MarkOccurrence(
+func (tx plannerTransactionStorage) MarkOccurrence(
 	ctx context.Context,
 	reminderID int64,
 	status database.ReminderStatus,
@@ -147,7 +177,29 @@ func (tx transactionStorage) MarkOccurrence(
 	return nil
 }
 
-func (tx transactionStorage) CreateNextOccurrence(
+func (tx plannerTransactionStorage) MarkHolidayOccurrence(
+	ctx context.Context,
+	holiday database.Holiday,
+	sentAt *time.Time,
+) error {
+	query := `
+		UPDATE holidays
+		SET remind_at = $2,
+			last_sent_at = $3
+		WHERE id = $1
+			AND status = 'active'
+	`
+
+	if affectedRows, err := tx.Exec(ctx, query, holiday.ID, holiday.RemindAt.AddDate(1, 0, 0), sentAt); err != nil {
+		return fmt.Errorf("mark holiday occurrence: %w", err)
+	} else if affectedRows.RowsAffected() == 0 {
+		return fmt.Errorf("mark holiday occurrence: %w", database.ErrHolidayNotFound)
+	}
+
+	return nil
+}
+
+func (tx plannerTransactionStorage) CreateNextOccurrence(
 	ctx context.Context,
 	noteID int64,
 	ruleID int64,
@@ -178,7 +230,7 @@ func (tx transactionStorage) CreateNextOccurrence(
 	return reminder, nil
 }
 
-func (tx transactionStorage) MarkCustomDateGenerated(
+func (tx plannerTransactionStorage) MarkCustomDateGenerated(
 	ctx context.Context,
 	ruleID int64,
 	remindDate time.Time,
@@ -200,7 +252,7 @@ func (tx transactionStorage) MarkCustomDateGenerated(
 	return nil
 }
 
-func (tx transactionStorage) UpdateRuleStatus(
+func (tx plannerTransactionStorage) UpdateRuleStatus(
 	ctx context.Context,
 	ruleID int64,
 	status database.ReminderRuleStatus,

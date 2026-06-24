@@ -42,6 +42,21 @@ func (m *MockStorage) EXPECT() *MockStorageMockRecorder {
 	return m.recorder
 }
 
+// FindHolidaysReadyToSend mocks base method.
+func (m *MockStorage) FindHolidaysReadyToSend(ctx context.Context, now time.Time, limit int) ([]*database.ScheduledHoliday, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindHolidaysReadyToSend", ctx, now, limit)
+	ret0, _ := ret[0].([]*database.ScheduledHoliday)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FindHolidaysReadyToSend indicates an expected call of FindHolidaysReadyToSend.
+func (mr *MockStorageMockRecorder) FindHolidaysReadyToSend(ctx, now, limit any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindHolidaysReadyToSend", reflect.TypeOf((*MockStorage)(nil).FindHolidaysReadyToSend), ctx, now, limit)
+}
+
 // FindRemindersReadyToSend mocks base method.
 func (m *MockStorage) FindRemindersReadyToSend(ctx context.Context, now time.Time, limit int) ([]*database.ScheduledReminder, error) {
 	m.ctrl.T.Helper()
@@ -95,6 +110,35 @@ func (m *MockSender) EXPECT() *MockSenderMockRecorder {
 	return m.recorder
 }
 
+// DeleteReminderMessage mocks base method.
+func (m *MockSender) DeleteReminderMessage(ctx context.Context, reminder database.ScheduledReminder) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteReminderMessage", ctx, reminder)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteReminderMessage indicates an expected call of DeleteReminderMessage.
+func (mr *MockSenderMockRecorder) DeleteReminderMessage(ctx, reminder any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteReminderMessage", reflect.TypeOf((*MockSender)(nil).DeleteReminderMessage), ctx, reminder)
+}
+
+// SendHoliday mocks base method.
+func (m *MockSender) SendHoliday(ctx context.Context, holiday database.ScheduledHoliday) (int, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SendHoliday", ctx, holiday)
+	ret0, _ := ret[0].(int)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SendHoliday indicates an expected call of SendHoliday.
+func (mr *MockSenderMockRecorder) SendHoliday(ctx, holiday any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendHoliday", reflect.TypeOf((*MockSender)(nil).SendHoliday), ctx, holiday)
+}
+
 // SendReminder mocks base method.
 func (m *MockSender) SendReminder(ctx context.Context, reminder database.ScheduledReminder) (int, error) {
 	m.ctrl.T.Helper()
@@ -132,6 +176,20 @@ func NewMockPlanner(ctrl *gomock.Controller) *MockPlanner {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockPlanner) EXPECT() *MockPlannerMockRecorder {
 	return m.recorder
+}
+
+// CompleteHoliday mocks base method.
+func (m *MockPlanner) CompleteHoliday(ctx context.Context, holidayID int64, sentAt *time.Time) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CompleteHoliday", ctx, holidayID, sentAt)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CompleteHoliday indicates an expected call of CompleteHoliday.
+func (mr *MockPlannerMockRecorder) CompleteHoliday(ctx, holidayID, sentAt any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CompleteHoliday", reflect.TypeOf((*MockPlanner)(nil).CompleteHoliday), ctx, holidayID, sentAt)
 }
 
 // CompleteOccurrence mocks base method.

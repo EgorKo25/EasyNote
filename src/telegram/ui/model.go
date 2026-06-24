@@ -3,12 +3,16 @@ package ui
 import (
 	"fmt"
 	"time"
+
+	"github.com/EgorKo25/EasyNote/src/database"
 )
 
 type Draft struct {
+	Kind          DraftKind
 	Title         string
 	Description   string
 	Notice        string
+	ShoppingItems []database.ShoppingListItem
 	Date          time.Time
 	Hour          int
 	Minute        int

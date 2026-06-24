@@ -16,11 +16,22 @@ import (
 var (
 	errCreateReminderRepository = errors.New("create reminder repository")
 	errCancelReminderRepository = errors.New("cancel reminder repository")
+	errHolidayRepository        = errors.New("holiday repository")
+	errShoppingRepository       = errors.New("shopping repository")
+	errUpdateReminderRepository = errors.New("update reminder repository")
 	errExpectedTitleEmpty       = errors.New("create reminder: reminder title is empty")
 	errExpectedCreateReminder   = errors.New("create reminder: create reminder repository")
 	errExpectedCancelReminder   = errors.New("delete reminder: cancel reminder repository")
 	errExpectedReminderNotFound = errors.New("delete reminder: reminder not found")
 )
+
+func errorText(err error) string {
+	if err == nil {
+		return ""
+	}
+
+	return err.Error()
+}
 
 func TestReminderServiceCreatesReminder(t *testing.T) {
 	t.Parallel()
@@ -153,6 +164,556 @@ func TestReminderServiceCreatesReminder(t *testing.T) {
 
 			require.NoError(t, err)
 			require.Equal(t, test.expected.reminder, reminder)
+		})
+	}
+}
+
+func TestReminderServiceUpdatesReminder(t *testing.T) {
+	t.Parallel()
+
+	chatID := int64(100)
+	reminderID := int64(55)
+	remindAt := time.Date(2026, 6, 2, 9, 30, 0, 0, time.Local)
+
+	tests := []struct {
+		name     string
+		title    string
+		desc     string
+		before   func(repository *mocks.MockReminderCommandRepository)
+		expected struct {
+			reminder        database.ReminderView
+			expectedErrText string
+		}
+	}{
+		{
+			name:  "updates reminder with description",
+			title: "Pay rent",
+			desc:  "Before lunch",
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					UpdateReminder(gomock.Any(), chatID, reminderID, "Pay rent", "Before lunch", remindAt).
+					Return(database.ReminderView{ID: reminderID, Title: "Pay rent", Description: "Before lunch"}, nil).
+					Times(1)
+			},
+			expected: struct {
+				reminder        database.ReminderView
+				expectedErrText string
+			}{reminder: database.ReminderView{ID: reminderID, Title: "Pay rent", Description: "Before lunch"}},
+		},
+		{
+			name:  "trims title before update",
+			title: "  Pay rent  ",
+			desc:  "Before lunch",
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					UpdateReminder(gomock.Any(), chatID, reminderID, "Pay rent", "Before lunch", remindAt).
+					Return(database.ReminderView{ID: reminderID, Title: "Pay rent", Description: "Before lunch"}, nil).
+					Times(1)
+			},
+			expected: struct {
+				reminder        database.ReminderView
+				expectedErrText string
+			}{reminder: database.ReminderView{ID: reminderID, Title: "Pay rent", Description: "Before lunch"}},
+		},
+		{
+			name:  "trims description before update",
+			title: "Pay rent",
+			desc:  "  Before lunch  ",
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					UpdateReminder(gomock.Any(), chatID, reminderID, "Pay rent", "Before lunch", remindAt).
+					Return(database.ReminderView{ID: reminderID, Title: "Pay rent", Description: "Before lunch"}, nil).
+					Times(1)
+			},
+			expected: struct {
+				reminder        database.ReminderView
+				expectedErrText string
+			}{reminder: database.ReminderView{ID: reminderID, Title: "Pay rent", Description: "Before lunch"}},
+		},
+		{
+			name:  "updates reminder without description",
+			title: "Pay rent",
+			desc:  "",
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					UpdateReminder(gomock.Any(), chatID, reminderID, "Pay rent", "", remindAt).
+					Return(database.ReminderView{ID: reminderID, Title: "Pay rent"}, nil).
+					Times(1)
+			},
+			expected: struct {
+				reminder        database.ReminderView
+				expectedErrText string
+			}{reminder: database.ReminderView{ID: reminderID, Title: "Pay rent"}},
+		},
+		{
+			name:  "empty title returns validation error",
+			title: " ",
+			desc:  "Before lunch",
+			before: func(_ *mocks.MockReminderCommandRepository) {
+			},
+			expected: struct {
+				reminder        database.ReminderView
+				expectedErrText string
+			}{expectedErrText: "update reminder: reminder title is empty"},
+		},
+		{
+			name:  "repository update error is returned",
+			title: "Pay rent",
+			desc:  "Before lunch",
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					UpdateReminder(gomock.Any(), chatID, reminderID, "Pay rent", "Before lunch", remindAt).
+					Return(database.ReminderView{}, errUpdateReminderRepository).
+					Times(1)
+			},
+			expected: struct {
+				reminder        database.ReminderView
+				expectedErrText string
+			}{expectedErrText: "update reminder: update reminder repository"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctrl := gomock.NewController(t)
+			repository := mocks.NewMockReminderCommandRepository(ctrl)
+			test.before(repository)
+
+			reminderService := service.NewReminderService(repository, mocks.NewMockReminderCreationPlanner(ctrl))
+			reminder, err := reminderService.UpdateReminder(
+				context.Background(),
+				chatID,
+				reminderID,
+				test.title,
+				test.desc,
+				remindAt,
+			)
+
+			if test.expected.expectedErrText != "" {
+				require.EqualError(t, err, test.expected.expectedErrText)
+				require.Equal(t, test.expected.reminder, reminder)
+
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, test.expected.reminder, reminder)
+		})
+	}
+}
+
+func TestReminderServiceManagesHolidays(t *testing.T) {
+	t.Parallel()
+
+	chatID := int64(100)
+	holidayID := int64(7)
+	holidayDate := time.Date(2026, 6, 2, 0, 0, 0, 0, time.UTC)
+	remindAt := time.Date(2026, 6, 2, 10, 15, 0, 0, time.UTC)
+
+	tests := []struct {
+		name     string
+		before   func(repository *mocks.MockReminderCommandRepository)
+		action   func(reminderService *service.ReminderService) (string, string)
+		expected struct {
+			result          string
+			expectedErrText string
+		}
+	}{
+		{
+			name: "create holiday trims name fields and returns created holiday",
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					CreateHoliday(gomock.Any(), database.HolidayRequest{
+						TelegramChatID: chatID,
+						HolidayName:    "Birthday",
+						RecipientName:  "Oleg",
+						HolidayDate:    holidayDate,
+						RemindAt:       remindAt,
+					}).
+					Return(database.HolidayView{ID: holidayID, HolidayName: "Birthday"}, nil).
+					Times(1)
+			},
+			action: func(reminderService *service.ReminderService) (string, string) {
+				holiday, err := reminderService.CreateHoliday(context.Background(), database.HolidayRequest{
+					TelegramChatID: chatID,
+					HolidayName:    " Birthday ",
+					RecipientName:  " Oleg ",
+					HolidayDate:    holidayDate,
+					RemindAt:       remindAt,
+				})
+
+				return holiday.HolidayName, errorText(err)
+			},
+			expected: struct {
+				result          string
+				expectedErrText string
+			}{result: "Birthday"},
+		},
+		{
+			name: "update holiday trims name fields and returns updated holiday",
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					UpdateHoliday(gomock.Any(), database.HolidayUpdateRequest{
+						ID: holidayID,
+						HolidayRequest: database.HolidayRequest{
+							TelegramChatID: chatID,
+							HolidayName:    "Anniversary",
+							RecipientName:  "Anna",
+							HolidayDate:    holidayDate,
+							RemindAt:       remindAt,
+						},
+					}).
+					Return(database.HolidayView{ID: holidayID, HolidayName: "Anniversary"}, nil).
+					Times(1)
+			},
+			action: func(reminderService *service.ReminderService) (string, string) {
+				holiday, err := reminderService.UpdateHoliday(context.Background(), database.HolidayUpdateRequest{
+					ID: holidayID,
+					HolidayRequest: database.HolidayRequest{
+						TelegramChatID: chatID,
+						HolidayName:    " Anniversary ",
+						RecipientName:  " Anna ",
+						HolidayDate:    holidayDate,
+						RemindAt:       remindAt,
+					},
+				})
+
+				return holiday.HolidayName, errorText(err)
+			},
+			expected: struct {
+				result          string
+				expectedErrText string
+			}{result: "Anniversary"},
+		},
+		{
+			name: "find holidays returns repository page",
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					FindHolidaysByChat(gomock.Any(), chatID, 2, 4).
+					Return([]database.HolidayView{{ID: 1}, {ID: 2}}, nil).
+					Times(1)
+			},
+			action: func(reminderService *service.ReminderService) (string, string) {
+				holidays, err := reminderService.FindHolidaysByChat(context.Background(), chatID, 2, 4)
+				if len(holidays) == 2 {
+					return "two holidays", errorText(err)
+				}
+
+				return "unexpected holidays", errorText(err)
+			},
+			expected: struct {
+				result          string
+				expectedErrText string
+			}{result: "two holidays"},
+		},
+		{
+			name: "holiday by id returns repository holiday",
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					HolidayByID(gomock.Any(), chatID, holidayID).
+					Return(database.HolidayView{ID: holidayID, RecipientName: "Oleg"}, nil).
+					Times(1)
+			},
+			action: func(reminderService *service.ReminderService) (string, string) {
+				holiday, err := reminderService.HolidayByID(context.Background(), chatID, holidayID)
+
+				return holiday.RecipientName, errorText(err)
+			},
+			expected: struct {
+				result          string
+				expectedErrText string
+			}{result: "Oleg"},
+		},
+		{
+			name: "delete holiday returns nil after repository delete",
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					DeleteHoliday(gomock.Any(), chatID, holidayID).
+					Return(nil).
+					Times(1)
+			},
+			action: func(reminderService *service.ReminderService) (string, string) {
+				err := reminderService.DeleteHoliday(context.Background(), chatID, holidayID)
+
+				return "deleted", errorText(err)
+			},
+			expected: struct {
+				result          string
+				expectedErrText string
+			}{result: "deleted"},
+		},
+		{
+			name: "create holiday repository error is wrapped",
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					CreateHoliday(gomock.Any(), gomock.Any()).
+					Return(database.HolidayView{}, errHolidayRepository).
+					Times(1)
+			},
+			action: func(reminderService *service.ReminderService) (string, string) {
+				holiday, err := reminderService.CreateHoliday(context.Background(), database.HolidayRequest{
+					TelegramChatID: chatID,
+					HolidayName:    "Birthday",
+					RecipientName:  "Oleg",
+					HolidayDate:    holidayDate,
+					RemindAt:       remindAt,
+				})
+
+				return holiday.HolidayName, errorText(err)
+			},
+			expected: struct {
+				result          string
+				expectedErrText string
+			}{expectedErrText: "create holiday: holiday repository"},
+		},
+		{
+			name: "find holidays repository error is wrapped",
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					FindHolidaysByChat(gomock.Any(), chatID, 2, 4).
+					Return(nil, errHolidayRepository).
+					Times(1)
+			},
+			action: func(reminderService *service.ReminderService) (string, string) {
+				holidays, err := reminderService.FindHolidaysByChat(context.Background(), chatID, 2, 4)
+				if len(holidays) == 0 {
+					return "", errorText(err)
+				}
+
+				return "unexpected holidays", errorText(err)
+			},
+			expected: struct {
+				result          string
+				expectedErrText string
+			}{expectedErrText: "find holidays by chat: holiday repository"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctrl := gomock.NewController(t)
+			repository := mocks.NewMockReminderCommandRepository(ctrl)
+			planner := mocks.NewMockReminderCreationPlanner(ctrl)
+
+			test.before(repository)
+
+			reminderService := service.NewReminderService(repository, planner)
+			result, errText := test.action(reminderService)
+
+			if test.expected.expectedErrText != "" {
+				require.Equal(t, test.expected.expectedErrText, errText)
+				require.Equal(t, test.expected.result, result)
+
+				return
+			}
+
+			require.Empty(t, errText)
+			require.Equal(t, test.expected.result, result)
+		})
+	}
+}
+
+func TestReminderServiceManagesShoppingLists(t *testing.T) {
+	t.Parallel()
+
+	chatID := int64(100)
+	listID := int64(9)
+	itemID := int64(10)
+	items := []database.ShoppingListItem{{Text: "Milk", Position: 1}, {Text: "Bread", Position: 2}}
+	unexpectedList := "unexpected list"
+
+	tests := []struct {
+		name     string
+		before   func(repository *mocks.MockReminderCommandRepository)
+		action   func(reminderService *service.ReminderService) (string, string)
+		expected struct {
+			result          string
+			expectedErrText string
+		}
+	}{
+		{
+			name: "create shopping list returns repository list",
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					CreateShoppingList(gomock.Any(), chatID, items).
+					Return(database.ShoppingListView{ID: listID, Items: items}, nil).
+					Times(1)
+			},
+			action: func(reminderService *service.ReminderService) (string, string) {
+				list, err := reminderService.CreateShoppingList(context.Background(), chatID, items)
+				if len(list.Items) == 2 {
+					return "two items", errorText(err)
+				}
+
+				return "unexpected items", errorText(err)
+			},
+			expected: struct {
+				result          string
+				expectedErrText string
+			}{result: "two items"},
+		},
+		{
+			name: "find shopping lists returns repository page",
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					FindShoppingListsByChat(gomock.Any(), chatID, 2, 4).
+					Return([]database.ShoppingListView{{ID: 1}, {ID: 2}}, nil).
+					Times(1)
+			},
+			action: func(reminderService *service.ReminderService) (string, string) {
+				lists, err := reminderService.FindShoppingListsByChat(context.Background(), chatID, 2, 4)
+				if len(lists) == 2 {
+					return "two lists", errorText(err)
+				}
+
+				return "unexpected lists", errorText(err)
+			},
+			expected: struct {
+				result          string
+				expectedErrText string
+			}{result: "two lists"},
+		},
+		{
+			name: "shopping list by id returns repository list",
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					ShoppingListByID(gomock.Any(), chatID, listID).
+					Return(database.ShoppingListView{ID: listID, Items: items}, nil).
+					Times(1)
+			},
+			action: func(reminderService *service.ReminderService) (string, string) {
+				list, err := reminderService.ShoppingListByID(context.Background(), chatID, listID)
+				if list.ID == listID {
+					return "loaded list", errorText(err)
+				}
+
+				return unexpectedList, errorText(err)
+			},
+			expected: struct {
+				result          string
+				expectedErrText string
+			}{result: "loaded list"},
+		},
+		{
+			name: "toggle shopping item returns updated repository list",
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					ToggleShoppingListItem(gomock.Any(), chatID, itemID).
+					Return(database.ShoppingListView{ID: listID, Items: []database.ShoppingListItem{{
+						ID:   itemID,
+						Text: "Milk",
+						Done: true,
+					}}}, nil).
+					Times(1)
+			},
+			action: func(reminderService *service.ReminderService) (string, string) {
+				list, err := reminderService.ToggleShoppingListItem(context.Background(), chatID, itemID)
+				if len(list.Items) == 1 && list.Items[0].Done {
+					return "item toggled", errorText(err)
+				}
+
+				return "unexpected item", errorText(err)
+			},
+			expected: struct {
+				result          string
+				expectedErrText string
+			}{result: "item toggled"},
+		},
+		{
+			name: "create shopping list with empty items is delegated",
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					CreateShoppingList(gomock.Any(), chatID, []database.ShoppingListItem{}).
+					Return(database.ShoppingListView{ID: listID}, nil).
+					Times(1)
+			},
+			action: func(reminderService *service.ReminderService) (string, string) {
+				list, err := reminderService.CreateShoppingList(
+					context.Background(),
+					chatID,
+					[]database.ShoppingListItem{},
+				)
+				if list.ID == listID {
+					return "empty list", errorText(err)
+				}
+
+				return unexpectedList, errorText(err)
+			},
+			expected: struct {
+				result          string
+				expectedErrText string
+			}{result: "empty list"},
+		},
+		{
+			name: "create shopping list repository error is wrapped",
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					CreateShoppingList(gomock.Any(), chatID, items).
+					Return(database.ShoppingListView{}, errShoppingRepository).
+					Times(1)
+			},
+			action: func(reminderService *service.ReminderService) (string, string) {
+				list, err := reminderService.CreateShoppingList(context.Background(), chatID, items)
+				if list.ID == 0 {
+					return "", errorText(err)
+				}
+
+				return unexpectedList, errorText(err)
+			},
+			expected: struct {
+				result          string
+				expectedErrText string
+			}{expectedErrText: "create shopping list: shopping repository"},
+		},
+		{
+			name: "toggle shopping item repository error is wrapped",
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					ToggleShoppingListItem(gomock.Any(), chatID, itemID).
+					Return(database.ShoppingListView{}, errShoppingRepository).
+					Times(1)
+			},
+			action: func(reminderService *service.ReminderService) (string, string) {
+				list, err := reminderService.ToggleShoppingListItem(context.Background(), chatID, itemID)
+				if list.ID == 0 {
+					return "", errorText(err)
+				}
+
+				return unexpectedList, errorText(err)
+			},
+			expected: struct {
+				result          string
+				expectedErrText string
+			}{expectedErrText: "toggle shopping list item: shopping repository"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctrl := gomock.NewController(t)
+			repository := mocks.NewMockReminderCommandRepository(ctrl)
+			planner := mocks.NewMockReminderCreationPlanner(ctrl)
+
+			test.before(repository)
+
+			reminderService := service.NewReminderService(repository, planner)
+			result, errText := test.action(reminderService)
+
+			if test.expected.expectedErrText != "" {
+				require.Equal(t, test.expected.expectedErrText, errText)
+				require.Equal(t, test.expected.result, result)
+
+				return
+			}
+
+			require.Empty(t, errText)
+			require.Equal(t, test.expected.result, result)
 		})
 	}
 }
