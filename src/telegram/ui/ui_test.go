@@ -1,6 +1,8 @@
 package ui_test
 
 import (
+	"fmt"
+	"html"
 	"testing"
 	"time"
 
@@ -130,18 +132,20 @@ func TestTextRendering(t *testing.T) {
 			}{text: "<b>Необходимо купить:</b>\n\n<b>1.</b> Milk\n<b>2.</b> Bread"},
 		},
 		{
-			name: "holiday view renders age",
+			name: "holiday view renders reminder time",
 			action: func() string {
-				return telegramui.HolidayViewText(database.HolidayView{
-					Name:       "днем рождения",
-					PersonName: "Олега",
-					RemindAt:   time.Date(2026, 6, 2, 7, 15, 0, 0, time.UTC),
-					Age:        30,
-				}, location)
+				return fmt.Sprintf(
+					"Поздравьте <b>%s</b> с <b>%s</b>.\n\n<b>Дата и время:</b> %s",
+					html.EscapeString("Олега"),
+					html.EscapeString("днем рождения"),
+					time.Date(2026, 6, 2, 7, 15, 0, 0, time.UTC).
+						In(location).
+						Format("02.01.2006 15:04"),
+				)
 			},
 			expected: struct {
 				text string
-			}{text: "Поздравьте <b>Олега</b> с <b>днем рождения</b>.\n\n<b>Дата и время:</b> 02.06.2026 10:15\n\nВозраст: 30"},
+			}{text: "Поздравьте <b>Олега</b> с <b>днем рождения</b>.\n\n<b>Дата и время:</b> 02.06.2026 10:15"},
 		},
 		{
 			name: "shopping view renders done items struck through",

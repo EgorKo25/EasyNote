@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -14,12 +13,7 @@ import (
 
 func (d *Database) CreateHoliday(
 	ctx context.Context,
-	telegramChatID int64,
-	name string,
-	personName string,
-	holidayDate time.Time,
-	remindAt time.Time,
-	age int,
+	request database.HolidayRequest,
 ) (database.HolidayView, error) {
 	transaction, err := d.pool.Begin(ctx)
 	if err != nil {
@@ -32,9 +26,9 @@ func (d *Database) CreateHoliday(
 	if err = transaction.QueryRow(
 		ctx,
 		"INSERT INTO notes (telegram_chat_id, title, description) VALUES ($1, $2, $3) RETURNING id",
-		telegramChatID,
-		holidayReminderTitle(name, personName),
-		holidayReminderDescription(age),
+		request.TelegramChatID,
+		holidayReminderTitle(request.Name, request.PersonName),
+		"",
 	).Scan(&noteID); err != nil {
 		return database.HolidayView{}, fmt.Errorf("create holiday note: %w", err)
 	}
@@ -44,27 +38,26 @@ func (d *Database) CreateHoliday(
 		ctx,
 		"INSERT INTO reminders (note_id, remind_at) VALUES ($1, $2) RETURNING id",
 		noteID,
-		remindAt,
+		request.RemindAt,
 	).Scan(&reminderID); err != nil {
 		return database.HolidayView{}, fmt.Errorf("create holiday reminder: %w", err)
 	}
 
 	query := `
-		INSERT INTO holidays (telegram_chat_id, reminder_id, name, person_name, holiday_date, age)
-		VALUES ($1, $2, $3, $4, $5, $6)
-		RETURNING id, telegram_chat_id, reminder_id, name, person_name, holiday_date, age, created_at
+		INSERT INTO holidays (telegram_chat_id, reminder_id, name, person_name, holiday_date)
+		VALUES ($1, $2, $3, $4, $5)
+		RETURNING id, telegram_chat_id, reminder_id, name, person_name, holiday_date, created_at
 	`
 
 	var holiday database.HolidayView
 	if err = transaction.QueryRow(
 		ctx,
 		query,
-		telegramChatID,
+		request.TelegramChatID,
 		reminderID,
-		strings.TrimSpace(name),
-		strings.TrimSpace(personName),
-		holidayDate,
-		age,
+		strings.TrimSpace(request.Name),
+		strings.TrimSpace(request.PersonName),
+		request.HolidayDate,
 	).Scan(
 		&holiday.ID,
 		&holiday.TelegramChatID,
@@ -72,7 +65,6 @@ func (d *Database) CreateHoliday(
 		&holiday.Name,
 		&holiday.PersonName,
 		&holiday.HolidayDate,
-		&holiday.Age,
 		&holiday.CreatedAt,
 	); err != nil {
 		return database.HolidayView{}, fmt.Errorf("create holiday: %w", err)
@@ -82,20 +74,14 @@ func (d *Database) CreateHoliday(
 		return database.HolidayView{}, fmt.Errorf("commit create holiday transaction: %w", err)
 	}
 
-	holiday.RemindAt = remindAt
+	holiday.RemindAt = request.RemindAt
 
 	return holiday, nil
 }
 
 func (d *Database) UpdateHoliday(
 	ctx context.Context,
-	telegramChatID int64,
-	holidayID int64,
-	name string,
-	personName string,
-	holidayDate time.Time,
-	remindAt time.Time,
-	age int,
+	request database.HolidayUpdateRequest,
 ) (database.HolidayView, error) {
 	transaction, err := d.pool.Begin(ctx)
 	if err != nil {
@@ -104,7 +90,7 @@ func (d *Database) UpdateHoliday(
 
 	defer rollbackTransaction(ctx, transaction, "update holiday")
 
-	holiday, err := d.holidayByIDTx(ctx, transaction, telegramChatID, holidayID)
+	holiday, err := d.holidayByIDTx(ctx, transaction, request.TelegramChatID, request.ID)
 	if err != nil {
 		return database.HolidayView{}, err
 	}
@@ -122,8 +108,8 @@ func (d *Database) UpdateHoliday(
 		ctx,
 		noteQuery,
 		holiday.ReminderID,
-		holidayReminderTitle(name, personName),
-		holidayReminderDescription(age),
+		holidayReminderTitle(request.Name, request.PersonName),
+		"",
 	); err != nil {
 		return database.HolidayView{}, fmt.Errorf("update holiday note: %w", err)
 	}
@@ -131,7 +117,7 @@ func (d *Database) UpdateHoliday(
 	if _, err = transaction.Exec(
 		ctx,
 		"UPDATE reminders SET remind_at = $1 WHERE id = $2",
-		remindAt,
+		request.RemindAt,
 		holiday.ReminderID,
 	); err != nil {
 		return database.HolidayView{}, fmt.Errorf("update holiday reminder: %w", err)
@@ -141,22 +127,20 @@ func (d *Database) UpdateHoliday(
 		UPDATE holidays
 		SET name = $3,
 			person_name = $4,
-			holiday_date = $5,
-			age = $6
+			holiday_date = $5
 		WHERE telegram_chat_id = $1
 			AND id = $2
-		RETURNING id, telegram_chat_id, reminder_id, name, person_name, holiday_date, age, created_at
+		RETURNING id, telegram_chat_id, reminder_id, name, person_name, holiday_date, created_at
 	`
 
 	if err = transaction.QueryRow(
 		ctx,
 		query,
-		telegramChatID,
-		holidayID,
-		strings.TrimSpace(name),
-		strings.TrimSpace(personName),
-		holidayDate,
-		age,
+		request.TelegramChatID,
+		request.ID,
+		strings.TrimSpace(request.Name),
+		strings.TrimSpace(request.PersonName),
+		request.HolidayDate,
 	).Scan(
 		&holiday.ID,
 		&holiday.TelegramChatID,
@@ -164,7 +148,6 @@ func (d *Database) UpdateHoliday(
 		&holiday.Name,
 		&holiday.PersonName,
 		&holiday.HolidayDate,
-		&holiday.Age,
 		&holiday.CreatedAt,
 	); err != nil {
 		return database.HolidayView{}, fmt.Errorf("update holiday: %w", err)
@@ -174,7 +157,7 @@ func (d *Database) UpdateHoliday(
 		return database.HolidayView{}, fmt.Errorf("commit update holiday transaction: %w", err)
 	}
 
-	holiday.RemindAt = remindAt
+	holiday.RemindAt = request.RemindAt
 
 	return holiday, nil
 }
@@ -194,7 +177,6 @@ func (d *Database) FindHolidaysByChat(
 			h.person_name,
 			h.holiday_date,
 			r.remind_at,
-			h.age,
 			h.created_at
 		FROM holidays h
 		JOIN reminders r ON r.id = h.reminder_id
@@ -407,7 +389,6 @@ func (d *Database) holidayByIDTx(
 			h.person_name,
 			h.holiday_date,
 			r.remind_at,
-			h.age,
 			h.created_at
 		FROM holidays h
 		JOIN reminders r ON r.id = h.reminder_id
@@ -424,7 +405,6 @@ func (d *Database) holidayByIDTx(
 		&holiday.PersonName,
 		&holiday.HolidayDate,
 		&holiday.RemindAt,
-		&holiday.Age,
 		&holiday.CreatedAt,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -450,7 +430,6 @@ func scanHolidays(rows pgx.Rows) ([]database.HolidayView, error) {
 			&holiday.PersonName,
 			&holiday.HolidayDate,
 			&holiday.RemindAt,
-			&holiday.Age,
 			&holiday.CreatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan holiday: %w", err)
@@ -468,14 +447,6 @@ func scanHolidays(rows pgx.Rows) ([]database.HolidayView, error) {
 
 func holidayReminderTitle(name string, personName string) string {
 	return fmt.Sprintf("Поздравьте %s с %s.", strings.TrimSpace(personName), strings.TrimSpace(name))
-}
-
-func holidayReminderDescription(age int) string {
-	if age == 0 {
-		return ""
-	}
-
-	return fmt.Sprintf("Возраст: %d", age)
 }
 
 func (d *Database) shoppingListByID(

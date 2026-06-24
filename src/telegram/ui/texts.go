@@ -226,17 +226,11 @@ func ReminderViewText(reminder database.ReminderView, location *time.Location) s
 }
 
 func HolidayViewText(holiday database.HolidayView, location *time.Location) string {
-	ageText := ""
-	if holiday.Age > 0 {
-		ageText = fmt.Sprintf("\n\nВозраст: %d", holiday.Age)
-	}
-
 	return fmt.Sprintf(
-		"Поздравьте <b>%s</b> с <b>%s</b>.\n\n<b>Дата и время:</b> %s%s",
+		"Поздравьте <b>%s</b> с <b>%s</b>.\n\n<b>Дата и время:</b> %s",
 		html.EscapeString(holiday.PersonName),
 		html.EscapeString(holiday.Name),
 		holiday.RemindAt.In(location).Format("02.01.2006 15:04"),
-		ageText,
 	)
 }
 
