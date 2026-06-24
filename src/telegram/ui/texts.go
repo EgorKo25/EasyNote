@@ -225,15 +225,6 @@ func ReminderViewText(reminder database.ReminderView, location *time.Location) s
 	)
 }
 
-func HolidayViewText(holiday database.HolidayView, location *time.Location) string {
-	return fmt.Sprintf(
-		"Поздравьте <b>%s</b> с <b>%s</b>.\n\n<b>Дата и время:</b> %s",
-		html.EscapeString(holiday.PersonName),
-		html.EscapeString(holiday.Name),
-		holiday.RemindAt.In(location).Format("02.01.2006 15:04"),
-	)
-}
-
 func ShoppingListViewText(list database.ShoppingListView) string {
 	items := make([]string, 0, len(list.Items))
 	for index, item := range list.Items {

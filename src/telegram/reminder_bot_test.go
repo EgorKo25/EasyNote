@@ -1339,7 +1339,7 @@ func TestReminderBotHandlesMessages(t *testing.T) {
 			bot := &ReminderBot{
 				bot:         botAPI,
 				service:     service,
-				repository:  repository,
+				userRepo:    repository,
 				draftByChat: map[int64]reminderDraft{chatID: test.draft},
 				uiByChat:    uiByChat,
 			}
@@ -1628,7 +1628,7 @@ func TestReminderBotRunsReplyMessageCommands(t *testing.T) {
 			bot := &ReminderBot{
 				bot:            botAPI,
 				service:        service,
-				repository:     repository,
+				userRepo:       repository,
 				draftByChat:    make(map[int64]reminderDraft),
 				uiByChat:       make(map[int64]int),
 				locationByChat: make(map[int64]*time.Location),
@@ -1918,7 +1918,7 @@ func TestReminderBotHandlesReplyNavigationState(t *testing.T) {
 			bot := &ReminderBot{
 				bot:            botAPI,
 				service:        service,
-				repository:     repository,
+				userRepo:       repository,
 				draftByChat:    make(map[int64]reminderDraft),
 				uiByChat:       make(map[int64]int),
 				locationByChat: make(map[int64]*time.Location),
@@ -2315,7 +2315,7 @@ func TestReminderBotHandlesHolidayAndShoppingViews(t *testing.T) {
 			bot := &ReminderBot{
 				bot:            botAPI,
 				service:        service,
-				repository:     repository,
+				userRepo:       repository,
 				draftByChat:    make(map[int64]reminderDraft),
 				uiByChat:       make(map[int64]int),
 				locationByChat: make(map[int64]*time.Location),
@@ -2434,7 +2434,7 @@ func TestReminderBotHandlesUpdates(t *testing.T) {
 
 			bot := &ReminderBot{
 				bot:            botAPI,
-				repository:     repository,
+				userRepo:       repository,
 				draftByChat:    make(map[int64]reminderDraft),
 				uiByChat:       make(map[int64]int),
 				locationByChat: make(map[int64]*time.Location),
@@ -2929,7 +2929,7 @@ func TestReminderBotAppliesSettingsTextInput(t *testing.T) {
 
 			bot := &ReminderBot{
 				service:        service,
-				repository:     repository,
+				userRepo:       repository,
 				draftByChat:    map[int64]reminderDraft{chatID: test.draft},
 				locationByChat: make(map[int64]*time.Location),
 			}
@@ -3105,7 +3105,7 @@ func TestReminderBotHandlesReminderCallbacks(t *testing.T) {
 			bot := &ReminderBot{
 				bot:         botAPI,
 				service:     service,
-				repository:  repository,
+				userRepo:    repository,
 				draftByChat: map[int64]reminderDraft{},
 				uiByChat:    map[int64]int{chatID: messageID},
 			}
@@ -3279,10 +3279,10 @@ func TestReminderBotAcknowledgesDeliveredReminders(t *testing.T) {
 			require.NoError(t, err)
 
 			bot := &ReminderBot{
-				bot:        botAPI,
-				service:    service,
-				repository: repository,
-				uiByChat:   map[int64]int{chatID: messageID},
+				bot:      botAPI,
+				service:  service,
+				userRepo: repository,
+				uiByChat: map[int64]int{chatID: messageID},
 			}
 
 			err = bot.acknowledgeReminder(t.Context(), chatID, messageID, test.data, test.prefix, test.status)
@@ -3541,7 +3541,7 @@ func TestReminderBotHandlesSettingsCallbacks(t *testing.T) {
 			bot := &ReminderBot{
 				bot:            botAPI,
 				service:        service,
-				repository:     repository,
+				userRepo:       repository,
 				draftByChat:    map[int64]reminderDraft{chatID: {}},
 				uiByChat:       map[int64]int{chatID: messageID},
 				locationByChat: make(map[int64]*time.Location),
@@ -3725,7 +3725,7 @@ func TestReminderBotSendsListsAndSettingsScreens(t *testing.T) {
 			bot := &ReminderBot{
 				bot:            botAPI,
 				service:        service,
-				repository:     repository,
+				userRepo:       repository,
 				draftByChat:    map[int64]reminderDraft{},
 				uiByChat:       map[int64]int{},
 				locationByChat: make(map[int64]*time.Location),
@@ -4070,7 +4070,7 @@ func TestReminderBotSavesDraft(t *testing.T) {
 			bot := &ReminderBot{
 				bot:         botAPI,
 				service:     service,
-				repository:  repository,
+				userRepo:    repository,
 				draftByChat: map[int64]reminderDraft{chatID: test.draft},
 				uiByChat:    map[int64]int{chatID: messageID},
 			}
