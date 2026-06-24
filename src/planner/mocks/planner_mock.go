@@ -141,6 +141,21 @@ func (mr *MockTransactionStorageMockRecorder) LoadCustomDatesForUpdate(ctx, rule
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LoadCustomDatesForUpdate", reflect.TypeOf((*MockTransactionStorage)(nil).LoadCustomDatesForUpdate), ctx, ruleID)
 }
 
+// LoadHolidayForUpdate mocks base method.
+func (m *MockTransactionStorage) LoadHolidayForUpdate(ctx context.Context, holidayID int64) (database.Holiday, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "LoadHolidayForUpdate", ctx, holidayID)
+	ret0, _ := ret[0].(database.Holiday)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// LoadHolidayForUpdate indicates an expected call of LoadHolidayForUpdate.
+func (mr *MockTransactionStorageMockRecorder) LoadHolidayForUpdate(ctx, holidayID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LoadHolidayForUpdate", reflect.TypeOf((*MockTransactionStorage)(nil).LoadHolidayForUpdate), ctx, holidayID)
+}
+
 // LoadOccurrenceForUpdate mocks base method.
 func (m *MockTransactionStorage) LoadOccurrenceForUpdate(ctx context.Context, reminderID int64) (database.Reminder, error) {
 	m.ctrl.T.Helper()
@@ -183,6 +198,20 @@ func (m *MockTransactionStorage) MarkCustomDateGenerated(ctx context.Context, ru
 func (mr *MockTransactionStorageMockRecorder) MarkCustomDateGenerated(ctx, ruleID, remindDate, reminderID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkCustomDateGenerated", reflect.TypeOf((*MockTransactionStorage)(nil).MarkCustomDateGenerated), ctx, ruleID, remindDate, reminderID)
+}
+
+// MarkHolidayOccurrence mocks base method.
+func (m *MockTransactionStorage) MarkHolidayOccurrence(ctx context.Context, holiday database.Holiday, sentAt *time.Time) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MarkHolidayOccurrence", ctx, holiday, sentAt)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// MarkHolidayOccurrence indicates an expected call of MarkHolidayOccurrence.
+func (mr *MockTransactionStorageMockRecorder) MarkHolidayOccurrence(ctx, holiday, sentAt any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MarkHolidayOccurrence", reflect.TypeOf((*MockTransactionStorage)(nil).MarkHolidayOccurrence), ctx, holiday, sentAt)
 }
 
 // MarkOccurrence mocks base method.

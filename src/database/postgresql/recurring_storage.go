@@ -53,7 +53,7 @@ func (d *Database) CreateRecurringReminder(
 		return database.ReminderView{}, fmt.Errorf("create reminder rule: %w", err)
 	}
 
-	reminder, err := newTransactionStorage(transaction).
+	reminder, err := newPlannerTransactionStorage(transaction).
 		CreateNextOccurrence(ctx, noteID, ruleID, request.FirstRemindAt)
 	if err != nil {
 		return database.ReminderView{}, fmt.Errorf("create reminder: %w", err)

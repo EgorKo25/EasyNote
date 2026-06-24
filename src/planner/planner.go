@@ -29,9 +29,11 @@ type Storage interface {
 
 type TransactionStorage interface {
 	LoadOccurrenceForUpdate(ctx context.Context, reminderID int64) (database.Reminder, error)
+	LoadHolidayForUpdate(ctx context.Context, holidayID int64) (database.Holiday, error)
 	LoadRuleForUpdate(ctx context.Context, ruleID int64) (database.ReminderRule, error)
 	LoadCustomDatesForUpdate(ctx context.Context, ruleID int64) ([]database.CustomReminderDate, error)
 	MarkOccurrence(ctx context.Context, reminderID int64, status database.ReminderStatus, sentAt *time.Time) error
+	MarkHolidayOccurrence(ctx context.Context, holiday database.Holiday, sentAt *time.Time) error
 	CreateNextOccurrence(ctx context.Context, noteID int64, ruleID int64, remindAt time.Time) (database.Reminder, error)
 	MarkCustomDateGenerated(ctx context.Context, ruleID int64, remindDate time.Time, reminderID int64) error
 	UpdateRuleStatus(ctx context.Context, ruleID int64, status database.ReminderRuleStatus) error
@@ -99,6 +101,33 @@ func (p *Planner) CompleteOccurrence(
 		return p.createNextOccurrence(ctx, storage, occurrence)
 	}); err != nil {
 		return fmt.Errorf("complete occurrence: %w", err)
+	}
+
+	return nil
+}
+
+func (p *Planner) CompleteHoliday(
+	ctx context.Context,
+	holidayID int64,
+	sentAt *time.Time,
+) error {
+	if err := p.storage.WithinTransaction(ctx, func(ctx context.Context, storage TransactionStorage) error {
+		holiday, err := storage.LoadHolidayForUpdate(ctx, holidayID)
+		if err != nil {
+			return fmt.Errorf("load holiday for update: %w", err)
+		}
+
+		if holiday.Status != database.HolidayStatusActive {
+			return nil
+		}
+
+		if err = storage.MarkHolidayOccurrence(ctx, holiday, sentAt); err != nil {
+			return fmt.Errorf("mark holiday occurrence: %w", err)
+		}
+
+		return nil
+	}); err != nil {
+		return fmt.Errorf("complete holiday: %w", err)
 	}
 
 	return nil

@@ -6,22 +6,26 @@ Telegram reminder bot for routine tasks.
 
 The source of truth for the application version is `CHANGELIST.md`.
 
-Current version: `1.3.2`.
+Current version: `1.4.0`.
+
+## Branch Naming
+
+Branch names must be grouped by work type: use `feature/<what-will-be-done>` for feature work and `fix/<what-will-be-fixed>` for bug fixes. Keep the suffix short, descriptive, and kebab-case, for example `feature/v1.4.0-holidays-lists` or `fix/holiday-domain-model`.
 
 ## Tests
 
 Focused verification commands:
 
 ```bash
-go test ./src/scheduler ./src/telegram ./src/config -cover
-golangci-lint run --config ./.golangci.yml
+go test ./...
+golangci-lint run
 ```
 
 Deployment-focused checks:
 
 ```bash
 go test ./src/config ./src/telegram -count=1
-golangci-lint run --config ./.golangci.yml ./src/config
+golangci-lint run
 docker build --check -f deploy/docker/EasyNote.Dockerfile .
 ```
 
@@ -115,21 +119,27 @@ scheduler:
 
 The main menu is a reply-keyboard message with a compact formatted stats block for completed, pending, and missed tasks. Missed tasks include canceled, skipped, and failed reminders.
 
-Reminder creation uses inline keyboards again. The draft message is rendered as labeled sections: title, description, reminder start date, and repeat state. Draft buttons are ordered as date/time, title/description, repeat, and save/cancel. While the bot waits for title or description input, those buttons change to `Введите название` or `Введите описание`; after input they change to `Изменить ...`.
+The main menu reply keyboard is ordered as `➕ Создать`, `⏰ Напоминания` / `🛒 Списки`, and `🎉 Праздники` / `⚙️ Настройки`.
+
+Reminder creation uses inline keyboards again. The draft message is rendered as labeled sections: title, description, reminder start date, and repeat state. Draft buttons are ordered as title/description, date/time, repeat, and save/cancel. While the bot waits for title or description input, those buttons change to `Введите название` or `Введите описание`; after input they change to `Изменить ...`.
+
+Holiday creation starts from `Создать` -> `Праздник`. The bot renders the prepared congratulation template, asks for holiday name, recipient name, date, and reminder time, and stores the holiday separately from regular notes and reminders. The scheduler sends due holidays through the planner, so holidays do not appear in active or past reminder lists. The `🎉 Праздники` menu shows two holidays per page and opens holiday details with `Изменить`, `Удалить`, and `Назад` actions.
+
+Shopping list creation starts from `Создать` -> `Список покупок`. The editor renders `Необходимо купить` with numbered items, adds items as the user sends them, and stores the list in PostgreSQL. The `🛒 Списки` menu shows two lists per page; opening a list renders each item as an inline button. Pressing an item persists its checked state and shows it with a check mark and strikethrough text.
 
 The draft screen shows service prompts in italic. The prompt only asks for missing required fields: title, time, or both.
 
 Reminder time is entered as text while the time screen is open, in `HH:MM` format.
 
-Active reminders opened from the reply-keyboard list show inline details actions, including `Удалить`. Reminder list buttons hide internal reminder IDs.
+Active reminders opened from the reply-keyboard list show inline details actions, including `Изменить` and `Удалить`. Editing opens the reminder draft with the current title, description, date, and time. Reminder list buttons hide internal reminder IDs.
 
-Intrusive reminder settings use an inline `Включено` / `Выключено` toggle, a `Сохранить` button that returns to settings, and edit the existing settings message after manual interval input. Intervals can be entered as plain minutes or Go duration values such as `1m` and `1h30m`, are persisted from 1 to 120 minutes, and are displayed as user-facing text such as `каждые 30 минут` or `раз в 1 час 20 минут`.
+Intrusive reminder settings use an inline `Включено` / `Выключено` toggle, a `Сохранить` button that returns to settings, and edit the existing settings message after manual interval input. Intervals can be entered as plain minutes or Go duration values such as `1m` and `1h30m`, are persisted from 1 to 120 minutes, and are displayed as user-facing text such as `каждые 30 минут` or `раз в 1 час 20 минут`. Intrusive delivery stops at 00:00 on the next local calendar day after the reminder time, and the last intrusive message is deleted when the scheduler stops that mode.
 
 Settings have an explicit `Сохранить` button that returns to the main menu. Timezone selection contains 24 unique UTC hour offsets shown uniformly as `UTC (+N)` / `UTC (-N)`; the UTC+3 option uses Moscow internally as the default timezone. Reminder drafts and reminder details load the user's timezone before formatting or calculating reminder time.
 
 Reminder lists keep their reply `Назад` navigation available while reminder-title buttons still open reminder details.
 
-Reminder notifications keep the main reply keyboard available by sending a visible main-menu message before the inline reminder notification. The sender stores the latest main-menu message id in memory and deletes the previous one before the next reminder for that chat. The notification itself uses only inline `Готово` and `Отменить` actions and is deleted after either action.
+Reminder notifications keep the main reply keyboard available by sending a visible `Напоминаю:` message before the inline reminder notification. The sender stores the latest main-menu message id in memory and deletes the previous one before the next reminder for that chat. The notification itself uses only inline `Готово` and `Отменить` actions and is deleted after either action.
 
 After reply-keyboard commands and user text inputs are handled, the bot deletes those user messages from the dialog and logs deletion failures without interrupting the command.
 
@@ -212,12 +222,22 @@ docker compose up -d --no-deps app
 
 PostgreSQL is not restarted by the beta CD job.
 
-For a manual deployment from a pull request branch, run the same workflow manually on the PR branch and enable `deploy_from_pr`. The image tag is built as `X.Y.Z.<short_sha>`, for example `1.3.2.a1b2c3d`, and that exact tag is deployed.
+For a manual deployment from a pull request branch, run the same workflow manually on the PR branch and enable `deploy_from_pr`. The image tag is built as `X.Y.Z.<short_sha>`, for example `1.4.0.a1b2c3d`, and that exact tag is deployed.
 
 ## Changelist
 
 <div style="max-height: 420px; overflow-y: auto; border: 1px solid #d0d7de; border-radius: 6px; padding: 16px;">
-<p><strong>version: 1.3.2</strong></p>
+<p><strong>version: 1.4.0</strong></p>
+
+<h2>v1.4.0 - Holidays and shopping lists</h2>
+<ul>
+  <li>Creation now supports reminders, holidays, and shopping lists.</li>
+  <li>Holiday drafts collect holiday name, recipient name, date, and time, and save holidays separately from regular reminders.</li>
+  <li>The main menu now exposes 🎉 Праздники with paginated holiday details, edit, delete, and back actions.</li>
+  <li>Shopping lists persist numbered items and checked state; opened lists render each item as an inline toggle button.</li>
+  <li>The main menu keyboard was reordered and reminder draft date/time moved below title/description.</li>
+  <li>The reply-keyboard refresh message before notifications now says Напоминаю:.</li>
+</ul>
 
 <h2>v1.3.2 - Telegram UI recovery and PR deployment</h2>
 <ul>

@@ -1,4 +1,46 @@
-version: 1.3.2
+version: 1.4.0
+
+## v1.4.0 - Holidays and shopping lists
+
+### What was done
+
+Telegram creation now supports three entry points: regular reminders, holidays, and shopping lists.
+
+Holiday drafts render the congratulation template, collect holiday name, recipient name, date, and reminder time, and save holidays separately from regular notes and reminders. The scheduler sends due holidays through the planner, so holidays do not appear in active or past reminder lists. The main menu now has a `🎉 Праздники` section with two-items-per-page navigation, holiday details, edit, delete, and back actions.
+
+Active reminder details now include an edit action that opens the reminder draft with the current title, description, date, and time.
+
+Intrusive reminders now stop at 00:00 on the next local calendar day after the reminder time. When that cutoff is reached, the scheduler deletes the last intrusive reminder message and completes the reminder as skipped.
+
+Shopping list drafts render numbered items under `Необходимо купить`, append new items as the user adds them, and persist lists with item state in PostgreSQL. The main menu now has a `🛒 Списки` section with two-items-per-page navigation. Opening a list shows each item as an inline button; pressing an item toggles its persisted checked state and shows the item with a check mark and strikethrough text.
+
+The main menu reply keyboard was reordered to `➕ Создать`, then `⏰ Напоминания` / `🛒 Списки`, then `🎉 Праздники` / `⚙️ Настройки`.
+
+Regular reminder draft buttons now place `Дата и время` below the `Название` / `Описание` row.
+
+The visible reply-keyboard refresh message sent immediately before a reminder notification now says `Напоминаю:`.
+
+### API changes
+
+- added separate PostgreSQL storage methods for holidays and shopping lists;
+- added `holidays`, `shopping_lists`, and `shopping_list_items` tables;
+- added planner and scheduler paths for due holiday delivery.
+
+### Affected files
+
+- `CHANGELIST.md`
+- `README.md`
+- `README_RU.md`
+- `migrations/00006_add_holidays_and_shopping_lists.go`
+- `src/database/postgresql/holiday_storage.go`
+- `src/database/postgresql/shopping_storage.go`
+- `src/database/postgresql/planner_transaction_storage.go`
+- `src/database/types.go`
+- `src/planner/planner.go`
+- `src/scheduler/ready_reminders.go`
+- `src/telegram/reminder_bot.go`
+- `src/telegram/sender.go`
+- `src/telegram/ui`
 
 ## v1.3.2 - Telegram UI recovery and PR deployment
 

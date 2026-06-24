@@ -8,6 +8,10 @@ const (
 	ButtonReminderHistory       = "Прошедшие"
 	ButtonSettings              = "Настройки"
 	ButtonCreateReminderKind    = "Напоминание"
+	ButtonCreateHolidayKind     = "Праздник"
+	ButtonCreateShoppingKind    = "Список покупок"
+	ButtonShoppingLists         = "🛒 Списки"
+	ButtonHolidays              = "🎉 Праздники"
 	ButtonBack                  = "Назад"
 	ButtonPreviousPage          = "<-"
 	ButtonNextPage              = "->"
@@ -18,6 +22,14 @@ const (
 	ButtonDraftEnterDescription = "Введите описание"
 	ButtonDraftEditDescription  = "Изменить описание"
 	ButtonDraftDate             = "Дата и время"
+	ButtonHolidayName           = "Название праздника"
+	ButtonHolidayEnterName      = "Введите название праздника"
+	ButtonHolidayEditName       = "Изменить название праздника"
+	ButtonHolidayPerson         = "Имя"
+	ButtonHolidayEnterPerson    = "Введите имя"
+	ButtonHolidayEditPerson     = "Изменить имя"
+	ButtonDraftEditDateTime     = "Изменить дату и время"
+	ButtonShoppingAddItem       = "Добавить в список"
 	ButtonDraftSave             = "Сохранить"
 	ButtonDraftCancel           = "Отменить"
 	ButtonDraftRepeat           = "Повторяемость"
@@ -46,6 +58,7 @@ const (
 const (
 	CallbackDraftTitle              = "draft:title"
 	CallbackDraftDescription        = "draft:description"
+	CallbackShoppingAddItem         = "shopping:add_item"
 	CallbackDraftDate               = "draft:date"
 	CallbackDraftCalendar           = "draft:calendar"
 	CallbackDraftRepeat             = "draft:repeat"
@@ -81,11 +94,18 @@ const (
 	CallbackWeekdayPrefix           = "weekday:"
 	CallbackViewPrefix              = "reminder:view:"
 	CallbackDeletePrefix            = "reminder:delete:"
+	CallbackReminderEditPrefix      = "reminder:edit:"
+	CallbackHolidayEditPrefix       = "holiday:edit:"
+	CallbackHolidayDeletePrefix     = "holiday:delete:"
+	CallbackHolidayBackList         = "holiday:back_list"
+	CallbackShoppingBackList        = "shopping:back_list"
+	CallbackShoppingItemPrefix      = "shopping:item:"
 )
 
 const (
 	FieldTitle             Field = "title"
 	FieldDescription       Field = "description"
+	FieldShoppingItem      Field = "shopping_item"
 	FieldIntrusiveInterval Field = "intrusive_interval"
 	FieldRepeatInterval    Field = "repeat_interval"
 )
@@ -103,6 +123,13 @@ const (
 type Field string
 type Screen string
 type Repeat string
+type DraftKind string
+
+const (
+	DraftKindReminder DraftKind = ""
+	DraftKindHoliday  DraftKind = "holiday"
+	DraftKindShopping DraftKind = "shopping"
+)
 
 const (
 	RepeatNone           Repeat = ""
