@@ -8,14 +8,17 @@ import (
 var ErrReminderNotFound = errors.New("reminder not found")
 var ErrHolidayNotFound = errors.New("holiday not found")
 var ErrShoppingListNotFound = errors.New("shopping list not found")
+var ErrBotUserNotFound = errors.New("bot user not found")
 
 type Note struct {
 	ID int64
 
 	TelegramChatID int64
+	SenderChatID   int64
 
-	Title       string
-	Description string
+	Title             string
+	Description       string
+	RecipientUsername string
 
 	CreatedAt time.Time
 }
@@ -23,12 +26,14 @@ type Note struct {
 type ReminderStatus string
 
 const (
-	ReminderStatusNew       ReminderStatus = "new"
-	ReminderStatusSent      ReminderStatus = "sent"
-	ReminderStatusFailed    ReminderStatus = "failed"
-	ReminderStatusCanceled  ReminderStatus = "canceled"
-	ReminderStatusCompleted ReminderStatus = "completed"
-	ReminderStatusSkipped   ReminderStatus = "skipped"
+	ReminderStatusNew                 ReminderStatus = "new"
+	ReminderStatusSent                ReminderStatus = "sent"
+	ReminderStatusFailed              ReminderStatus = "failed"
+	ReminderStatusCanceled            ReminderStatus = "canceled"
+	ReminderStatusCompleted           ReminderStatus = "completed"
+	ReminderStatusSkipped             ReminderStatus = "skipped"
+	ReminderStatusPendingConfirmation ReminderStatus = "pending_confirmation"
+	ReminderStatusDeclined            ReminderStatus = "declined"
 )
 
 type Reminder struct {
@@ -56,9 +61,11 @@ type ScheduledReminder struct {
 	NoteID int64
 	RuleID *int64
 
-	TelegramChatID int64
-	Title          string
-	Description    string
+	TelegramChatID    int64
+	SenderChatID      int64
+	Title             string
+	Description       string
+	RecipientUsername string
 
 	RemindAt time.Time
 
@@ -74,10 +81,11 @@ type ReminderView struct {
 	ID     int64
 	RuleID *int64
 
-	Title       string
-	Description string
-	RemindAt    time.Time
-	Status      ReminderStatus
+	Title             string
+	Description       string
+	RemindAt          time.Time
+	Status            ReminderStatus
+	RecipientUsername string
 
 	CreatedAt time.Time
 }
@@ -146,12 +154,42 @@ type RecurringReminderRequest struct {
 }
 
 type UserSettings struct {
-	TelegramChatID    int64
-	Language          string
-	Timezone          string
-	IntrusiveEnabled  bool
-	IntrusiveInterval time.Duration
-	UpdatedAt         time.Time
+	TelegramChatID                  int64
+	Language                        string
+	Timezone                        string
+	IntrusiveEnabled                bool
+	IntrusiveInterval               time.Duration
+	IncomingReminderRequestsEnabled bool
+	UpdatedAt                       time.Time
+}
+
+type BotUser struct {
+	TelegramChatID int64
+	Username       string
+	UpdatedAt      time.Time
+}
+
+type ReminderRecipient struct {
+	TelegramChatID  int64
+	Username        string
+	Allowed         bool
+	IncomingEnabled bool
+}
+
+type SharedReminderRequest struct {
+	SenderChatID      int64
+	RecipientChatID   int64
+	RecipientUsername string
+	Title             string
+	Description       string
+	RemindAt          time.Time
+	Status            ReminderStatus
+}
+
+type ReminderPermissionView struct {
+	TelegramChatID int64
+	Username       string
+	CreatedAt      time.Time
 }
 
 type ReminderDelivery struct {

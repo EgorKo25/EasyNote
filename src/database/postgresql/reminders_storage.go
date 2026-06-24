@@ -49,8 +49,8 @@ func (d *Database) CreateReminder(
 ) (database.ReminderView, error) {
 	query := `
 		WITH created_note AS (
-			INSERT INTO notes (telegram_chat_id, title, description)
-			VALUES ($1, $2, $3)
+			INSERT INTO notes (telegram_chat_id, sender_chat_id, title, description)
+			VALUES ($1, $1, $2, $3)
 			RETURNING id
 		),
 		created_reminder AS (
@@ -59,7 +59,7 @@ func (d *Database) CreateReminder(
 			FROM created_note
 			RETURNING id, remind_at, status, created_at
 		)
-		SELECT r.id, $2::text, $3::text, r.remind_at, r.status, r.created_at
+		SELECT r.id, $2::text, $3::text, r.remind_at, r.status, ''::text, r.created_at
 		FROM created_reminder r
 	`
 
@@ -70,6 +70,7 @@ func (d *Database) CreateReminder(
 		&reminder.Description,
 		&reminder.RemindAt,
 		&reminder.Status,
+		&reminder.RecipientUsername,
 		&reminder.CreatedAt,
 	); err != nil {
 		return database.ReminderView{}, fmt.Errorf("create reminder: %w", err)
@@ -85,7 +86,15 @@ func (d *Database) FindRemindersByChat(
 	offset int,
 ) ([]database.ReminderView, error) {
 	query := `
-		SELECT r.id, r.rule_id, n.title, n.description, r.remind_at, r.status, r.created_at
+		SELECT
+			r.id,
+			r.rule_id,
+			n.title,
+			n.description,
+			r.remind_at,
+			r.status,
+			COALESCE(n.recipient_username, '') AS recipient_username,
+			r.created_at
 		FROM reminders r
 		JOIN notes n ON n.id = r.note_id
 		WHERE n.telegram_chat_id = $1
@@ -114,7 +123,15 @@ func (d *Database) FindReminderHistoryByChat(
 	offset int,
 ) ([]database.ReminderView, error) {
 	query := `
-		SELECT r.id, r.rule_id, n.title, n.description, r.remind_at, r.status, r.created_at
+		SELECT
+			r.id,
+			r.rule_id,
+			n.title,
+			n.description,
+			r.remind_at,
+			r.status,
+			COALESCE(n.recipient_username, '') AS recipient_username,
+			r.created_at
 		FROM reminders r
 		JOIN notes n ON n.id = r.note_id
 		WHERE n.telegram_chat_id = $1
@@ -142,7 +159,15 @@ func (d *Database) ReminderByID(
 	reminderID int64,
 ) (database.ReminderView, error) {
 	query := `
-		SELECT r.id, r.rule_id, n.title, n.description, r.remind_at, r.status, r.created_at
+		SELECT
+			r.id,
+			r.rule_id,
+			n.title,
+			n.description,
+			r.remind_at,
+			r.status,
+			COALESCE(n.recipient_username, '') AS recipient_username,
+			r.created_at
 		FROM reminders r
 		JOIN notes n ON n.id = r.note_id
 		WHERE n.telegram_chat_id = $1
@@ -158,6 +183,7 @@ func (d *Database) ReminderByID(
 		&reminder.Description,
 		&reminder.RemindAt,
 		&reminder.Status,
+		&reminder.RecipientUsername,
 		&reminder.CreatedAt,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -207,7 +233,15 @@ func (d *Database) UpdateReminder(
 			WHERE r.id = sr.id
 			RETURNING r.id, r.rule_id, r.note_id, r.remind_at, r.status, r.created_at
 		)
-		SELECT r.id, r.rule_id, n.title, n.description, r.remind_at, r.status, r.created_at
+		SELECT
+			r.id,
+			r.rule_id,
+			n.title,
+			n.description,
+			r.remind_at,
+			r.status,
+			COALESCE(n.recipient_username, '') AS recipient_username,
+			r.created_at
 		FROM updated_reminder r
 		JOIN updated_note n ON n.id = r.note_id
 	`
@@ -220,6 +254,7 @@ func (d *Database) UpdateReminder(
 		&reminder.Description,
 		&reminder.RemindAt,
 		&reminder.Status,
+		&reminder.RecipientUsername,
 		&reminder.CreatedAt,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

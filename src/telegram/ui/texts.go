@@ -60,6 +60,12 @@ func ReminderDraftText(draft Draft, location *time.Location) string {
 	dateText := ""
 	title := html.EscapeString(draft.Title)
 	description := html.EscapeString(draft.Description)
+
+	recipient := "мне"
+	if draft.Recipient != "" {
+		recipient = "@" + strings.TrimPrefix(html.EscapeString(draft.Recipient), "@")
+	}
+
 	repeat := strings.TrimPrefix(RepeatText(draft), "Повторять: ")
 
 	remindAt := draft.RemindAt(location)
@@ -95,11 +101,13 @@ func ReminderDraftText(draft Draft, location *time.Location) string {
 		"<b>Название:</b>\n%s\n\n"+
 			"<b>Описание:</b>\n%s\n\n"+
 			"<b>Дата начала напоминаний:</b>\n%s\n\n"+
+			"<b>Напомнить:</b>\n%s\n\n"+
 			"<b>Повторять:</b>\n%s\n\n"+
 			"<i>%s</i>%s",
 		title,
 		description,
 		dateText,
+		recipient,
 		repeat,
 		draftNextStep(draft, location),
 		notice,
@@ -174,8 +182,12 @@ func draftWaitingPrompt(field Field) string {
 		return "Введите название напоминания сообщением."
 	case FieldDescription:
 		return "Введите описание напоминания сообщением."
+	case FieldRecipient:
+		return "Введите никнейм получателя через @username"
 	case FieldShoppingItem:
-		return "Введите пункт списка сообщением."
+		return "Отправляйте товары сообщениями. Каждое сообщение станет отдельным пунктом списка."
+	case FieldPermissionUser:
+		return "Введите никнейм пользователя через @username."
 	default:
 		return ""
 	}
@@ -255,12 +267,45 @@ func ReminderHistoryText(reminders []database.ReminderView) string {
 	return "<b>Прошедшие напоминания</b>\n\n<i>Выберите напоминание из списка.</i>"
 }
 
+func OutgoingReminderListText(reminders []database.ReminderView) string {
+	if len(reminders) == 0 {
+		return "<b>Исходящие напоминания</b>\n\n<i>Вы пока не ставили напоминания другим пользователям.</i>"
+	}
+
+	return "<b>Исходящие напоминания</b>\n\n<i>Выберите напоминание из списка.</i>"
+}
+
+func OutgoingReminderViewText(reminder database.ReminderView, location *time.Location) string {
+	return fmt.Sprintf(
+		"<b>%s</b>\n\n%s\n\n<b>Получатель:</b> @%s\n<b>Статус:</b> %s\n<b>Дата:</b> %s",
+		html.EscapeString(reminder.Title),
+		html.EscapeString(reminder.Description),
+		html.EscapeString(strings.TrimPrefix(reminder.RecipientUsername, "@")),
+		OutgoingReminderStatusText(reminder.Status),
+		reminder.RemindAt.In(location).Format("02.01.2006 15:04"),
+	)
+}
+
+func ReminderAccessText(users []database.ReminderPermissionView) string {
+	if len(users) == 0 {
+		return "<b>Кто может мне напоминать</b>\n\n<i>Разрешенных пользователей пока нет.</i>"
+	}
+
+	return "<b>Кто может мне напоминать</b>\n\n<i>Выберите пользователя из списка.</i>"
+}
+
 func SettingsText(settings database.UserSettings) string {
 	return fmt.Sprintf(
-		"<b>Настройки</b>\n\nЯзык: русский\nЧасовой пояс: %s\nНастойчивые напоминания: %s\nИнтервал: %s",
+		"<b>Настройки</b>\n\n"+
+			"Язык: русский\n"+
+			"Часовой пояс: %s\n"+
+			"Настойчивые напоминания: %s\n"+
+			"Интервал: %s\n"+
+			"Запросы на напоминания: %s",
 		html.EscapeString(settings.Timezone),
 		intrusiveEnabledText(settings.IntrusiveEnabled),
 		IntrusiveIntervalValueText(settings.IntrusiveInterval),
+		incomingReminderRequestsText(settings.IncomingReminderRequestsEnabled),
 	)
 }
 
@@ -327,6 +372,31 @@ func ReminderStatusText(status database.ReminderStatus) string {
 		return "Отправлено"
 	case database.ReminderStatusFailed:
 		return "Ошибка отправки"
+	case database.ReminderStatusPendingConfirmation:
+		return "Ожидает подтверждения"
+	case database.ReminderStatusDeclined:
+		return "Отклонено"
+	default:
+		return string(status)
+	}
+}
+
+func OutgoingReminderStatusText(status database.ReminderStatus) string {
+	switch status {
+	case database.ReminderStatusCompleted:
+		return "Выполнено"
+	case database.ReminderStatusCanceled:
+		return "Отменено"
+	case database.ReminderStatusSent, database.ReminderStatusSkipped:
+		return "Напомнено"
+	case database.ReminderStatusNew:
+		return "Ожидает исполнения"
+	case database.ReminderStatusDeclined:
+		return "Отклонено"
+	case database.ReminderStatusPendingConfirmation:
+		return "Ожидает подтверждения"
+	case database.ReminderStatusFailed:
+		return "Не отправлено"
 	default:
 		return string(status)
 	}
@@ -338,6 +408,14 @@ func intrusiveEnabledText(enabled bool) string {
 	}
 
 	return "выключены"
+}
+
+func incomingReminderRequestsText(enabled bool) string {
+	if enabled {
+		return "Включено"
+	}
+
+	return "Выключено"
 }
 
 func weekdayText(value time.Time) string {

@@ -72,22 +72,25 @@ const (
 	reminderPageSize                      = 2
 	reminderListActive   reminderListKind = "active"
 	reminderListHistory  reminderListKind = "history"
+	reminderListOutgoing reminderListKind = "outgoing"
 	reminderListHoliday  reminderListKind = "holiday"
 	reminderListShopping reminderListKind = "shopping"
+	reminderListAccess   reminderListKind = "access"
 )
 
 type chatMenu string
 
 const (
-	chatMenuMain         chatMenu = "main"
-	chatMenuCreate       chatMenu = "create"
-	chatMenuReminders    chatMenu = "reminders"
-	chatMenuReminderList chatMenu = "reminder_list"
-	chatMenuHolidays     chatMenu = "holidays"
-	chatMenuShopping     chatMenu = "shopping"
-	chatMenuSettings     chatMenu = "settings"
-	chatMenuTimezone     chatMenu = "timezone"
-	chatMenuIntrusive    chatMenu = "intrusive"
+	chatMenuMain           chatMenu = "main"
+	chatMenuCreate         chatMenu = "create"
+	chatMenuReminders      chatMenu = "reminders"
+	chatMenuReminderList   chatMenu = "reminder_list"
+	chatMenuHolidays       chatMenu = "holidays"
+	chatMenuShopping       chatMenu = "shopping"
+	chatMenuSettings       chatMenu = "settings"
+	chatMenuTimezone       chatMenu = "timezone"
+	chatMenuIntrusive      chatMenu = "intrusive"
+	chatMenuReminderAccess chatMenu = "reminder_access"
 )
 
 //go:generate go run go.uber.org/mock/mockgen -source=reminder_bot.go -destination=mocks/reminder_bot_mock.go -package=mocks
@@ -164,6 +167,31 @@ type ReminderService interface {
 	) ([]database.ShoppingListView, error)
 	ShoppingListByID(ctx context.Context, telegramChatID int64, listID int64) (database.ShoppingListView, error)
 	ToggleShoppingListItem(ctx context.Context, telegramChatID int64, itemID int64) (database.ShoppingListView, error)
+	ReminderRecipientByUsername(
+		ctx context.Context,
+		ownerChatID int64,
+		username string,
+	) (database.ReminderRecipient, error)
+	BotUserByChatID(ctx context.Context, telegramChatID int64) (database.BotUser, error)
+	CreateSharedReminder(ctx context.Context, request database.SharedReminderRequest) (database.ReminderView, error)
+	AcceptIncomingReminder(ctx context.Context, ownerChatID int64, reminderID int64) error
+	DeclineIncomingReminder(ctx context.Context, ownerChatID int64, reminderID int64) error
+	ReminderSenderChatID(ctx context.Context, ownerChatID int64, reminderID int64) (int64, error)
+	AllowReminderSender(ctx context.Context, ownerChatID int64, senderChatID int64) error
+	RemoveReminderSender(ctx context.Context, ownerChatID int64, senderChatID int64) error
+	FindReminderPermissions(
+		ctx context.Context,
+		ownerChatID int64,
+		limit int,
+		offset int,
+	) ([]database.ReminderPermissionView, error)
+	FindOutgoingRemindersByChat(
+		ctx context.Context,
+		senderChatID int64,
+		limit int,
+		offset int,
+	) ([]database.ReminderView, error)
+	UpdateIncomingReminderRequests(ctx context.Context, telegramChatID int64, enabled bool) error
 }
 
 type ReminderRepository interface {
@@ -188,25 +216,29 @@ type ReminderRepository interface {
 		limit int,
 		offset int,
 	) ([]database.ReminderView, error)
+	UpsertBotUser(ctx context.Context, telegramChatID int64, username string) error
 }
 
 type reminderDraft struct {
-	id            int64
-	kind          telegramui.DraftKind
-	title         string
-	description   string
-	notice        string
-	shoppingItems []database.ShoppingListItem
-	date          time.Time
-	hour          int
-	minute        int
-	repeat        telegramui.Repeat
-	customDates   []time.Time
-	weekdaysMask  int
-	intervalDays  int
-	screen        telegramui.Screen
-	calendarMonth time.Time
-	waitingFor    telegramui.Field
+	id                int64
+	kind              telegramui.DraftKind
+	title             string
+	description       string
+	recipientUsername string
+	recipientChatID   int64
+	recipientAllowed  bool
+	notice            string
+	shoppingItems     []database.ShoppingListItem
+	date              time.Time
+	hour              int
+	minute            int
+	repeat            telegramui.Repeat
+	customDates       []time.Time
+	weekdaysMask      int
+	intervalDays      int
+	screen            telegramui.Screen
+	calendarMonth     time.Time
+	waitingFor        telegramui.Field
 }
 
 func (b *ReminderBot) Info() string {
@@ -260,6 +292,12 @@ func (b *ReminderBot) handleMessage(ctx context.Context, message telego.Message)
 	text := strings.TrimSpace(message.Text)
 
 	defer b.deleteMessage(ctx, chatID, message.MessageID)
+
+	if message.From != nil {
+		if err := b.userRepo.UpsertBotUser(ctx, chatID, message.From.Username); err != nil {
+			return fmt.Errorf("save bot user: %w", err)
+		}
+	}
 
 	if handled, err := b.handleKnownMessage(ctx, chatID, text); handled || err != nil {
 		if err != nil {
@@ -405,6 +443,8 @@ func (b *ReminderBot) runReminderListMessageCommand(ctx context.Context, chatID 
 		return b.sendReminderListPage(ctx, chatID, 0), true
 	case telegramui.ButtonReminderHistory:
 		return b.sendReminderHistoryPage(ctx, chatID, 0), true
+	case telegramui.ButtonOutgoingReminders:
+		return b.sendOutgoingReminderPage(ctx, chatID, 0), true
 	case telegramui.ButtonPreviousPage:
 		return b.sendShiftedReminderPage(ctx, chatID, -reminderPageSize), true
 	case telegramui.ButtonNextPage:
@@ -415,6 +455,10 @@ func (b *ReminderBot) runReminderListMessageCommand(ctx context.Context, chatID 
 }
 
 func (b *ReminderBot) runDraftFieldMessageCommand(ctx context.Context, chatID int64, text string) (error, bool) {
+	if err, handled := b.runDraftRecipientMessageCommand(ctx, chatID, text); handled {
+		return err, true
+	}
+
 	switch text {
 	case telegramui.ButtonDraftTitle,
 		telegramui.ButtonDraftEnterTitle,
@@ -452,6 +496,25 @@ func (b *ReminderBot) runDraftFieldMessageCommand(ctx context.Context, chatID in
 		b.deleteDraft(chatID)
 
 		return b.sendStart(ctx, chatID), true
+	default:
+		return nil, false
+	}
+}
+
+func (b *ReminderBot) runDraftRecipientMessageCommand(
+	ctx context.Context,
+	chatID int64,
+	text string,
+) (error, bool) {
+	switch text {
+	case telegramui.ButtonDraftRecipient, telegramui.ButtonDraftEnterRecipient:
+		b.setDraftWaitingFor(chatID, telegramui.FieldRecipient)
+
+		return b.editDraftText(ctx, chatID), true
+	case telegramui.ButtonDraftRecipientMe:
+		b.setDraftRecipientMe(chatID)
+
+		return b.editDraftText(ctx, chatID), true
 	default:
 		return nil, false
 	}
@@ -553,6 +616,10 @@ func (b *ReminderBot) runSettingsMessageCommand(ctx context.Context, chatID int6
 		return b.sendTimezoneSettings(ctx, chatID), true
 	case telegramui.ButtonSettingsIntrusive:
 		return b.sendIntrusiveSettings(ctx, chatID), true
+	case telegramui.ButtonSettingsReminderAccess:
+		return b.sendReminderAccessPage(ctx, chatID, 0), true
+	case telegramui.ButtonSettingsIncomingRequests:
+		return b.toggleIncomingReminderRequests(ctx, chatID), true
 	case telegramui.ButtonIntrusiveEnabled, telegramui.ButtonIntrusiveDisabled:
 		return b.toggleIntrusiveSettings(ctx, chatID), true
 	case telegramui.ButtonSettingsSave:
@@ -568,6 +635,12 @@ func (b *ReminderBot) handleCallback(ctx context.Context, query telego.CallbackQ
 	}
 
 	chatID := query.Message.GetChat().ID
+	if query.From.ID != 0 {
+		if err := b.userRepo.UpsertBotUser(ctx, chatID, query.From.Username); err != nil {
+			return fmt.Errorf("save bot user: %w", err)
+		}
+	}
+
 	if err := b.bot.AnswerCallbackQuery(ctx, tu.CallbackQuery(query.ID)); err != nil {
 		return fmt.Errorf("answer callback: %w", err)
 	}
@@ -581,24 +654,17 @@ func (b *ReminderBot) handleCallback(ctx context.Context, query telego.CallbackQ
 		return b.sendStart(ctx, chatID)
 	}
 
-	if handled, err := b.handleSettingsCallback(ctx, chatID, messageID, query.Data); handled {
-		return err
-	}
-
-	if handled, err := b.handleDraftCommandCallback(ctx, chatID, messageID, query.Data); handled {
-		return err
-	}
-
-	if handled, err := b.handleDraftValueCallback(ctx, chatID, messageID, query.Data); handled {
-		return err
-	}
-
-	if handled, err := b.handleHolidayCallback(ctx, chatID, messageID, query.Data); handled {
-		return err
-	}
-
-	if handled, err := b.handleShoppingCallback(ctx, chatID, messageID, query.Data); handled {
-		return err
+	for _, handler := range []func(context.Context, int64, int, string) (bool, error){
+		b.handleSettingsCallback,
+		b.handleIncomingReminderCallback,
+		b.handleDraftCommandCallback,
+		b.handleDraftValueCallback,
+		b.handleHolidayCallback,
+		b.handleShoppingCallback,
+	} {
+		if handled, err := handler(ctx, chatID, messageID, query.Data); handled {
+			return err
+		}
 	}
 
 	return b.handleReminderCallback(ctx, chatID, messageID, query.Data)
@@ -682,6 +748,8 @@ func (b *ReminderBot) handleReminderCallback(ctx context.Context, chatID int64, 
 		return b.editReminderList(ctx, chatID, messageID)
 	case telegramui.CallbackReminderHistory:
 		return b.editReminderHistory(ctx, chatID, messageID)
+	case telegramui.CallbackOutgoingReminders:
+		return b.editOutgoingReminders(ctx, chatID, messageID)
 	default:
 		return nil
 	}
@@ -728,6 +796,81 @@ func (b *ReminderBot) handleReminderActionCallback(
 	}
 }
 
+func (b *ReminderBot) handleIncomingReminderCallback(
+	ctx context.Context,
+	chatID int64,
+	messageID int,
+	data string,
+) (bool, error) {
+	switch {
+	case strings.HasPrefix(data, telegramui.CallbackIncomingReminderAllow):
+		reminderID, err := strconv.ParseInt(strings.TrimPrefix(data, telegramui.CallbackIncomingReminderAllow), 10, 64)
+		if err != nil {
+			return true, fmt.Errorf("parse incoming reminder id: %w", err)
+		}
+
+		return true, b.acceptIncomingReminder(ctx, chatID, messageID, reminderID, false)
+	case strings.HasPrefix(data, telegramui.CallbackIncomingReminderAlways):
+		reminderID, err := strconv.ParseInt(strings.TrimPrefix(data, telegramui.CallbackIncomingReminderAlways), 10, 64)
+		if err != nil {
+			return true, fmt.Errorf("parse incoming reminder id: %w", err)
+		}
+
+		return true, b.acceptIncomingReminder(ctx, chatID, messageID, reminderID, true)
+	case strings.HasPrefix(data, telegramui.CallbackIncomingReminderDeny):
+		reminderID, err := strconv.ParseInt(strings.TrimPrefix(data, telegramui.CallbackIncomingReminderDeny), 10, 64)
+		if err != nil {
+			return true, fmt.Errorf("parse incoming reminder id: %w", err)
+		}
+
+		return true, b.declineIncomingReminder(ctx, chatID, messageID, reminderID)
+	default:
+		return false, nil
+	}
+}
+
+func (b *ReminderBot) acceptIncomingReminder(
+	ctx context.Context,
+	chatID int64,
+	messageID int,
+	reminderID int64,
+	allowAlways bool,
+) error {
+	_ = messageID
+
+	if allowAlways {
+		senderChatID, err := b.service.ReminderSenderChatID(ctx, chatID, reminderID)
+		if err != nil {
+			return fmt.Errorf("load incoming reminder sender: %w", err)
+		}
+
+		if err = b.service.AllowReminderSender(ctx, chatID, senderChatID); err != nil {
+			return fmt.Errorf("allow reminder sender: %w", err)
+		}
+	}
+
+	if err := b.service.AcceptIncomingReminder(ctx, chatID, reminderID); err != nil {
+		return fmt.Errorf("accept incoming reminder: %w", err)
+	}
+
+	return b.replaceUI(ctx, chatID, "<i>Напоминание разрешено.</i>", telegramui.MainKeyboard())
+}
+
+func (b *ReminderBot) declineIncomingReminder(
+	ctx context.Context,
+	chatID int64,
+	messageID int,
+	reminderID int64,
+) error {
+	_ = messageID
+
+	if err := b.service.DeclineIncomingReminder(ctx, chatID, reminderID); err != nil {
+		return fmt.Errorf("decline incoming reminder: %w", err)
+	}
+
+	return b.replaceUI(ctx, chatID, "<i>Напоминание отклонено.</i>", telegramui.MainKeyboard())
+}
+
 func (b *ReminderBot) handleSettingsCallback(
 	ctx context.Context,
 	chatID int64,
@@ -735,6 +878,14 @@ func (b *ReminderBot) handleSettingsCallback(
 	data string,
 ) (bool, error) {
 	if handled, err := b.handleTimezoneSettingsCallback(ctx, chatID, messageID, data); handled {
+		return true, err
+	}
+
+	if handled, err := b.handlePermissionSettingsCallback(ctx, chatID, messageID, data); handled {
+		return true, err
+	}
+
+	if handled, err := b.handleIntrusiveSettingsCallback(ctx, chatID, messageID, data); handled {
 		return true, err
 	}
 
@@ -752,6 +903,43 @@ func (b *ReminderBot) handleSettingsCallback(
 		b.setDraftWaitingFor(chatID, telegramui.FieldIntrusiveInterval)
 
 		return true, b.editIntrusiveSettings(ctx, chatID, messageID)
+	case telegramui.CallbackSettingsIncomingToggle:
+		return true, b.toggleIncomingReminderRequestsInMessage(ctx, chatID, messageID)
+	}
+
+	return false, nil
+}
+
+func (b *ReminderBot) handlePermissionSettingsCallback(
+	ctx context.Context,
+	chatID int64,
+	messageID int,
+	data string,
+) (bool, error) {
+	if data == telegramui.CallbackSettingsReminderAccess {
+		return true, b.editReminderAccessPage(ctx, chatID, messageID, 0)
+	}
+
+	after, ok := strings.CutPrefix(data, telegramui.CallbackPermissionRemovePrefix)
+	if !ok {
+		return false, nil
+	}
+
+	senderChatID, err := strconv.ParseInt(after, 10, 64)
+	if err != nil {
+		return true, fmt.Errorf("parse permission sender id: %w", err)
+	}
+
+	return true, b.removeReminderPermission(ctx, chatID, messageID, senderChatID)
+}
+
+func (b *ReminderBot) handleIntrusiveSettingsCallback(
+	ctx context.Context,
+	chatID int64,
+	messageID int,
+	data string,
+) (bool, error) {
+	switch data {
 	case telegramui.CallbackSettingsIntrusiveOn:
 		if err := b.setIntrusiveEnabled(ctx, chatID, true); err != nil {
 			return true, fmt.Errorf("enable intrusive reminders: %w", err)
@@ -811,6 +999,10 @@ func (b *ReminderBot) handleDraftNavigationCallback(
 	messageID int,
 	data string,
 ) (bool, error) {
+	if handled, err := b.handleDraftRecipientNavigationCallback(ctx, chatID, messageID, data); handled {
+		return true, err
+	}
+
 	switch data {
 	case telegramui.CallbackDraftTitle:
 		b.setDraftWaitingFor(chatID, telegramui.FieldTitle)
@@ -838,6 +1030,26 @@ func (b *ReminderBot) handleDraftNavigationCallback(
 		return true, b.editDraft(ctx, chatID, messageID)
 	case telegramui.CallbackDraftBack:
 		b.setDraftScreen(chatID, telegramui.ScreenMain)
+
+		return true, b.editDraft(ctx, chatID, messageID)
+	default:
+		return false, nil
+	}
+}
+
+func (b *ReminderBot) handleDraftRecipientNavigationCallback(
+	ctx context.Context,
+	chatID int64,
+	messageID int,
+	data string,
+) (bool, error) {
+	switch data {
+	case telegramui.CallbackDraftRecipient:
+		b.setDraftWaitingFor(chatID, telegramui.FieldRecipient)
+
+		return true, b.editDraft(ctx, chatID, messageID)
+	case telegramui.CallbackDraftRecipientMe:
+		b.setDraftRecipientMe(chatID)
 
 		return true, b.editDraft(ctx, chatID, messageID)
 	default:
@@ -950,7 +1162,10 @@ func (b *ReminderBot) startHolidayDraft(ctx context.Context, chatID int64) error
 }
 
 func (b *ReminderBot) startShoppingDraft(ctx context.Context, chatID int64) error {
-	draft := reminderDraft{kind: telegramui.DraftKindShopping}
+	draft := reminderDraft{
+		kind:       telegramui.DraftKindShopping,
+		waitingFor: telegramui.FieldShoppingItem,
+	}
 
 	b.mu.Lock()
 	b.draftByChat[chatID] = draft
@@ -1186,15 +1401,103 @@ func (b *ReminderBot) sendReminderHistoryPage(ctx context.Context, chatID int64,
 	)
 }
 
+func (b *ReminderBot) sendOutgoingReminderPage(ctx context.Context, chatID int64, offset int) error {
+	if err := b.loadChatLocation(ctx, chatID); err != nil {
+		return err
+	}
+
+	offset = normalizePageOffset(offset)
+
+	reminders, err := b.service.FindOutgoingRemindersByChat(ctx, chatID, reminderPageSize, offset)
+	if err != nil {
+		return fmt.Errorf("load outgoing reminders: %w", err)
+	}
+
+	if len(reminders) == 0 && offset > 0 {
+		return b.sendOutgoingReminderPage(ctx, chatID, offset-reminderPageSize)
+	}
+
+	b.setReminderListState(chatID, reminderListState{kind: reminderListOutgoing, offset: offset})
+	b.setChatMenu(chatID, chatMenuReminderList)
+
+	return b.replaceUI(
+		ctx,
+		chatID,
+		telegramui.OutgoingReminderListText(reminders),
+		telegramui.ReminderListKeyboard(reminders),
+	)
+}
+
+func (b *ReminderBot) editOutgoingReminders(ctx context.Context, chatID int64, messageID int) error {
+	_ = messageID
+
+	if err := b.loadChatLocation(ctx, chatID); err != nil {
+		return err
+	}
+
+	reminders, err := b.service.FindOutgoingRemindersByChat(ctx, chatID, reminderPageSize, 0)
+	if err != nil {
+		return fmt.Errorf("load outgoing reminders: %w", err)
+	}
+
+	b.setReminderListState(chatID, reminderListState{kind: reminderListOutgoing, offset: 0})
+	b.setChatMenu(chatID, chatMenuReminderList)
+
+	return b.replaceUI(
+		ctx,
+		chatID,
+		telegramui.OutgoingReminderListText(reminders),
+		telegramui.ReminderListKeyboard(reminders),
+	)
+}
+
+func (b *ReminderBot) sendReminderAccessPage(ctx context.Context, chatID int64, offset int) error {
+	offset = normalizePageOffset(offset)
+
+	users, err := b.service.FindReminderPermissions(ctx, chatID, reminderPageSize, offset)
+	if err != nil {
+		return fmt.Errorf("load reminder permissions: %w", err)
+	}
+
+	if len(users) == 0 && offset > 0 {
+		return b.sendReminderAccessPage(ctx, chatID, offset-reminderPageSize)
+	}
+
+	b.setReminderListState(chatID, reminderListState{kind: reminderListAccess, offset: offset})
+	b.setChatMenu(chatID, chatMenuReminderAccess)
+
+	return b.replaceUI(ctx, chatID, telegramui.ReminderAccessText(users), telegramui.ReminderAccessKeyboard(users))
+}
+
+func (b *ReminderBot) editReminderAccessPage(ctx context.Context, chatID int64, messageID int, offset int) error {
+	_ = messageID
+
+	offset = normalizePageOffset(offset)
+
+	users, err := b.service.FindReminderPermissions(ctx, chatID, reminderPageSize, offset)
+	if err != nil {
+		return fmt.Errorf("load reminder permissions: %w", err)
+	}
+
+	b.setReminderListState(chatID, reminderListState{kind: reminderListAccess, offset: offset})
+	b.setChatMenu(chatID, chatMenuReminderAccess)
+
+	return b.replaceUI(ctx, chatID, telegramui.ReminderAccessText(users), telegramui.ReminderAccessKeyboard(users))
+}
+
 func (b *ReminderBot) sendShiftedReminderPage(ctx context.Context, chatID int64, shift int) error {
 	list := b.reminderListState(chatID)
 	switch list.kind {
 	case reminderListHistory:
 		return b.sendReminderHistoryPage(ctx, chatID, list.offset+shift)
+	case reminderListOutgoing:
+		return b.sendOutgoingReminderPage(ctx, chatID, list.offset+shift)
 	case reminderListHoliday:
 		return b.sendHolidayListPage(ctx, chatID, list.offset+shift)
 	case reminderListShopping:
 		return b.sendShoppingListPage(ctx, chatID, list.offset+shift)
+	case reminderListAccess:
+		return b.sendReminderAccessPage(ctx, chatID, list.offset+shift)
 	default:
 		return b.sendReminderListPage(ctx, chatID, list.offset+shift)
 	}
@@ -1295,6 +1598,57 @@ func (b *ReminderBot) toggleIntrusiveSettings(ctx context.Context, chatID int64)
 	}
 
 	return b.sendIntrusiveSettings(ctx, chatID)
+}
+
+func (b *ReminderBot) toggleIncomingReminderRequests(ctx context.Context, chatID int64) error {
+	settings, err := b.userRepo.UserSettings(ctx, chatID)
+	if err != nil {
+		return fmt.Errorf("load user settings: %w", err)
+	}
+
+	if err = b.service.UpdateIncomingReminderRequests(
+		ctx,
+		chatID,
+		!settings.IncomingReminderRequestsEnabled,
+	); err != nil {
+		return fmt.Errorf("toggle incoming reminder requests: %w", err)
+	}
+
+	return b.sendSettings(ctx, chatID)
+}
+
+func (b *ReminderBot) toggleIncomingReminderRequestsInMessage(
+	ctx context.Context,
+	chatID int64,
+	messageID int,
+) error {
+	settings, err := b.userRepo.UserSettings(ctx, chatID)
+	if err != nil {
+		return fmt.Errorf("load user settings: %w", err)
+	}
+
+	if err = b.service.UpdateIncomingReminderRequests(
+		ctx,
+		chatID,
+		!settings.IncomingReminderRequestsEnabled,
+	); err != nil {
+		return fmt.Errorf("toggle incoming reminder requests: %w", err)
+	}
+
+	return b.editSettings(ctx, chatID, messageID)
+}
+
+func (b *ReminderBot) removeReminderPermission(
+	ctx context.Context,
+	chatID int64,
+	messageID int,
+	senderChatID int64,
+) error {
+	if err := b.service.RemoveReminderSender(ctx, chatID, senderChatID); err != nil {
+		return fmt.Errorf("remove reminder permission: %w", err)
+	}
+
+	return b.editReminderAccessPage(ctx, chatID, messageID, b.reminderListState(chatID).offset)
 }
 
 func (b *ReminderBot) setIntrusiveEnabled(ctx context.Context, chatID int64, enabled bool) error {
@@ -1506,6 +1860,10 @@ func (b *ReminderBot) handleSelectedReplyMessage(ctx context.Context, chatID int
 		return false, nil
 	}
 
+	if draft := b.draft(chatID); draft.waitingFor == telegramui.FieldPermissionUser {
+		return false, nil
+	}
+
 	if handled, err := b.handleListReplyMessage(ctx, chatID, text); handled || err != nil {
 		return handled, err
 	}
@@ -1518,6 +1876,10 @@ func (b *ReminderBot) handleSelectedReplyMessage(ctx context.Context, chatID int
 }
 
 func (b *ReminderBot) handleListReplyMessage(ctx context.Context, chatID int64, text string) (bool, error) {
+	if b.chatMenu(chatID) == chatMenuReminderAccess {
+		return b.handleReminderAccessReplyMessage(ctx, chatID, text)
+	}
+
 	switch b.chatMenu(chatID) {
 	case chatMenuReminderList:
 		if reminderListCommandText(text) {
@@ -1542,17 +1904,64 @@ func (b *ReminderBot) handleListReplyMessage(ctx context.Context, chatID int64, 
 	}
 }
 
+func (b *ReminderBot) handleReminderAccessReplyMessage(
+	ctx context.Context,
+	chatID int64,
+	text string,
+) (bool, error) {
+	if reminderListCommandText(text) {
+		return false, nil
+	}
+
+	if text == telegramui.ButtonDraftEnterRecipient {
+		b.setDraftWaitingFor(chatID, telegramui.FieldPermissionUser)
+
+		return true, b.replaceUI(
+			ctx,
+			chatID,
+			"<i>Введите никнейм пользователя через @username.</i>",
+			telegramui.ReminderAccessKeyboard(nil),
+		)
+	}
+
+	return true, b.viewReminderPermissionByReply(ctx, chatID, text)
+}
+
 func reminderListCommandText(text string) bool {
 	switch text {
 	case telegramui.ButtonBack,
 		telegramui.ButtonPreviousPage,
 		telegramui.ButtonNextPage,
 		telegramui.ButtonReminderList,
-		telegramui.ButtonReminderHistory:
+		telegramui.ButtonReminderHistory,
+		telegramui.ButtonOutgoingReminders:
 		return true
 	default:
 		return false
 	}
+}
+
+func (b *ReminderBot) viewReminderPermissionByReply(ctx context.Context, chatID int64, text string) error {
+	listState := b.reminderListState(chatID)
+
+	users, err := b.service.FindReminderPermissions(ctx, chatID, reminderPageSize, listState.offset)
+	if err != nil {
+		return fmt.Errorf("load reminder permissions: %w", err)
+	}
+
+	username := strings.TrimPrefix(text, "@")
+	for _, user := range users {
+		if strings.EqualFold(user.Username, username) {
+			return b.replaceUI(
+				ctx,
+				chatID,
+				fmt.Sprintf("<b>@%s</b>", html.EscapeString(user.Username)),
+				telegramui.ReminderAccessDetailsKeyboard(user),
+			)
+		}
+	}
+
+	return b.sendReminderAccessPage(ctx, chatID, listState.offset)
 }
 
 func (b *ReminderBot) applyDraftTimeTextByMessage(chatID int64, text string) bool {
@@ -1587,11 +1996,19 @@ func (b *ReminderBot) viewReminderByReply(ctx context.Context, chatID int64, tex
 
 	for _, reminder := range reminders {
 		if telegramui.ReminderButtonText(reminder) == text {
+			viewText := telegramui.ReminderViewText(reminder, b.location(chatID))
+
+			keyboard := telegramui.ReminderDetailsKeyboard(reminder)
+			if list.kind == reminderListOutgoing {
+				viewText = telegramui.OutgoingReminderViewText(reminder, b.location(chatID))
+				keyboard = telegramui.ReminderCreatedKeyboard()
+			}
+
 			return b.replaceUI(
 				ctx,
 				chatID,
-				telegramui.ReminderViewText(reminder, b.location(chatID)),
-				telegramui.ReminderDetailsKeyboard(reminder),
+				viewText,
+				keyboard,
 			)
 		}
 	}
@@ -1671,6 +2088,15 @@ func (b *ReminderBot) loadReminderPage(
 		return reminders, nil
 	}
 
+	if list.kind == reminderListOutgoing {
+		reminders, err := b.service.FindOutgoingRemindersByChat(ctx, chatID, reminderPageSize, list.offset)
+		if err != nil {
+			return nil, fmt.Errorf("load outgoing reminder page: %w", err)
+		}
+
+		return reminders, nil
+	}
+
 	reminders, err := b.userRepo.FindRemindersByChat(ctx, chatID, reminderPageSize, list.offset)
 	if err != nil {
 		return nil, fmt.Errorf("load active reminder page: %w", err)
@@ -1709,7 +2135,11 @@ func (b *ReminderBot) saveReminderDraft(
 	)
 
 	if draft.id == 0 {
-		reminder, err = b.createDraftReminder(ctx, chatID, draft, remindAt)
+		if draft.recipientChatID == 0 {
+			reminder, err = b.createDraftReminder(ctx, chatID, draft, remindAt)
+		} else {
+			reminder, err = b.createSharedDraftReminder(ctx, chatID, draft, remindAt)
+		}
 	} else {
 		reminder, err = b.service.UpdateReminder(ctx, chatID, draft.id, draft.title, draft.description, remindAt)
 	}
@@ -1720,11 +2150,16 @@ func (b *ReminderBot) saveReminderDraft(
 
 	b.deleteDraft(chatID)
 
+	text := "<i>Напоминание сохранено.</i>\n\n" + telegramui.ReminderViewText(reminder, b.location(chatID))
+	if draft.recipientChatID != 0 {
+		text = "<i>Напоминание сохранено.</i>\n\n" + telegramui.OutgoingReminderViewText(reminder, b.location(chatID))
+	}
+
 	return b.editUI(
 		ctx,
 		chatID,
 		messageID,
-		"<i>Напоминание сохранено.</i>\n\n"+telegramui.ReminderViewText(reminder, b.location(chatID)),
+		text,
 		telegramui.ReminderCreatedKeyboard(),
 	)
 }
@@ -2067,6 +2502,10 @@ func (b *ReminderBot) applyDraftText(ctx context.Context, chatID int64, text str
 	if !exists {
 		b.mu.Unlock()
 
+		if b.chatMenu(chatID) == chatMenuReminderAccess {
+			return b.applyReminderPermissionText(ctx, chatID, text)
+		}
+
 		return false
 	}
 
@@ -2076,32 +2515,28 @@ func (b *ReminderBot) applyDraftText(ctx context.Context, chatID int64, text str
 		return b.applyIntrusiveInterval(ctx, chatID, text)
 	}
 
-	switch draft.waitingFor {
-	case telegramui.FieldTitle:
-		draft.title = text
-	case telegramui.FieldDescription:
-		draft.description = text
-	case telegramui.FieldShoppingItem:
-		draft.shoppingItems = append(draft.shoppingItems, database.ShoppingListItem{
-			Text:     strings.TrimSpace(text),
-			Position: len(draft.shoppingItems) + 1,
-		})
-	case telegramui.FieldRepeatInterval:
+	if draft.waitingFor == telegramui.FieldRecipient {
+		b.mu.Unlock()
+
+		return b.applyDraftRecipient(ctx, chatID, text)
+	}
+
+	if draft.waitingFor == telegramui.FieldPermissionUser {
+		b.mu.Unlock()
+
+		return b.applyReminderPermissionText(ctx, chatID, text)
+	}
+
+	if draft.waitingFor == telegramui.FieldRepeatInterval {
 		b.mu.Unlock()
 
 		return b.applyDraftIntervalDays(chatID, text)
-	default:
-		if draft.screen != telegramui.ScreenTime {
-			b.mu.Unlock()
+	}
 
-			return false
-		}
+	if !b.applyDraftTextValue(chatID, text, &draft) {
+		b.mu.Unlock()
 
-		if !applyDraftTimeText(&draft, text, b.location(chatID), b.now(chatID)) {
-			b.mu.Unlock()
-
-			return false
-		}
+		return false
 	}
 
 	draft.notice = ""
@@ -2109,6 +2544,103 @@ func (b *ReminderBot) applyDraftText(ctx context.Context, chatID int64, text str
 	draft.screen = telegramui.ScreenMain
 	b.draftByChat[chatID] = draft
 	b.mu.Unlock()
+
+	return true
+}
+
+func (b *ReminderBot) applyDraftTextValue(chatID int64, text string, draft *reminderDraft) bool {
+	switch draft.waitingFor {
+	case telegramui.FieldTitle:
+		draft.title = text
+	case telegramui.FieldDescription:
+		draft.description = text
+	case telegramui.FieldShoppingItem:
+		appendShoppingDraftItem(draft, text)
+	default:
+		if draft.kind == telegramui.DraftKindShopping {
+			appendShoppingDraftItem(draft, text)
+
+			return true
+		}
+
+		if draft.screen != telegramui.ScreenTime {
+			return false
+		}
+
+		return applyDraftTimeText(draft, text, b.location(chatID), b.now(chatID))
+	}
+
+	return true
+}
+
+func appendShoppingDraftItem(draft *reminderDraft, text string) {
+	draft.shoppingItems = append(draft.shoppingItems, database.ShoppingListItem{
+		Text:     strings.TrimSpace(text),
+		Position: len(draft.shoppingItems) + 1,
+	})
+}
+
+func (b *ReminderBot) applyDraftRecipient(ctx context.Context, chatID int64, text string) bool {
+	username := strings.TrimPrefix(strings.TrimSpace(text), "@")
+	if username == "" {
+		b.setDraftNotice(chatID, "Введите никнейм получателя через @username.")
+
+		return true
+	}
+
+	recipient, err := b.service.ReminderRecipientByUsername(ctx, chatID, username)
+	if err != nil {
+		b.setDraftNotice(chatID, "Этот человек еще не пользовался ботом. Пригласите его в EasyNote.")
+
+		return true
+	}
+
+	if recipient.TelegramChatID == chatID {
+		b.setDraftRecipientMe(chatID)
+
+		return true
+	}
+
+	b.mu.Lock()
+	draft := b.draftByChat[chatID]
+	draft.recipientUsername = recipient.Username
+	draft.recipientChatID = recipient.TelegramChatID
+	draft.recipientAllowed = recipient.Allowed
+	draft.notice = ""
+	draft.waitingFor = ""
+	draft.screen = telegramui.ScreenMain
+	b.draftByChat[chatID] = draft
+	b.mu.Unlock()
+
+	return true
+}
+
+func (b *ReminderBot) applyReminderPermissionText(ctx context.Context, chatID int64, text string) bool {
+	username := strings.TrimPrefix(strings.TrimSpace(text), "@")
+	if username == "" {
+		return false
+	}
+
+	recipient, err := b.service.ReminderRecipientByUsername(ctx, chatID, username)
+	if err != nil {
+		_ = b.replaceUI(
+			ctx,
+			chatID,
+			"<i>Такой пользователь пока не найден в EasyNote.</i>",
+			telegramui.SettingsKeyboard(),
+		)
+
+		return true
+	}
+
+	if err = b.service.AllowReminderSender(ctx, chatID, recipient.TelegramChatID); err != nil {
+		_ = b.replaceUI(ctx, chatID, "<i>Не удалось добавить пользователя.</i>", telegramui.SettingsKeyboard())
+
+		return true
+	}
+
+	b.deleteDraft(chatID)
+	_ = b.sendReminderAccessPage(ctx, chatID, b.reminderListState(chatID).offset)
 
 	return true
 }
@@ -2282,6 +2814,75 @@ func (b *ReminderBot) createDraftOneTimeReminder(
 	}
 
 	return reminder, nil
+}
+
+func (b *ReminderBot) createSharedDraftReminder(
+	ctx context.Context,
+	chatID int64,
+	draft reminderDraft,
+	remindAt time.Time,
+) (database.ReminderView, error) {
+	status := database.ReminderStatusPendingConfirmation
+	if draft.recipientAllowed {
+		status = database.ReminderStatusNew
+	}
+
+	settings, err := b.userRepo.UserSettings(ctx, draft.recipientChatID)
+	if err != nil {
+		return database.ReminderView{}, fmt.Errorf("load recipient settings: %w", err)
+	}
+
+	if !settings.IncomingReminderRequestsEnabled && !draft.recipientAllowed {
+		status = database.ReminderStatusDeclined
+	}
+
+	reminder, err := b.service.CreateSharedReminder(ctx, database.SharedReminderRequest{
+		SenderChatID:      chatID,
+		RecipientChatID:   draft.recipientChatID,
+		RecipientUsername: draft.recipientUsername,
+		Title:             draft.title,
+		Description:       draft.description,
+		RemindAt:          remindAt,
+		Status:            status,
+	})
+	if err != nil {
+		return database.ReminderView{}, fmt.Errorf("create shared reminder: %w", err)
+	}
+
+	if status == database.ReminderStatusPendingConfirmation {
+		if err = b.sendIncomingReminderRequest(ctx, chatID, draft.recipientChatID, reminder.ID); err != nil {
+			return database.ReminderView{}, fmt.Errorf("send incoming reminder request: %w", err)
+		}
+	}
+
+	return reminder, nil
+}
+
+func (b *ReminderBot) sendIncomingReminderRequest(
+	ctx context.Context,
+	senderChatID int64,
+	recipientChatID int64,
+	reminderID int64,
+) error {
+	sender, err := b.service.BotUserByChatID(ctx, senderChatID)
+	if err != nil {
+		return fmt.Errorf("load sender user: %w", err)
+	}
+
+	_, err = b.bot.SendMessage(ctx, &telego.SendMessageParams{
+		ChatID: tu.ID(recipientChatID),
+		Text: fmt.Sprintf(
+			"Разрешить пользователю @%s добавить вам напоминание?",
+			html.EscapeString(sender.Username),
+		),
+		ParseMode:   telego.ModeHTML,
+		ReplyMarkup: telegramui.IncomingReminderRequestKeyboard(reminderID),
+	})
+	if err != nil {
+		return fmt.Errorf("send incoming reminder request: %w", err)
+	}
+
+	return nil
 }
 
 func (b *ReminderBot) createDraftWeekdaysReminder(
@@ -2623,6 +3224,20 @@ func (b *ReminderBot) setDraftWaitingFor(chatID int64, field telegramui.Field) {
 	b.draftByChat[chatID] = draft
 }
 
+func (b *ReminderBot) setDraftRecipientMe(chatID int64) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	draft := b.draftByChat[chatID]
+	draft.recipientUsername = ""
+	draft.recipientChatID = 0
+	draft.recipientAllowed = false
+	draft.notice = ""
+	draft.waitingFor = ""
+	draft.screen = telegramui.ScreenMain
+	b.draftByChat[chatID] = draft
+}
+
 func (b *ReminderBot) setDraftNotice(chatID int64, notice string) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -2854,6 +3469,7 @@ func uiDraft(draft reminderDraft) telegramui.Draft {
 		Kind:          draft.kind,
 		Title:         draft.title,
 		Description:   draft.description,
+		Recipient:     draft.recipientUsername,
 		Notice:        draft.notice,
 		ShoppingItems: draft.shoppingItems,
 		Date:          draft.date,

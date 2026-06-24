@@ -11,6 +11,7 @@ type Draft struct {
 	Kind          DraftKind
 	Title         string
 	Description   string
+	Recipient     string
 	Notice        string
 	ShoppingItems []database.ShoppingListItem
 	Date          time.Time
