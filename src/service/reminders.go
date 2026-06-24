@@ -12,6 +12,7 @@ import (
 
 var ErrReminderTitleEmpty = errors.New("reminder title is empty")
 var ErrWeekdaysMaskEmpty = errors.New("weekdays mask is empty")
+var ErrReminderRecipientEmpty = errors.New("reminder recipient is empty")
 
 func NewReminderService(repository ReminderCommandRepository, planner ReminderCreationPlanner) *ReminderService {
 	return &ReminderService{repository: repository, ReminderCreationPlanner: planner}
@@ -90,6 +91,31 @@ type ReminderCommandRepository interface {
 	) ([]database.ShoppingListView, error)
 	ShoppingListByID(ctx context.Context, telegramChatID int64, listID int64) (database.ShoppingListView, error)
 	ToggleShoppingListItem(ctx context.Context, telegramChatID int64, itemID int64) (database.ShoppingListView, error)
+	ReminderRecipientByUsername(
+		ctx context.Context,
+		ownerChatID int64,
+		username string,
+	) (database.ReminderRecipient, error)
+	BotUserByChatID(ctx context.Context, telegramChatID int64) (database.BotUser, error)
+	CreateSharedReminder(ctx context.Context, request database.SharedReminderRequest) (database.ReminderView, error)
+	AcceptIncomingReminder(ctx context.Context, ownerChatID int64, reminderID int64) error
+	DeclineIncomingReminder(ctx context.Context, ownerChatID int64, reminderID int64) error
+	ReminderSenderChatID(ctx context.Context, ownerChatID int64, reminderID int64) (int64, error)
+	AllowReminderSender(ctx context.Context, ownerChatID int64, senderChatID int64) error
+	RemoveReminderSender(ctx context.Context, ownerChatID int64, senderChatID int64) error
+	FindReminderPermissions(
+		ctx context.Context,
+		ownerChatID int64,
+		limit int,
+		offset int,
+	) ([]database.ReminderPermissionView, error)
+	FindOutgoingRemindersByChat(
+		ctx context.Context,
+		senderChatID int64,
+		limit int,
+		offset int,
+	) ([]database.ReminderView, error)
+	UpdateIncomingReminderRequests(ctx context.Context, telegramChatID int64, enabled bool) error
 }
 
 func (s *ReminderService) CreateReminder(
@@ -341,6 +367,142 @@ func (s *ReminderService) ToggleShoppingListItem(
 	}
 
 	return list, nil
+}
+
+func (s *ReminderService) ReminderRecipientByUsername(
+	ctx context.Context,
+	ownerChatID int64,
+	username string,
+) (database.ReminderRecipient, error) {
+	username = strings.TrimPrefix(strings.TrimSpace(username), "@")
+	if username == "" {
+		return database.ReminderRecipient{}, fmt.Errorf("load reminder recipient: %w", ErrReminderRecipientEmpty)
+	}
+
+	recipient, err := s.repository.ReminderRecipientByUsername(ctx, ownerChatID, username)
+	if err != nil {
+		return database.ReminderRecipient{}, fmt.Errorf("load reminder recipient: %w", err)
+	}
+
+	return recipient, nil
+}
+
+func (s *ReminderService) BotUserByChatID(ctx context.Context, telegramChatID int64) (database.BotUser, error) {
+	user, err := s.repository.BotUserByChatID(ctx, telegramChatID)
+	if err != nil {
+		return database.BotUser{}, fmt.Errorf("load bot user: %w", err)
+	}
+
+	return user, nil
+}
+
+func (s *ReminderService) CreateSharedReminder(
+	ctx context.Context,
+	request database.SharedReminderRequest,
+) (database.ReminderView, error) {
+	request.Title = strings.TrimSpace(request.Title)
+	request.Description = strings.TrimSpace(request.Description)
+
+	request.RecipientUsername = strings.TrimPrefix(strings.TrimSpace(request.RecipientUsername), "@")
+	if request.Title == "" {
+		return database.ReminderView{}, fmt.Errorf("create shared reminder: %w", ErrReminderTitleEmpty)
+	}
+
+	if request.RecipientUsername == "" || request.RecipientChatID == 0 {
+		return database.ReminderView{}, fmt.Errorf("create shared reminder: %w", ErrReminderRecipientEmpty)
+	}
+
+	reminder, err := s.repository.CreateSharedReminder(ctx, request)
+	if err != nil {
+		return database.ReminderView{}, fmt.Errorf("create shared reminder: %w", err)
+	}
+
+	return reminder, nil
+}
+
+func (s *ReminderService) AcceptIncomingReminder(ctx context.Context, ownerChatID int64, reminderID int64) error {
+	if err := s.repository.AcceptIncomingReminder(ctx, ownerChatID, reminderID); err != nil {
+		return fmt.Errorf("accept incoming reminder: %w", err)
+	}
+
+	return nil
+}
+
+func (s *ReminderService) DeclineIncomingReminder(ctx context.Context, ownerChatID int64, reminderID int64) error {
+	if err := s.repository.DeclineIncomingReminder(ctx, ownerChatID, reminderID); err != nil {
+		return fmt.Errorf("decline incoming reminder: %w", err)
+	}
+
+	return nil
+}
+
+func (s *ReminderService) ReminderSenderChatID(
+	ctx context.Context,
+	ownerChatID int64,
+	reminderID int64,
+) (int64, error) {
+	senderChatID, err := s.repository.ReminderSenderChatID(ctx, ownerChatID, reminderID)
+	if err != nil {
+		return 0, fmt.Errorf("load reminder sender chat id: %w", err)
+	}
+
+	return senderChatID, nil
+}
+
+func (s *ReminderService) AllowReminderSender(ctx context.Context, ownerChatID int64, senderChatID int64) error {
+	if err := s.repository.AllowReminderSender(ctx, ownerChatID, senderChatID); err != nil {
+		return fmt.Errorf("allow reminder sender: %w", err)
+	}
+
+	return nil
+}
+
+func (s *ReminderService) RemoveReminderSender(ctx context.Context, ownerChatID int64, senderChatID int64) error {
+	if err := s.repository.RemoveReminderSender(ctx, ownerChatID, senderChatID); err != nil {
+		return fmt.Errorf("remove reminder sender: %w", err)
+	}
+
+	return nil
+}
+
+func (s *ReminderService) FindReminderPermissions(
+	ctx context.Context,
+	ownerChatID int64,
+	limit int,
+	offset int,
+) ([]database.ReminderPermissionView, error) {
+	permissions, err := s.repository.FindReminderPermissions(ctx, ownerChatID, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("find reminder permissions: %w", err)
+	}
+
+	return permissions, nil
+}
+
+func (s *ReminderService) FindOutgoingRemindersByChat(
+	ctx context.Context,
+	senderChatID int64,
+	limit int,
+	offset int,
+) ([]database.ReminderView, error) {
+	reminders, err := s.repository.FindOutgoingRemindersByChat(ctx, senderChatID, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("find outgoing reminders: %w", err)
+	}
+
+	return reminders, nil
+}
+
+func (s *ReminderService) UpdateIncomingReminderRequests(
+	ctx context.Context,
+	telegramChatID int64,
+	enabled bool,
+) error {
+	if err := s.repository.UpdateIncomingReminderRequests(ctx, telegramChatID, enabled); err != nil {
+		return fmt.Errorf("update incoming reminder requests: %w", err)
+	}
+
+	return nil
 }
 
 func (s *ReminderService) createRecurringReminder(

@@ -26,8 +26,8 @@ func (d *Database) CreateRecurringReminder(
 		ctx,
 		`
 		INSERT INTO
-			notes (telegram_chat_id, title, description)
-		VALUES ($1, $2, $3)
+			notes (telegram_chat_id, sender_chat_id, title, description)
+		VALUES ($1, $1, $2, $3)
 		RETURNING id
 		`,
 		request.TelegramChatID,
@@ -86,12 +86,13 @@ func (d *Database) CreateRecurringReminder(
 	}
 
 	return database.ReminderView{
-		ID:          reminder.ID,
-		RuleID:      &ruleID,
-		Title:       request.Title,
-		Description: request.Description,
-		RemindAt:    reminder.RemindAt,
-		Status:      reminder.Status,
-		CreatedAt:   reminder.CreatedAt,
+		ID:                reminder.ID,
+		RuleID:            &ruleID,
+		Title:             request.Title,
+		Description:       request.Description,
+		RemindAt:          reminder.RemindAt,
+		Status:            reminder.Status,
+		RecipientUsername: "",
+		CreatedAt:         reminder.CreatedAt,
 	}, nil
 }
