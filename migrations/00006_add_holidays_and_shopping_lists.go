@@ -17,18 +17,24 @@ func upAddHolidaysAndShoppingLists(ctx context.Context, tx *sql.Tx) error {
 	CREATE TABLE holidays (
 		id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
 		telegram_chat_id BIGINT NOT NULL,
-		reminder_id BIGINT NOT NULL REFERENCES reminders(id) ON DELETE CASCADE,
 		holiday_name TEXT NOT NULL CHECK (length(trim(holiday_name)) > 0),
 		recipient_name TEXT NOT NULL CHECK (length(trim(recipient_name)) > 0),
 		holiday_date DATE NOT NULL,
+		remind_at TIMESTAMPTZ NOT NULL,
+		status TEXT NOT NULL DEFAULT 'active',
+		last_sent_at TIMESTAMPTZ,
 		created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 	);
 
-	CREATE UNIQUE INDEX holidays_reminder_id_idx
-		ON holidays (reminder_id);
+	ALTER TABLE holidays
+		ADD CONSTRAINT holidays_status_check CHECK (status IN ('active', 'canceled'));
 
 	CREATE INDEX holidays_chat_created_idx
 		ON holidays (telegram_chat_id, created_at DESC, id DESC);
+
+	CREATE INDEX holidays_due_idx
+		ON holidays (status, remind_at)
+		WHERE status = 'active';
 
 	CREATE TABLE shopping_lists (
 		id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,

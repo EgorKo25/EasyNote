@@ -72,7 +72,7 @@ func (s *Sender) SendReminder(ctx context.Context, reminder database.ScheduledRe
 		}
 	}
 
-	if err := s.refreshMainKeyboard(ctx, reminder); err != nil {
+	if err := s.refreshMainKeyboard(ctx, reminder.TelegramChatID); err != nil {
 		return 0, fmt.Errorf("send telegram main menu keyboard before reminder %d: %w", reminder.ID, err)
 	}
 
@@ -81,6 +81,38 @@ func (s *Sender) SendReminder(ctx context.Context, reminder database.ScheduledRe
 	message, err := s.bot.SendMessage(ctx, params)
 	if err != nil {
 		return 0, fmt.Errorf("send telegram reminder %d: %w", reminder.ID, err)
+	}
+
+	if message == nil {
+		return 0, nil
+	}
+
+	return message.MessageID, nil
+}
+
+func (s *Sender) SendHoliday(ctx context.Context, holiday database.ScheduledHoliday) (int, error) {
+	if err := s.refreshMainKeyboard(ctx, holiday.TelegramChatID); err != nil {
+		return 0, fmt.Errorf("send telegram main menu keyboard before holiday %d: %w", holiday.ID, err)
+	}
+
+	text := fmt.Sprintf("Поздравьте %s с %s.", holiday.RecipientName, holiday.HolidayName)
+
+	params := tu.Message(tu.ID(holiday.TelegramChatID), text)
+	if s.cfg.ParseMode != "" {
+		params.WithParseMode(s.cfg.ParseMode)
+	}
+
+	if s.cfg.DisableNotification {
+		params.WithDisableNotification()
+	}
+
+	if s.cfg.ProtectContent {
+		params.WithProtectContent()
+	}
+
+	message, err := s.bot.SendMessage(ctx, params)
+	if err != nil {
+		return 0, fmt.Errorf("send telegram holiday %d: %w", holiday.ID, err)
 	}
 
 	if message == nil {
@@ -105,10 +137,10 @@ func (s *Sender) DeleteReminderMessage(ctx context.Context, reminder database.Sc
 	return nil
 }
 
-func (s *Sender) refreshMainKeyboard(ctx context.Context, reminder database.ScheduledReminder) error {
-	if previousMenuID := s.mainMenuMessageID(reminder.TelegramChatID); previousMenuID != 0 {
+func (s *Sender) refreshMainKeyboard(ctx context.Context, chatID int64) error {
+	if previousMenuID := s.mainMenuMessageID(chatID); previousMenuID != 0 {
 		err := s.bot.DeleteMessage(ctx, &telego.DeleteMessageParams{
-			ChatID:    tu.ID(reminder.TelegramChatID),
+			ChatID:    tu.ID(chatID),
 			MessageID: previousMenuID,
 		})
 		if err != nil {
@@ -117,14 +149,14 @@ func (s *Sender) refreshMainKeyboard(ctx context.Context, reminder database.Sche
 	}
 
 	menuMessage, err := s.bot.SendMessage(ctx,
-		tu.Message(tu.ID(reminder.TelegramChatID), "Напоминаю:").WithReplyMarkup(telegramui.MainKeyboard()),
+		tu.Message(tu.ID(chatID), "Напоминаю:").WithReplyMarkup(telegramui.MainKeyboard()),
 	)
 	if err != nil {
 		return fmt.Errorf("send telegram main menu keyboard message: %w", err)
 	}
 
 	if menuMessage != nil {
-		s.setMainMenuMessageID(reminder.TelegramChatID, menuMessage.MessageID)
+		s.setMainMenuMessageID(chatID, menuMessage.MessageID)
 	}
 
 	return nil

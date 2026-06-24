@@ -28,7 +28,15 @@ var (
 	errExpectedSendCaller = errors.New(
 		"send telegram reminder 5: telego: sendMessage: internal execution: request call: telegram api",
 	)
-	errExpectedSendResponse   = errors.New("send telegram reminder 6: telego: sendMessage: api: 400 \"bad request\"")
+	errExpectedSendResponse = errors.New(
+		"send telegram reminder 6: telego: sendMessage: api: 400 \"bad request\"",
+	)
+	errExpectedHolidayCaller = errors.New(
+		"send telegram holiday 5: telego: sendMessage: internal execution: request call: telegram api",
+	)
+	errExpectedHolidayMessage = errors.New(
+		"send telegram main menu keyboard before holiday 6: send telegram main menu keyboard message: telego: sendMessage: internal execution: request call: telegram api",
+	)
 	errExpectedEmptyTokenEnvE = errors.New("telegram token is empty: env EASY_NOTE_TEST_TOKEN_E")
 	errExpectedEmptyTokenEnvF = errors.New("telegram token is empty: env EASY_NOTE_TEST_TOKEN_F")
 	errLoadReminders          = errors.New("load reminders")
@@ -936,6 +944,132 @@ func TestSenderSendsReminder(t *testing.T) {
 			}
 
 			_, err = sender.SendReminder(t.Context(), test.reminder)
+
+			if test.expected.expectedErr != nil {
+				require.EqualError(t, err, test.expected.expectedErr.Error())
+
+				return
+			}
+
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestSenderSendsHoliday(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		cfg      config.Telegram
+		holiday  database.ScheduledHoliday
+		state    func(sender *Sender)
+		before   func(caller *telegoapimock.MockCaller)
+		expected struct {
+			expectedErr error
+		}
+	}{
+		{
+			name: "holiday is sent",
+			holiday: database.ScheduledHoliday{
+				ID: 1, TelegramChatID: 100, HolidayName: "Birthday", RecipientName: "Oleg",
+			},
+			before: func(caller *telegoapimock.MockCaller) {
+				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(testTelegramResponse(t, telego.Message{MessageID: 1}), nil).
+					Times(2)
+			},
+		},
+		{
+			name: "parse mode holiday is sent",
+			cfg:  config.Telegram{ParseMode: telego.ModeHTML},
+			holiday: database.ScheduledHoliday{
+				ID: 2, TelegramChatID: 100, HolidayName: "<b>Birthday</b>", RecipientName: "Oleg",
+			},
+			before: func(caller *telegoapimock.MockCaller) {
+				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(testTelegramResponse(t, telego.Message{MessageID: 2}), nil).
+					Times(2)
+			},
+		},
+		{
+			name: "silent protected holiday is sent",
+			cfg:  config.Telegram{DisableNotification: true, ProtectContent: true},
+			holiday: database.ScheduledHoliday{
+				ID: 3, TelegramChatID: 100, HolidayName: "Birthday", RecipientName: "Oleg",
+			},
+			before: func(caller *telegoapimock.MockCaller) {
+				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(testTelegramResponse(t, telego.Message{MessageID: 3}), nil).
+					Times(2)
+			},
+		},
+		{
+			name: "previous main menu message is deleted before holiday is sent",
+			holiday: database.ScheduledHoliday{
+				ID: 4, TelegramChatID: 100, HolidayName: "Birthday", RecipientName: "Oleg",
+			},
+			state: func(sender *Sender) {
+				sender.setMainMenuMessageID(100, 55)
+			},
+			before: func(caller *telegoapimock.MockCaller) {
+				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(testTelegramResponse(t, telego.Message{MessageID: 4}), nil).
+					Times(3)
+			},
+		},
+		{
+			name: "holiday send api caller error is returned",
+			holiday: database.ScheduledHoliday{
+				ID: 5, TelegramChatID: 100, HolidayName: "Birthday", RecipientName: "Oleg",
+			},
+			before: func(caller *telegoapimock.MockCaller) {
+				gomock.InOrder(
+					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+						Return(testTelegramResponse(t, telego.Message{MessageID: 5}), nil).
+						Times(1),
+					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+						Return(nil, errTelegramAPI).
+						Times(1),
+				)
+			},
+			expected: struct{ expectedErr error }{expectedErr: errExpectedHolidayCaller},
+		},
+		{
+			name: "holiday main menu api caller error is returned",
+			holiday: database.ScheduledHoliday{
+				ID: 6, TelegramChatID: 100, HolidayName: "Birthday", RecipientName: "Oleg",
+			},
+			before: func(caller *telegoapimock.MockCaller) {
+				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil, errTelegramAPI).
+					Times(1)
+			},
+			expected: struct{ expectedErr error }{expectedErr: errExpectedHolidayMessage},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctrl := gomock.NewController(t)
+			caller := telegoapimock.NewMockCaller(ctrl)
+			test.before(caller)
+
+			bot, err := telego.NewBot(
+				testTelegramToken,
+				telego.WithAPICaller(caller),
+				telego.WithDiscardLogger(),
+			)
+			require.NoError(t, err)
+
+			sender := &Sender{bot: bot, cfg: test.cfg}
+			if test.state != nil {
+				test.state(sender)
+			}
+
+			_, err = sender.SendHoliday(t.Context(), test.holiday)
 
 			if test.expected.expectedErr != nil {
 				require.EqualError(t, err, test.expected.expectedErr.Error())

@@ -28,7 +28,86 @@ func (r *Runner) sendDueReminders(ctx context.Context) error {
 		}
 	}
 
+	holidays, err := r.FindHolidaysReadyToSend(ctx, now, r.cfg.BatchLimit)
+	if err != nil {
+		return fmt.Errorf("find holidays ready to send: %w", err)
+	}
+
+	for _, holiday := range holidays {
+		if err = ctx.Err(); err != nil {
+			return fmt.Errorf("send due holidays: %w", err)
+		}
+
+		if err = r.sendDueHoliday(ctx, *holiday, now); err != nil {
+			return err
+		}
+	}
+
 	return nil
+}
+
+func (r *Runner) sendDueHoliday(
+	ctx context.Context,
+	holiday database.ScheduledHoliday,
+	now time.Time,
+) error {
+	messageID, err := r.sendHoliday(ctx, holiday)
+	if err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return fmt.Errorf("send holiday %d: %w", holiday.ID, err)
+		}
+
+		logger.Get("scheduler/runner").Error(
+			"cannot send holiday",
+			err,
+			logger.Int64("holiday_id", holiday.ID),
+		)
+	}
+
+	var completedAt *time.Time
+	if messageID != 0 {
+		completedAt = &now
+	}
+
+	if err = r.CompleteHoliday(ctx, holiday.ID, completedAt); err != nil {
+		return fmt.Errorf("complete holiday %d: %w", holiday.ID, err)
+	}
+
+	return nil
+}
+
+func (r *Runner) sendHoliday(
+	ctx context.Context,
+	holiday database.ScheduledHoliday,
+) (int, error) {
+	var messageID int
+
+	err := r.Retry(
+		ctx,
+		func() error {
+			sentMessageID, err := r.SendHoliday(ctx, holiday)
+			if err != nil {
+				return fmt.Errorf("send holiday: %w", err)
+			}
+
+			messageID = sentMessageID
+
+			return nil
+		},
+		func(err error, delay time.Duration) {
+			logger.Get("scheduler/runner").Warn(
+				"cannot send holiday, retrying",
+				logger.Any("error", err),
+				logger.Int64("holiday_id", holiday.ID),
+				logger.String("retry_after", delay.String()),
+			)
+		},
+	)
+	if err != nil {
+		return 0, fmt.Errorf("retry holiday send: %w", err)
+	}
+
+	return messageID, nil
 }
 
 func (r *Runner) sendDueReminder(

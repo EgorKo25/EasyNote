@@ -112,8 +112,11 @@ const (
 	WeekdayMaskFriday    = 16
 	WeekdayMaskSaturday  = 32
 	WeekdayMaskSunday    = 64
-	WeekdaysMaskWorkdays = WeekdayMaskMonday | WeekdayMaskTuesday | WeekdayMaskWednesday |
-		WeekdayMaskThursday | WeekdayMaskFriday
+	WeekdaysMaskWorkdays = WeekdayMaskMonday |
+		WeekdayMaskTuesday |
+		WeekdayMaskWednesday |
+		WeekdayMaskThursday |
+		WeekdayMaskFriday
 )
 
 type ReminderRule struct {
@@ -158,6 +161,35 @@ type ReminderDelivery struct {
 	IntrusiveUntil time.Time
 }
 
+type HolidayStatus string
+
+const (
+	HolidayStatusActive   HolidayStatus = "active"
+	HolidayStatusCanceled HolidayStatus = "canceled"
+)
+
+type Holiday struct {
+	ID             int64
+	TelegramChatID int64
+	HolidayName    string
+	RecipientName  string
+	HolidayDate    time.Time
+	RemindAt       time.Time
+	Status         HolidayStatus
+	LastSentAt     *time.Time
+	CreatedAt      time.Time
+}
+
+type ScheduledHoliday struct {
+	ID int64
+
+	TelegramChatID int64
+	HolidayName    string
+	RecipientName  string
+	RemindAt       time.Time
+	Timezone       string
+}
+
 type HolidayRequest struct {
 	TelegramChatID int64
 	HolidayName    string
@@ -175,11 +207,11 @@ type HolidayUpdateRequest struct {
 type HolidayView struct {
 	ID             int64
 	TelegramChatID int64
-	ReminderID     int64
 	HolidayName    string
 	RecipientName  string
 	HolidayDate    time.Time
 	RemindAt       time.Time
+	Status         HolidayStatus
 	CreatedAt      time.Time
 }
 
