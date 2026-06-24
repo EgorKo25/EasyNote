@@ -83,10 +83,6 @@ func (s *Sender) SendReminder(ctx context.Context, reminder database.ScheduledRe
 		return 0, fmt.Errorf("send telegram reminder %d: %w", reminder.ID, err)
 	}
 
-	if message == nil {
-		return 0, nil
-	}
-
 	return message.MessageID, nil
 }
 
@@ -113,10 +109,6 @@ func (s *Sender) SendHoliday(ctx context.Context, holiday database.ScheduledHoli
 	message, err := s.bot.SendMessage(ctx, params)
 	if err != nil {
 		return 0, fmt.Errorf("send telegram holiday %d: %w", holiday.ID, err)
-	}
-
-	if message == nil {
-		return 0, nil
 	}
 
 	return message.MessageID, nil
