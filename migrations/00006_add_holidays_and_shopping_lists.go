@@ -18,8 +18,8 @@ func upAddHolidaysAndShoppingLists(ctx context.Context, tx *sql.Tx) error {
 		id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
 		telegram_chat_id BIGINT NOT NULL,
 		reminder_id BIGINT NOT NULL REFERENCES reminders(id) ON DELETE CASCADE,
-		name TEXT NOT NULL CHECK (length(trim(name)) > 0),
-		person_name TEXT NOT NULL CHECK (length(trim(person_name)) > 0),
+		holiday_name TEXT NOT NULL CHECK (length(trim(holiday_name)) > 0),
+		recipient_name TEXT NOT NULL CHECK (length(trim(recipient_name)) > 0),
 		holiday_date DATE NOT NULL,
 		created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 	);

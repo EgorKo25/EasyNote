@@ -94,6 +94,7 @@ const (
 	CallbackWeekdayPrefix           = "weekday:"
 	CallbackViewPrefix              = "reminder:view:"
 	CallbackDeletePrefix            = "reminder:delete:"
+	CallbackReminderEditPrefix      = "reminder:edit:"
 	CallbackHolidayEditPrefix       = "holiday:edit:"
 	CallbackHolidayDeletePrefix     = "holiday:delete:"
 	CallbackHolidayBackList         = "holiday:back_list"

@@ -28,8 +28,12 @@ func TestRunnerProcessesReadyReminders(t *testing.T) {
 	baseTime := time.Date(2026, time.June, 5, 10, 0, 0, 0, time.UTC)
 	pollInterval := time.Minute
 	retryInterval := 5 * time.Second
-	firstReminder := database.ScheduledReminder{ID: 1, NoteID: 10, TelegramChatID: 100, Title: "first"}
-	secondReminder := database.ScheduledReminder{ID: 2, NoteID: 20, TelegramChatID: 200, Title: "second"}
+	firstReminder := database.ScheduledReminder{
+		ID: 1, NoteID: 10, TelegramChatID: 100, Title: "first", Timezone: "UTC",
+	}
+	secondReminder := database.ScheduledReminder{
+		ID: 2, NoteID: 20, TelegramChatID: 200, Title: "second", Timezone: "UTC",
+	}
 
 	type expected struct {
 		expectedErrText string
@@ -325,7 +329,7 @@ func TestRunnerProcessesReadyReminders(t *testing.T) {
 							ReminderID:     intrusiveReminder.ID,
 							MessageID:      301,
 							NextSendAt:     baseTime.Add(45 * time.Minute),
-							IntrusiveUntil: baseTime.Add(24 * time.Hour),
+							IntrusiveUntil: time.Date(2026, time.June, 5, 12, 0, 0, 0, time.UTC),
 						}).
 						Return(nil).
 						Times(1),
@@ -366,7 +370,7 @@ func TestRunnerProcessesReadyReminders(t *testing.T) {
 							ReminderID:     intrusiveReminder.ID,
 							MessageID:      302,
 							NextSendAt:     baseTime.Add(time.Minute),
-							IntrusiveUntil: baseTime.Add(24 * time.Hour),
+							IntrusiveUntil: time.Date(2026, time.June, 5, 12, 0, 0, 0, time.UTC),
 						}).
 						Return(nil).
 						Times(1),
@@ -377,7 +381,7 @@ func TestRunnerProcessesReadyReminders(t *testing.T) {
 			},
 		},
 		{
-			name: "expired intrusive reminder is completed as skipped",
+			name: "expired intrusive reminder after user local noon deletes previous message and is completed as skipped",
 			cfg: config.Scheduler{
 				PollInterval:      pollInterval,
 				SendRetryInterval: retryInterval,
@@ -387,18 +391,25 @@ func TestRunnerProcessesReadyReminders(t *testing.T) {
 			before: func(
 				_ *gomock.Controller,
 				storage *mocks.MockStorage,
-				_ *mocks.MockSender,
+				sender *mocks.MockSender,
 				planner *mocks.MockPlanner,
 				_ chan struct{},
 			) {
 				expiredReminder := firstReminder
 				expiredReminder.IntrusiveEnabled = true
-				expiredReminder.RemindAt = baseTime.Add(-24 * time.Hour)
+				expiredReminder.RemindAt = time.Date(2026, time.June, 4, 18, 0, 0, 0, time.UTC)
+				expiredReminder.Timezone = "Europe/Moscow"
+				messageID := 777
+				expiredReminder.TelegramMessageID = &messageID
 
 				gomock.InOrder(
 					storage.EXPECT().
 						FindRemindersReadyToSend(gomock.Any(), baseTime, 10).
 						Return([]*database.ScheduledReminder{&expiredReminder}, nil).
+						Times(1),
+					sender.EXPECT().
+						DeleteReminderMessage(gomock.Any(), expiredReminder).
+						Return(nil).
 						Times(1),
 					planner.EXPECT().
 						CompleteOccurrence(

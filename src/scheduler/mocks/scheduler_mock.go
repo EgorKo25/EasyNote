@@ -95,6 +95,20 @@ func (m *MockSender) EXPECT() *MockSenderMockRecorder {
 	return m.recorder
 }
 
+// DeleteReminderMessage mocks base method.
+func (m *MockSender) DeleteReminderMessage(ctx context.Context, reminder database.ScheduledReminder) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteReminderMessage", ctx, reminder)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteReminderMessage indicates an expected call of DeleteReminderMessage.
+func (mr *MockSenderMockRecorder) DeleteReminderMessage(ctx, reminder any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteReminderMessage", reflect.TypeOf((*MockSender)(nil).DeleteReminderMessage), ctx, reminder)
+}
+
 // SendReminder mocks base method.
 func (m *MockSender) SendReminder(ctx context.Context, reminder database.ScheduledReminder) (int, error) {
 	m.ctrl.T.Helper()

@@ -125,6 +125,15 @@ type ReminderService interface {
 		minute int,
 		location *time.Location,
 	) (database.ReminderView, error)
+	ReminderByID(ctx context.Context, telegramChatID int64, reminderID int64) (database.ReminderView, error)
+	UpdateReminder(
+		ctx context.Context,
+		telegramChatID int64,
+		reminderID int64,
+		title string,
+		description string,
+		remindAt time.Time,
+	) (database.ReminderView, error)
 	DeleteReminder(ctx context.Context, telegramChatID int64, reminderID int64) error
 	CompleteOccurrence(
 		ctx context.Context,
@@ -662,15 +671,31 @@ func (b *ReminderBot) handleShoppingCallback(
 }
 
 func (b *ReminderBot) handleReminderCallback(ctx context.Context, chatID int64, messageID int, data string) error {
-	switch {
-	case data == telegramui.CallbackCreateReminder:
+	if handled, err := b.handleReminderActionCallback(ctx, chatID, messageID, data); handled {
+		return err
+	}
+
+	switch data {
+	case telegramui.CallbackCreateReminder:
 		return b.startReminderDraftInMessage(ctx, chatID, messageID)
-	case data == telegramui.CallbackReminderList || data == telegramui.CallbackReminderBackList:
+	case telegramui.CallbackReminderList, telegramui.CallbackReminderBackList:
 		return b.editReminderList(ctx, chatID, messageID)
-	case data == telegramui.CallbackReminderHistory:
+	case telegramui.CallbackReminderHistory:
 		return b.editReminderHistory(ctx, chatID, messageID)
+	default:
+		return nil
+	}
+}
+
+func (b *ReminderBot) handleReminderActionCallback(
+	ctx context.Context,
+	chatID int64,
+	messageID int,
+	data string,
+) (bool, error) {
+	switch {
 	case strings.HasPrefix(data, telegramui.CallbackReminderDone):
-		return b.acknowledgeReminder(
+		return true, b.acknowledgeReminder(
 			ctx,
 			chatID,
 			messageID,
@@ -679,7 +704,7 @@ func (b *ReminderBot) handleReminderCallback(ctx context.Context, chatID int64, 
 			database.ReminderStatusCompleted,
 		)
 	case strings.HasPrefix(data, telegramui.CallbackReminderCancelDelivered):
-		return b.acknowledgeReminder(
+		return true, b.acknowledgeReminder(
 			ctx,
 			chatID,
 			messageID,
@@ -687,12 +712,19 @@ func (b *ReminderBot) handleReminderCallback(ctx context.Context, chatID int64, 
 			telegramui.CallbackReminderCancelDelivered,
 			database.ReminderStatusCanceled,
 		)
+	case strings.HasPrefix(data, telegramui.CallbackReminderEditPrefix):
+		reminderID, err := strconv.ParseInt(strings.TrimPrefix(data, telegramui.CallbackReminderEditPrefix), 10, 64)
+		if err != nil {
+			return true, fmt.Errorf("parse reminder id: %w", err)
+		}
+
+		return true, b.startReminderDraftForEdit(ctx, chatID, messageID, reminderID)
 	case strings.HasPrefix(data, telegramui.CallbackDeletePrefix):
-		return b.deleteReminder(ctx, chatID, messageID, data)
+		return true, b.deleteReminder(ctx, chatID, messageID, data)
 	case strings.HasPrefix(data, telegramui.CallbackViewPrefix):
-		return b.viewReminder(ctx, chatID, messageID, data)
+		return true, b.viewReminder(ctx, chatID, messageID, data)
 	default:
-		return nil
+		return false, nil
 	}
 }
 
@@ -946,14 +978,46 @@ func (b *ReminderBot) startHolidayDraftForEdit(
 	draft := reminderDraft{
 		id:            holiday.ID,
 		kind:          telegramui.DraftKindHoliday,
-		title:         holiday.Name,
-		description:   holiday.PersonName,
+		title:         holiday.HolidayName,
+		description:   holiday.RecipientName,
 		date:          remindAt,
 		hour:          remindAt.Hour(),
 		minute:        remindAt.Minute(),
 		screen:        telegramui.ScreenMain,
 		calendarMonth: telegramui.FirstDayOfMonth(remindAt),
 	}
+
+	b.mu.Lock()
+	b.draftByChat[chatID] = draft
+	b.mu.Unlock()
+
+	return b.editDraft(ctx, chatID, messageID)
+}
+
+func (b *ReminderBot) startReminderDraftForEdit(
+	ctx context.Context,
+	chatID int64,
+	messageID int,
+	reminderID int64,
+) error {
+	if err := b.loadChatLocation(ctx, chatID); err != nil {
+		return err
+	}
+
+	reminder, err := b.service.ReminderByID(ctx, chatID, reminderID)
+	if err != nil {
+		return fmt.Errorf("load reminder for edit: %w", err)
+	}
+
+	remindAt := reminder.RemindAt.In(b.location(chatID))
+	draft := newReminderDraft(remindAt)
+	draft.id = reminder.ID
+	draft.title = reminder.Title
+	draft.description = reminder.Description
+	draft.date = remindAt
+	draft.hour = remindAt.Hour()
+	draft.minute = remindAt.Minute()
+	draft.calendarMonth = telegramui.FirstDayOfMonth(remindAt)
 
 	b.mu.Lock()
 	b.draftByChat[chatID] = draft
@@ -1554,8 +1618,8 @@ func (b *ReminderBot) viewHolidayByReply(ctx context.Context, chatID int64, text
 				chatID,
 				fmt.Sprintf(
 					"Поздравьте <b>%s</b> с <b>%s</b>.\n\n<b>Дата и время:</b> %s",
-					html.EscapeString(holiday.PersonName),
-					html.EscapeString(holiday.Name),
+					html.EscapeString(holiday.RecipientName),
+					html.EscapeString(holiday.HolidayName),
 					holiday.RemindAt.In(b.location(chatID)).Format("02.01.2006 15:04"),
 				),
 				telegramui.HolidayDetailsKeyboard(holiday),
@@ -1639,9 +1703,19 @@ func (b *ReminderBot) saveReminderDraft(
 		return b.replaceDraft(ctx, chatID)
 	}
 
-	reminder, err := b.createDraftReminder(ctx, chatID, draft, remindAt)
+	var (
+		reminder database.ReminderView
+		err      error
+	)
+
+	if draft.id == 0 {
+		reminder, err = b.createDraftReminder(ctx, chatID, draft, remindAt)
+	} else {
+		reminder, err = b.service.UpdateReminder(ctx, chatID, draft.id, draft.title, draft.description, remindAt)
+	}
+
 	if err != nil {
-		return fmt.Errorf("create reminder: %w", err)
+		return fmt.Errorf("save reminder: %w", err)
 	}
 
 	b.deleteDraft(chatID)
@@ -1674,8 +1748,8 @@ func (b *ReminderBot) saveHolidayDraft(
 
 	request := database.HolidayRequest{
 		TelegramChatID: chatID,
-		Name:           draft.title,
-		PersonName:     draft.description,
+		HolidayName:    draft.title,
+		RecipientName:  draft.description,
 		HolidayDate:    draft.date,
 		RemindAt:       remindAt,
 	}
@@ -1701,8 +1775,8 @@ func (b *ReminderBot) saveHolidayDraft(
 		messageID,
 		"<i>Праздник сохранен.</i>\n\n"+fmt.Sprintf(
 			"Поздравьте <b>%s</b> с <b>%s</b>.\n\n<b>Дата и время:</b> %s",
-			html.EscapeString(holiday.PersonName),
-			html.EscapeString(holiday.Name),
+			html.EscapeString(holiday.RecipientName),
+			html.EscapeString(holiday.HolidayName),
 			holiday.RemindAt.In(b.location(chatID)).Format("02.01.2006 15:04"),
 		),
 		telegramui.HolidayDetailsKeyboard(holiday),

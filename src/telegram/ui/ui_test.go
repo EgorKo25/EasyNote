@@ -468,13 +468,13 @@ func TestMenuAndActionKeyboards(t *testing.T) {
 			}{rows: [][]string{{"Активные", "Прошедшие"}, {"Назад"}}},
 		},
 		{
-			name: "reminder details keyboard exposes back delete and main menu",
+			name: "reminder details keyboard exposes edit back delete and main menu",
 			action: func() [][]string {
 				return keyboardTexts(telegramui.ReminderDetailsKeyboard(reminder).InlineKeyboard)
 			},
 			expected: struct {
 				rows [][]string
-			}{rows: [][]string{{"Назад", "Удалить"}, {"Главное меню"}}},
+			}{rows: [][]string{{"Изменить"}, {"Назад", "Удалить"}, {"Главное меню"}}},
 		},
 		{
 			name: "create keyboard exposes reminder holiday and shopping kinds",
@@ -525,7 +525,7 @@ func TestMenuAndActionKeyboards(t *testing.T) {
 			name: "holiday list keyboard renders holiday buttons",
 			action: func() [][]string {
 				return keyboardTexts(telegramui.HolidayListKeyboard([]database.HolidayView{{
-					Name: "днем рождения", PersonName: "Олега",
+					HolidayName: "днем рождения", RecipientName: "Олега",
 				}}).Keyboard)
 			},
 			expected: struct {

@@ -90,6 +90,21 @@ func (s *Sender) SendReminder(ctx context.Context, reminder database.ScheduledRe
 	return message.MessageID, nil
 }
 
+func (s *Sender) DeleteReminderMessage(ctx context.Context, reminder database.ScheduledReminder) error {
+	if reminder.TelegramMessageID == nil {
+		return nil
+	}
+
+	if err := s.bot.DeleteMessage(ctx, &telego.DeleteMessageParams{
+		ChatID:    tu.ID(reminder.TelegramChatID),
+		MessageID: *reminder.TelegramMessageID,
+	}); err != nil {
+		return fmt.Errorf("delete telegram reminder %d message: %w", reminder.ID, err)
+	}
+
+	return nil
+}
+
 func (s *Sender) refreshMainKeyboard(ctx context.Context, reminder database.ScheduledReminder) error {
 	if previousMenuID := s.mainMenuMessageID(reminder.TelegramChatID); previousMenuID != 0 {
 		err := s.bot.DeleteMessage(ctx, &telego.DeleteMessageParams{

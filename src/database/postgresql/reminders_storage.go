@@ -136,6 +136,102 @@ func (d *Database) FindReminderHistoryByChat(
 	return reminders, nil
 }
 
+func (d *Database) ReminderByID(
+	ctx context.Context,
+	telegramChatID int64,
+	reminderID int64,
+) (database.ReminderView, error) {
+	query := `
+		SELECT r.id, r.rule_id, n.title, n.description, r.remind_at, r.status, r.created_at
+		FROM reminders r
+		JOIN notes n ON n.id = r.note_id
+		WHERE n.telegram_chat_id = $1
+			AND r.id = $2
+			AND r.status = 'new'
+	`
+
+	var reminder database.ReminderView
+	if err := d.pool.QueryRow(ctx, query, telegramChatID, reminderID).Scan(
+		&reminder.ID,
+		&reminder.RuleID,
+		&reminder.Title,
+		&reminder.Description,
+		&reminder.RemindAt,
+		&reminder.Status,
+		&reminder.CreatedAt,
+	); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return database.ReminderView{}, fmt.Errorf("%w: %d", database.ErrReminderNotFound, reminderID)
+		}
+
+		return database.ReminderView{}, fmt.Errorf("load reminder by id: %w", err)
+	}
+
+	return reminder, nil
+}
+
+func (d *Database) UpdateReminder(
+	ctx context.Context,
+	telegramChatID int64,
+	reminderID int64,
+	title string,
+	description string,
+	remindAt time.Time,
+) (database.ReminderView, error) {
+	query := `
+		WITH selected_reminder AS (
+			SELECT r.id, r.note_id
+			FROM reminders r
+			JOIN notes n ON n.id = r.note_id
+			WHERE n.telegram_chat_id = $1
+				AND r.id = $2
+				AND r.status = 'new'
+			FOR UPDATE
+		),
+		updated_note AS (
+			UPDATE notes n
+			SET title = $3,
+				description = $4
+			FROM selected_reminder sr
+			WHERE n.id = sr.note_id
+			RETURNING n.id, n.title, n.description
+		),
+		updated_reminder AS (
+			UPDATE reminders r
+			SET remind_at = $5,
+				last_sent_at = NULL,
+				next_send_at = NULL,
+				intrusive_until = NULL,
+				telegram_message_id = NULL
+			FROM selected_reminder sr
+			WHERE r.id = sr.id
+			RETURNING r.id, r.rule_id, r.note_id, r.remind_at, r.status, r.created_at
+		)
+		SELECT r.id, r.rule_id, n.title, n.description, r.remind_at, r.status, r.created_at
+		FROM updated_reminder r
+		JOIN updated_note n ON n.id = r.note_id
+	`
+
+	var reminder database.ReminderView
+	if err := d.pool.QueryRow(ctx, query, telegramChatID, reminderID, title, description, remindAt).Scan(
+		&reminder.ID,
+		&reminder.RuleID,
+		&reminder.Title,
+		&reminder.Description,
+		&reminder.RemindAt,
+		&reminder.Status,
+		&reminder.CreatedAt,
+	); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return database.ReminderView{}, fmt.Errorf("%w: %d", database.ErrReminderNotFound, reminderID)
+		}
+
+		return database.ReminderView{}, fmt.Errorf("update reminder: %w", err)
+	}
+
+	return reminder, nil
+}
+
 func (d *Database) ReminderStatsByChat(ctx context.Context, telegramChatID int64) (database.ReminderStats, error) {
 	query := `
 		SELECT
@@ -190,7 +286,7 @@ func (d *Database) CancelReminder(ctx context.Context, telegramChatID int64, rem
 	}
 
 	if ruleID != nil {
-		storage := newTransactionStorage(transaction)
+		storage := newPlannerTransactionStorage(transaction)
 		if err = storage.UpdateRuleStatus(ctx, *ruleID, database.ReminderRuleStatusCanceled); err != nil {
 			return fmt.Errorf("cancel reminder rule: %w", err)
 		}
@@ -241,6 +337,7 @@ func (d *Database) FindRemindersReadyToSend(
 			r.remind_at,
 			COALESCE(s.intrusive_enabled, false),
 			(COALESCE(s.intrusive_interval_minutes, 30) * INTERVAL '1 minute') AS intrusive_interval,
+			COALESCE(s.timezone, 'Europe/Moscow'),
 			r.telegram_message_id
 		FROM reminders r
 		JOIN due d ON d.id = r.id
@@ -282,6 +379,7 @@ func scanScheduledReminders(rows pgx.Rows) ([]*database.ScheduledReminder, error
 			&reminder.RemindAt,
 			&reminder.IntrusiveEnabled,
 			&reminder.IntrusiveInterval,
+			&reminder.Timezone,
 			&reminder.TelegramMessageID,
 		); err != nil {
 			return nil, fmt.Errorf("scan scheduled reminder: %w", err)

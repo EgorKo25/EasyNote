@@ -219,6 +219,21 @@ func (mr *MockReminderServiceMockRecorder) HolidayByID(ctx, telegramChatID, holi
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HolidayByID", reflect.TypeOf((*MockReminderService)(nil).HolidayByID), ctx, telegramChatID, holidayID)
 }
 
+// ReminderByID mocks base method.
+func (m *MockReminderService) ReminderByID(ctx context.Context, telegramChatID, reminderID int64) (database.ReminderView, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReminderByID", ctx, telegramChatID, reminderID)
+	ret0, _ := ret[0].(database.ReminderView)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReminderByID indicates an expected call of ReminderByID.
+func (mr *MockReminderServiceMockRecorder) ReminderByID(ctx, telegramChatID, reminderID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReminderByID", reflect.TypeOf((*MockReminderService)(nil).ReminderByID), ctx, telegramChatID, reminderID)
+}
+
 // ShoppingListByID mocks base method.
 func (m *MockReminderService) ShoppingListByID(ctx context.Context, telegramChatID, listID int64) (database.ShoppingListView, error) {
 	m.ctrl.T.Helper()
@@ -262,6 +277,21 @@ func (m *MockReminderService) UpdateHoliday(ctx context.Context, request databas
 func (mr *MockReminderServiceMockRecorder) UpdateHoliday(ctx, request any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateHoliday", reflect.TypeOf((*MockReminderService)(nil).UpdateHoliday), ctx, request)
+}
+
+// UpdateReminder mocks base method.
+func (m *MockReminderService) UpdateReminder(ctx context.Context, telegramChatID, reminderID int64, title, description string, remindAt time.Time) (database.ReminderView, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateReminder", ctx, telegramChatID, reminderID, title, description, remindAt)
+	ret0, _ := ret[0].(database.ReminderView)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateReminder indicates an expected call of UpdateReminder.
+func (mr *MockReminderServiceMockRecorder) UpdateReminder(ctx, telegramChatID, reminderID, title, description, remindAt any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateReminder", reflect.TypeOf((*MockReminderService)(nil).UpdateReminder), ctx, telegramChatID, reminderID, title, description, remindAt)
 }
 
 // MockReminderRepository is a mock of ReminderRepository interface.

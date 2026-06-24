@@ -37,6 +37,10 @@ func (r *Runner) sendDueReminder(
 	now time.Time,
 ) error {
 	if shouldSkipIntrusiveReminder(reminder, now) {
+		if err := r.DeleteReminderMessage(ctx, reminder); err != nil {
+			return fmt.Errorf("delete expired intrusive reminder %d message: %w", reminder.ID, err)
+		}
+
 		return r.CompleteOccurrence(ctx, reminder.ID, database.ReminderStatusSkipped, &now)
 	}
 
@@ -114,7 +118,32 @@ func (r *Runner) sendReminder(
 
 func shouldSkipIntrusiveReminder(reminder database.ScheduledReminder, now time.Time) bool {
 	return reminder.IntrusiveEnabled &&
-		!reminder.RemindAt.Add(24*time.Hour).After(now)
+		!intrusiveReminderCutoff(reminder).After(now)
+}
+
+func intrusiveReminderCutoff(reminder database.ScheduledReminder) time.Time {
+	location, err := time.LoadLocation(reminder.Timezone)
+	if err != nil {
+		location = time.Local
+	}
+
+	localRemindAt := reminder.RemindAt.In(location)
+
+	cutoff := time.Date(
+		localRemindAt.Year(),
+		localRemindAt.Month(),
+		localRemindAt.Day(),
+		12,
+		0,
+		0,
+		0,
+		location,
+	)
+	if !cutoff.After(localRemindAt) {
+		cutoff = cutoff.AddDate(0, 0, 1)
+	}
+
+	return cutoff
 }
 
 func deliveryForReminder(
@@ -127,7 +156,7 @@ func deliveryForReminder(
 		interval = 30 * time.Minute
 	}
 
-	intrusiveUntil := reminder.RemindAt.Add(24 * time.Hour)
+	intrusiveUntil := intrusiveReminderCutoff(reminder)
 	if messageID == 0 && reminder.TelegramMessageID != nil {
 		messageID = *reminder.TelegramMessageID
 	}
