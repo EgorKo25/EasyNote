@@ -37,3 +37,10 @@ go.work.sum
 
 *.ps1
 *.zip
+
+# Frontend (Expo)
+frontend/node_modules/
+frontend/.expo/
+frontend/dist/
+frontend/web-build/
+frontend/.env
