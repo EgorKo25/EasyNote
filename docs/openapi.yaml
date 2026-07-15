@@ -1,0 +1,771 @@
+openapi: 3.0.3
+info:
+  title: EasyNote API
+  description: API EasyNote - сервиса уведомлений
+  version: 1.4.0
+
+paths:
+  /api/v1/health:
+    get:
+      summary: проверка состояния сервиса
+      description: Проверяет, что HTTP-сервис доступен
+      operationId: getHealth
+      tags: [Health]
+      responses:
+        '200':
+          description: Сервис доступен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /api/v1/reminders:
+    get:
+      summary: получение списка активных напоминаний
+      description: Возвращает активные напоминания Telegram-чата
+      operationId: getReminders
+      tags: [Reminders]
+      parameters:
+        - $ref: '#/components/parameters/TelegramChatID'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: Список напоминаний успешно получен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReminderListResponse'
+
+    post:
+      summary: создание напоминания
+      description: Создаёт разовое или периодичное напоминание для Telegram-чата
+      operationId: createReminder
+      tags: [Reminders]
+      parameters:
+        - $ref: '#/components/parameters/TelegramChatID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReminderRequest'
+      responses:
+        '200':
+          description: Напоминание успешно создано
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReminderResponse'
+
+  /api/v1/reminders/history:
+    get:
+      summary: получение истории напоминаний
+      description: Возвращает завершённые, отменённые, пропущенные и failed-напоминания Telegram-чата
+      operationId: getReminderHistory
+      tags: [Reminders]
+      parameters:
+        - $ref: '#/components/parameters/TelegramChatID'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: История напоминаний успешно получена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReminderListResponse'
+
+  /api/v1/reminders/{id}:
+    get:
+      summary: получение напоминания
+      description: Возвращает напоминание Telegram-чата по идентификатору
+      operationId: getReminder
+      tags: [Reminders]
+      parameters:
+        - $ref: '#/components/parameters/ID'
+        - $ref: '#/components/parameters/TelegramChatID'
+      responses:
+        '200':
+          description: Напоминание успешно получено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReminderResponse'
+
+    patch:
+      summary: обновление напоминания
+      description: Обновляет название, описание и дату напоминания Telegram-чата
+      operationId: updateReminder
+      tags: [Reminders]
+      parameters:
+        - $ref: '#/components/parameters/ID'
+        - $ref: '#/components/parameters/TelegramChatID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateReminderRequest'
+      responses:
+        '200':
+          description: Напоминание успешно обновлено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReminderResponse'
+
+    delete:
+      summary: удаление напоминания
+      description: Отменяет напоминание Telegram-чата
+      operationId: deleteReminder
+      tags: [Reminders]
+      parameters:
+        - $ref: '#/components/parameters/ID'
+        - $ref: '#/components/parameters/TelegramChatID'
+      responses:
+        '200':
+          description: Напоминание успешно удалено
+
+  /api/v1/reminders/{id}/complete:
+    post:
+      summary: выполнение напоминания
+      description: Отмечает напоминание Telegram-чата как выполненное
+      operationId: completeReminder
+      tags: [Reminders]
+      parameters:
+        - $ref: '#/components/parameters/ID'
+        - $ref: '#/components/parameters/TelegramChatID'
+      responses:
+        '200':
+          description: Напоминание успешно выполнено
+
+  /api/v1/reminders/{id}/cancel:
+    post:
+      summary: отмена напоминания
+      description: Отмечает напоминание Telegram-чата как отменённое
+      operationId: cancelReminder
+      tags: [Reminders]
+      parameters:
+        - $ref: '#/components/parameters/ID'
+        - $ref: '#/components/parameters/TelegramChatID'
+      responses:
+        '200':
+          description: Напоминание успешно отменено
+
+  /api/v1/holidays:
+    get:
+      summary: получение списка праздников
+      description: Возвращает праздники Telegram-чата
+      operationId: getHolidays
+      tags: [Holidays]
+      parameters:
+        - $ref: '#/components/parameters/TelegramChatID'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: Список праздников успешно получен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HolidayListResponse'
+
+    post:
+      summary: создание праздника
+      description: Создаёт праздник для Telegram-чата
+      operationId: createHoliday
+      tags: [Holidays]
+      parameters:
+        - $ref: '#/components/parameters/TelegramChatID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateHolidayRequest'
+      responses:
+        '200':
+          description: Праздник успешно создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HolidayResponse'
+
+  /api/v1/holidays/{id}:
+    get:
+      summary: получение праздника
+      description: Возвращает праздник Telegram-чата по идентификатору
+      operationId: getHoliday
+      tags: [Holidays]
+      parameters:
+        - $ref: '#/components/parameters/ID'
+        - $ref: '#/components/parameters/TelegramChatID'
+      responses:
+        '200':
+          description: Праздник успешно получен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HolidayResponse'
+
+    patch:
+      summary: обновление праздника
+      description: Обновляет праздник Telegram-чата
+      operationId: updateHoliday
+      tags: [Holidays]
+      parameters:
+        - $ref: '#/components/parameters/ID'
+        - $ref: '#/components/parameters/TelegramChatID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateHolidayRequest'
+      responses:
+        '200':
+          description: Праздник успешно обновлён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HolidayResponse'
+
+    delete:
+      summary: удаление праздника
+      description: Удаляет праздник Telegram-чата
+      operationId: deleteHoliday
+      tags: [Holidays]
+      parameters:
+        - $ref: '#/components/parameters/ID'
+        - $ref: '#/components/parameters/TelegramChatID'
+      responses:
+        '200':
+          description: Праздник успешно удалён
+
+  /api/v1/shopping-lists:
+    get:
+      summary: получение списков покупок
+      description: Возвращает списки покупок Telegram-чата
+      operationId: getShoppingLists
+      tags: [ShoppingLists]
+      parameters:
+        - $ref: '#/components/parameters/TelegramChatID'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: Списки покупок успешно получены
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShoppingListsResponse'
+
+    post:
+      summary: создание списка покупок
+      description: Создаёт список покупок для Telegram-чата
+      operationId: createShoppingList
+      tags: [ShoppingLists]
+      parameters:
+        - $ref: '#/components/parameters/TelegramChatID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateShoppingListRequest'
+      responses:
+        '200':
+          description: Список покупок успешно создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShoppingListResponse'
+
+  /api/v1/shopping-lists/{id}:
+    get:
+      summary: получение списка покупок
+      description: Возвращает список покупок Telegram-чата по идентификатору
+      operationId: getShoppingList
+      tags: [ShoppingLists]
+      parameters:
+        - $ref: '#/components/parameters/ID'
+        - $ref: '#/components/parameters/TelegramChatID'
+      responses:
+        '200':
+          description: Список покупок успешно получен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShoppingListResponse'
+
+  /api/v1/shopping-list-items/{item_id}/toggle:
+    post:
+      summary: переключение состояния товара
+      description: Переключает состояние товара в списке покупок и возвращает обновлённый список
+      operationId: toggleShoppingListItem
+      tags: [ShoppingLists]
+      parameters:
+        - name: item_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - $ref: '#/components/parameters/TelegramChatID'
+      responses:
+        '200':
+          description: Состояние товара успешно изменено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShoppingListResponse'
+
+  /api/v1/dashboard:
+    get:
+      summary: получение данных главного меню
+      description: Возвращает статистику напоминаний для главного меню Telegram-чата
+      operationId: getDashboard
+      tags: [Dashboard]
+      parameters:
+        - $ref: '#/components/parameters/TelegramChatID'
+      responses:
+        '200':
+          description: Данные главного меню успешно получены
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardResponse'
+
+  /api/v1/settings:
+    get:
+      summary: получение настроек пользователя
+      description: Возвращает настройки Telegram-чата
+      operationId: getSettings
+      tags: [Settings]
+      parameters:
+        - $ref: '#/components/parameters/TelegramChatID'
+      responses:
+        '200':
+          description: Настройки успешно получены
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SettingsResponse'
+
+    patch:
+      summary: обновление настроек пользователя
+      description: Обновляет часовой пояс и настройки настойчивых напоминаний Telegram-чата
+      operationId: updateSettings
+      tags: [Settings]
+      parameters:
+        - $ref: '#/components/parameters/TelegramChatID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSettingsRequest'
+      responses:
+        '200':
+          description: Настройки успешно обновлены
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SettingsResponse'
+
+  /api/v1/timezones:
+    get:
+      summary: получение часовых поясов
+      description: Возвращает список доступных часовых поясов
+      operationId: getTimezones
+      tags: [Settings]
+      responses:
+        '200':
+          description: Список часовых поясов успешно получен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimezoneListResponse'
+
+components:
+  parameters:
+    ID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+
+    TelegramChatID:
+      name: X-Telegram-Chat-ID
+      in: header
+      required: true
+      schema:
+        type: integer
+        format: int64
+        example: 123456789
+
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        default: 10
+        minimum: 1
+        maximum: 100
+
+    Offset:
+      name: offset
+      in: query
+      required: false
+      schema:
+        type: integer
+        default: 0
+        minimum: 0
+
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+
+    CreateReminderRequest:
+      type: object
+      required:
+        - title
+      properties:
+        title:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        remind_at:
+          type: string
+          format: date-time
+          description: Обязателен для разового, interval и weekdays-напоминания
+        repeat:
+          $ref: '#/components/schemas/ReminderRepeat'
+
+    UpdateReminderRequest:
+      type: object
+      required:
+        - title
+        - remind_at
+      properties:
+        title:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        remind_at:
+          type: string
+          format: date-time
+
+    ReminderRepeat:
+      oneOf:
+        - $ref: '#/components/schemas/IntervalReminderRepeat'
+        - $ref: '#/components/schemas/WeekdaysReminderRepeat'
+        - $ref: '#/components/schemas/CustomDatesReminderRepeat'
+      discriminator:
+        propertyName: type
+
+    IntervalReminderRepeat:
+      type: object
+      required:
+        - type
+        - interval_days
+      properties:
+        type:
+          type: string
+          enum: [interval]
+        interval_days:
+          type: integer
+          minimum: 1
+
+    WeekdaysReminderRepeat:
+      type: object
+      required:
+        - type
+        - weekdays_mask
+      properties:
+        type:
+          type: string
+          enum: [weekdays]
+        weekdays_mask:
+          type: integer
+          minimum: 1
+
+    CustomDatesReminderRepeat:
+      type: object
+      required:
+        - type
+        - dates
+        - hour
+        - minute
+        - timezone
+      properties:
+        type:
+          type: string
+          enum: [custom_dates]
+        dates:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            format: date
+        hour:
+          type: integer
+          minimum: 0
+          maximum: 23
+        minute:
+          type: integer
+          minimum: 0
+          maximum: 59
+        timezone:
+          type: string
+
+    Reminder:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        rule_id:
+          type: integer
+          format: int64
+          nullable: true
+        title:
+          type: string
+        description:
+          type: string
+        remind_at:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [new, sent, failed, canceled, completed, skipped]
+        created_at:
+          type: string
+          format: date-time
+
+    ReminderResponse:
+      type: object
+      properties:
+        reminder:
+          $ref: '#/components/schemas/Reminder'
+
+    ReminderListResponse:
+      type: object
+      properties:
+        reminders:
+          type: array
+          items:
+            $ref: '#/components/schemas/Reminder'
+
+    CreateHolidayRequest:
+      type: object
+      required:
+        - holiday_name
+        - recipient_name
+        - holiday_date
+        - remind_at
+      properties:
+        holiday_name:
+          type: string
+          minLength: 1
+        recipient_name:
+          type: string
+          minLength: 1
+        holiday_date:
+          type: string
+          format: date
+        remind_at:
+          type: string
+          format: date-time
+
+    UpdateHolidayRequest:
+      allOf:
+        - $ref: '#/components/schemas/CreateHolidayRequest'
+
+    Holiday:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        telegram_chat_id:
+          type: integer
+          format: int64
+        holiday_name:
+          type: string
+        recipient_name:
+          type: string
+        holiday_date:
+          type: string
+          format: date
+        remind_at:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [active, canceled]
+        created_at:
+          type: string
+          format: date-time
+
+    HolidayResponse:
+      type: object
+      properties:
+        holiday:
+          $ref: '#/components/schemas/Holiday'
+
+    HolidayListResponse:
+      type: object
+      properties:
+        holidays:
+          type: array
+          items:
+            $ref: '#/components/schemas/Holiday'
+
+    CreateShoppingListRequest:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/CreateShoppingListItem'
+
+    CreateShoppingListItem:
+      type: object
+      required:
+        - text
+      properties:
+        text:
+          type: string
+          minLength: 1
+
+    ShoppingList:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        telegram_chat_id:
+          type: integer
+          format: int64
+        created_at:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ShoppingListItem'
+
+    ShoppingListItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        list_id:
+          type: integer
+          format: int64
+        text:
+          type: string
+        done:
+          type: boolean
+        position:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    ShoppingListResponse:
+      type: object
+      properties:
+        shopping_list:
+          $ref: '#/components/schemas/ShoppingList'
+
+    ShoppingListsResponse:
+      type: object
+      properties:
+        shopping_lists:
+          type: array
+          items:
+            $ref: '#/components/schemas/ShoppingList'
+
+    DashboardResponse:
+      type: object
+      properties:
+        stats:
+          $ref: '#/components/schemas/ReminderStats'
+
+    ReminderStats:
+      type: object
+      properties:
+        completed:
+          type: integer
+        pending:
+          type: integer
+        skipped:
+          type: integer
+
+    UpdateSettingsRequest:
+      type: object
+      properties:
+        timezone:
+          type: string
+        intrusive_enabled:
+          type: boolean
+        intrusive_interval_minutes:
+          type: integer
+          minimum: 1
+          maximum: 120
+
+    SettingsResponse:
+      type: object
+      properties:
+        settings:
+          $ref: '#/components/schemas/UserSettings'
+
+    UserSettings:
+      type: object
+      properties:
+        telegram_chat_id:
+          type: integer
+          format: int64
+          example: 123456789
+        language:
+          type: string
+        timezone:
+          type: string
+        intrusive_enabled:
+          type: boolean
+        intrusive_interval_minutes:
+          type: integer
+        updated_at:
+          type: string
+          format: date-time
+
+    TimezoneListResponse:
+      type: object
+      properties:
+        timezones:
+          type: array
+          items:
+            $ref: '#/components/schemas/Timezone'
+
+    Timezone:
+      type: object
+      properties:
+        city:
+          type: string
+        timezone:
+          type: string

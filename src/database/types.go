@@ -1,13 +1,8 @@
 package database
 
 import (
-	"errors"
 	"time"
 )
-
-var ErrReminderNotFound = errors.New("reminder not found")
-var ErrHolidayNotFound = errors.New("holiday not found")
-var ErrShoppingListNotFound = errors.New("shopping list not found")
 
 type Note struct {
 	ID int64

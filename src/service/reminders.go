@@ -2,16 +2,12 @@ package service
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/EgorKo25/EasyNote/src/database"
 )
-
-var ErrReminderTitleEmpty = errors.New("reminder title is empty")
-var ErrWeekdaysMaskEmpty = errors.New("weekdays mask is empty")
 
 func NewReminderService(repository ReminderCommandRepository, planner ReminderCreationPlanner) *ReminderService {
 	return &ReminderService{repository: repository, ReminderCreationPlanner: planner}
@@ -253,6 +249,20 @@ func (s *ReminderService) UpdateHoliday(
 	}
 
 	return holiday, nil
+}
+
+func (s *ReminderService) FindRemindersByChat(
+	ctx context.Context,
+	telegramChatID int64,
+	limit int,
+	offset int,
+) ([]database.ReminderView, error) {
+	reminders, err := s.repository.FindRemindersByChat(ctx, telegramChatID, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("find reminders: %w", err)
+	}
+
+	return reminders, nil
 }
 
 func (s *ReminderService) FindHolidaysByChat(
