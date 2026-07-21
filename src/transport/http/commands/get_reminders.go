@@ -5,24 +5,14 @@ import (
 	"strconv"
 
 	"github.com/EgorKo25/EasyNote/src/service"
-	transporthttp "github.com/EgorKo25/EasyNote/src/transport/http"
+	apphttp "github.com/EgorKo25/EasyNote/src/transport/http"
 	"github.com/EgorKo25/EasyNote/src/transport/http/middleware"
 	"github.com/gin-gonic/gin"
 )
 
 type GetRemindersCommand struct {
-	req     GetReminderRequest
+	req     PaginationRequest
 	service *service.ReminderService
-}
-
-type GetReminderRequest struct {
-	Offset         int
-	Limit          int
-	TelegramChatID int64
-}
-
-type GetRemindersResponse struct {
-	Reminders []ReminderDTO `json:"reminders"`
 }
 
 func NewGetRemindersCommand(svc *service.ReminderService) *GetRemindersCommand {
@@ -39,14 +29,14 @@ func (c *GetRemindersCommand) Path() string {
 	return "/reminders"
 }
 
-func (c *GetRemindersCommand) Clone() transporthttp.Command {
+func (c *GetRemindersCommand) Clone() apphttp.Command {
 	return &GetRemindersCommand{
 		service: c.service,
 	}
 }
 
 func (c *GetRemindersCommand) Parse(ctx *gin.Context) error {
-	var req GetReminderRequest
+	var req PaginationRequest
 
 	telegramChatID, err := middleware.TelegramChatID(ctx)
 	if err != nil {
@@ -59,16 +49,16 @@ func (c *GetRemindersCommand) Parse(ctx *gin.Context) error {
 
 	if value := ctx.Query("offset"); value != "" {
 		offset, err := strconv.Atoi(value)
-		if err != nil {
-			return ErrInvalidOffset
+		if err != nil || offset < 0 {
+			return apphttp.ErrInvalidOffset
 		}
-		req.Offset = normalizeOffset(offset)
+		req.Offset = offset
 	}
 
 	if value := ctx.Query("limit"); value != "" {
 		limit, err := strconv.Atoi(value)
 		if err != nil || limit < 1 || limit > 100 {
-			return ErrInvalidLimit
+			return apphttp.ErrInvalidLimit
 		}
 		req.Limit = limit
 	}
@@ -89,15 +79,7 @@ func (c *GetRemindersCommand) Apply(ctx *gin.Context) (any, error) {
 		return nil, err
 	}
 
-	return GetRemindersResponse{
+	return ReminderListResponse{
 		Reminders: mapRemindersViewToResponse(reminders),
 	}, nil
-}
-
-func normalizeOffset(offset int) int {
-	if offset < 0 {
-		offset = 0
-	}
-
-	return offset
 }

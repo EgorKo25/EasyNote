@@ -34,6 +34,7 @@ func NewReminderBot(
 		cfg:            cfg,
 		service:        service,
 		userRepo:       repository,
+		backendClient:  NewBackendClient(cfg.BackendBaseURL, cfg.RequestTimeout),
 		log:            logger.Get("telegram/reminder-bot"),
 		draftByChat:    make(map[int64]reminderDraft),
 		uiByChat:       make(map[int64]int),
@@ -45,11 +46,12 @@ func NewReminderBot(
 }
 
 type ReminderBot struct {
-	bot      *telego.Bot
-	cfg      config.Telegram
-	service  ReminderService
-	userRepo ReminderRepository
-	log      logger.Logger
+	bot           *telego.Bot
+	cfg           config.Telegram
+	service       ReminderService
+	userRepo      ReminderRepository
+	backendClient *BackendClient
+	log           logger.Logger
 
 	mu             sync.Mutex
 	locationMu     sync.RWMutex
@@ -890,12 +892,28 @@ func (b *ReminderBot) handleDraftFinalCommandCallback(
 func (b *ReminderBot) sendStart(ctx context.Context, chatID int64) error {
 	b.setChatMenu(chatID, chatMenuMain)
 
-	stats, err := b.userRepo.ReminderStatsByChat(ctx, chatID)
+	stats, err := b.reminderStats(ctx, chatID)
 	if err != nil {
 		return fmt.Errorf("load reminder stats: %w", err)
 	}
 
 	return b.replaceUI(ctx, chatID, telegramui.MainMenuText(stats), telegramui.MainKeyboard())
+}
+
+func (b *ReminderBot) reminderStats(ctx context.Context, chatID int64) (database.ReminderStats, error) {
+	if b.backendClient != nil {
+		return b.backendClient.Dashboard(ctx, chatID)
+	}
+
+	return b.userRepo.ReminderStatsByChat(ctx, chatID)
+}
+
+func (b *ReminderBot) userSettings(ctx context.Context, chatID int64) (database.UserSettings, error) {
+	if b.backendClient != nil {
+		return b.backendClient.Settings(ctx, chatID)
+	}
+
+	return b.userRepo.UserSettings(ctx, chatID)
 }
 
 func (b *ReminderBot) sendCreate(ctx context.Context, chatID int64) error {
@@ -1215,7 +1233,7 @@ func (b *ReminderBot) sendSettings(ctx context.Context, chatID int64) error {
 		return err
 	}
 
-	settings, err := b.userRepo.UserSettings(ctx, chatID)
+	settings, err := b.userSettings(ctx, chatID)
 	if err != nil {
 		return fmt.Errorf("load user settings: %w", err)
 	}
@@ -1228,7 +1246,7 @@ func (b *ReminderBot) editSettings(ctx context.Context, chatID int64, messageID 
 		return err
 	}
 
-	settings, err := b.userRepo.UserSettings(ctx, chatID)
+	settings, err := b.userSettings(ctx, chatID)
 	if err != nil {
 		return fmt.Errorf("load user settings: %w", err)
 	}
@@ -1244,7 +1262,7 @@ func (b *ReminderBot) editIntrusiveSettings(ctx context.Context, chatID int64, m
 		return err
 	}
 
-	settings, err := b.userRepo.UserSettings(ctx, chatID)
+	settings, err := b.userSettings(ctx, chatID)
 	if err != nil {
 		return fmt.Errorf("load user settings: %w", err)
 	}
@@ -1266,7 +1284,7 @@ func (b *ReminderBot) sendIntrusiveSettings(ctx context.Context, chatID int64) e
 		return err
 	}
 
-	settings, err := b.userRepo.UserSettings(ctx, chatID)
+	settings, err := b.userSettings(ctx, chatID)
 	if err != nil {
 		return fmt.Errorf("load user settings: %w", err)
 	}
@@ -1280,7 +1298,7 @@ func (b *ReminderBot) sendIntrusiveSettings(ctx context.Context, chatID int64) e
 }
 
 func (b *ReminderBot) toggleIntrusiveSettings(ctx context.Context, chatID int64) error {
-	settings, err := b.userRepo.UserSettings(ctx, chatID)
+	settings, err := b.userSettings(ctx, chatID)
 	if err != nil {
 		return fmt.Errorf("load user settings: %w", err)
 	}
@@ -1298,7 +1316,7 @@ func (b *ReminderBot) toggleIntrusiveSettings(ctx context.Context, chatID int64)
 }
 
 func (b *ReminderBot) setIntrusiveEnabled(ctx context.Context, chatID int64, enabled bool) error {
-	settings, err := b.userRepo.UserSettings(ctx, chatID)
+	settings, err := b.userSettings(ctx, chatID)
 	if err != nil {
 		return fmt.Errorf("load user settings: %w", err)
 	}
@@ -1319,7 +1337,7 @@ func (b *ReminderBot) editTimezoneSettings(ctx context.Context, chatID int64, me
 	var index int
 
 	if data == telegramui.CallbackSettingsTimezone {
-		settings, err := b.userRepo.UserSettings(ctx, chatID)
+		settings, err := b.userSettings(ctx, chatID)
 		if err != nil {
 			return fmt.Errorf("load user settings: %w", err)
 		}
@@ -1345,7 +1363,7 @@ func (b *ReminderBot) editTimezoneSettings(ctx context.Context, chatID int64, me
 func (b *ReminderBot) sendTimezoneSettings(ctx context.Context, chatID int64) error {
 	b.setChatMenu(chatID, chatMenuTimezone)
 
-	settings, err := b.userRepo.UserSettings(ctx, chatID)
+	settings, err := b.userSettings(ctx, chatID)
 	if err != nil {
 		return fmt.Errorf("load user settings: %w", err)
 	}
@@ -2121,7 +2139,7 @@ func (b *ReminderBot) applyIntrusiveInterval(ctx context.Context, chatID int64, 
 		return true
 	}
 
-	settings, err := b.userRepo.UserSettings(ctx, chatID)
+	settings, err := b.userSettings(ctx, chatID)
 	if err != nil {
 		b.deleteDraft(chatID)
 
@@ -2796,7 +2814,7 @@ func (b *ReminderBot) deleteMessage(ctx context.Context, chatID int64, messageID
 }
 
 func (b *ReminderBot) loadChatLocation(ctx context.Context, chatID int64) error {
-	settings, err := b.userRepo.UserSettings(ctx, chatID)
+	settings, err := b.userSettings(ctx, chatID)
 	if err != nil {
 		return fmt.Errorf("load chat location settings: %w", err)
 	}

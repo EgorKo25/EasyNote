@@ -8,9 +8,9 @@ import (
 	"github.com/EgorKo25/EasyNote/src/database/postgresql"
 	"github.com/EgorKo25/EasyNote/src/logger"
 	"github.com/EgorKo25/EasyNote/src/planner"
-	"github.com/EgorKo25/EasyNote/src/scheduler"
 	"github.com/EgorKo25/EasyNote/src/service"
-	"github.com/EgorKo25/EasyNote/src/telegram"
+	apphttp "github.com/EgorKo25/EasyNote/src/transport/http"
+	httprouter "github.com/EgorKo25/EasyNote/src/transport/http/router"
 )
 
 func main() {
@@ -42,23 +42,15 @@ func main() {
 		panic(err)
 	}
 
-	telegramSender, err := telegram.NewSender(ctx, cfg.Telegram)
-	if err != nil {
-		log.Error("cannot initialize telegram sender", err)
-		panic(err)
-	}
-
 	reminderPlanner := planner.New(database)
 	reminderService := service.NewReminderService(database, reminderPlanner)
-	reminderRunner := scheduler.NewRunner(database, telegramSender, reminderPlanner, cfg.Scheduler)
-	reminderBot := telegram.NewReminderBot(telegramSender, reminderService, database, cfg.Telegram)
+	httpServer := apphttp.NewServer(cfg.HTTP, httprouter.Create(reminderService))
 
 	runner := background.NewRunner()
 
 	runner.Run(
 		ctx,
-		reminderRunner,
-		reminderBot,
+		httpServer,
 	)
 
 	if err = runner.Wait(); err != nil {

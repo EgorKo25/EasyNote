@@ -718,6 +718,287 @@ func TestReminderServiceManagesShoppingLists(t *testing.T) {
 	}
 }
 
+func TestReminderServiceProvidesReadAndSettingsOperations(t *testing.T) {
+	t.Parallel()
+
+	chatID := int64(100)
+	reminderID := int64(55)
+	settings := database.UserSettings{
+		TelegramChatID:    chatID,
+		Language:          "ru",
+		Timezone:          "Europe/Moscow",
+		IntrusiveEnabled:  true,
+		IntrusiveInterval: 30 * time.Minute,
+		UpdatedAt:         time.Date(2026, 7, 16, 12, 0, 0, 0, time.UTC),
+	}
+	errRepository := errors.New("repository")
+
+	tests := []struct {
+		name     string
+		before   func(repository *mocks.MockReminderCommandRepository)
+		action   func(reminderService *service.ReminderService) (string, error)
+		expected struct {
+			result          string
+			expectedErrText string
+		}
+	}{
+		{
+			name: "find reminder history returns repository page",
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					FindReminderHistoryByChat(gomock.Any(), chatID, 2, 4).
+					Return([]database.ReminderView{{ID: 1}, {ID: 2}}, nil).
+					Times(1)
+			},
+			action: func(reminderService *service.ReminderService) (string, error) {
+				reminders, err := reminderService.FindReminderHistoryByChat(context.Background(), chatID, 2, 4)
+				if len(reminders) == 2 {
+					return "two reminders", err
+				}
+
+				return "unexpected reminders", err
+			},
+			expected: struct {
+				result          string
+				expectedErrText string
+			}{result: "two reminders"},
+		},
+		{
+			name: "reminder stats returns repository stats",
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					ReminderStatsByChat(gomock.Any(), chatID).
+					Return(database.ReminderStats{Completed: 1, Pending: 2, Skipped: 3}, nil).
+					Times(1)
+			},
+			action: func(reminderService *service.ReminderService) (string, error) {
+				stats, err := reminderService.ReminderStatsByChat(context.Background(), chatID)
+				if stats.Completed == 1 && stats.Pending == 2 && stats.Skipped == 3 {
+					return "stats loaded", err
+				}
+
+				return "unexpected stats", err
+			},
+			expected: struct {
+				result          string
+				expectedErrText string
+			}{result: "stats loaded"},
+		},
+		{
+			name: "user settings returns repository settings",
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					UserSettings(gomock.Any(), chatID).
+					Return(settings, nil).
+					Times(1)
+			},
+			action: func(reminderService *service.ReminderService) (string, error) {
+				userSettings, err := reminderService.UserSettings(context.Background(), chatID)
+				if userSettings.Timezone == settings.Timezone {
+					return "settings loaded", err
+				}
+
+				return "unexpected settings", err
+			},
+			expected: struct {
+				result          string
+				expectedErrText string
+			}{result: "settings loaded"},
+		},
+		{
+			name: "update user timezone delegates to repository",
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					UpdateUserTimezone(gomock.Any(), chatID, "Asia/Novosibirsk").
+					Return(nil).
+					Times(1)
+			},
+			action: func(reminderService *service.ReminderService) (string, error) {
+				err := reminderService.UpdateUserTimezone(context.Background(), chatID, "Asia/Novosibirsk")
+
+				return "timezone updated", err
+			},
+			expected: struct {
+				result          string
+				expectedErrText string
+			}{result: "timezone updated"},
+		},
+		{
+			name: "update intrusive settings delegates to repository",
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					UpdateIntrusiveSettings(gomock.Any(), chatID, false, 45*time.Minute).
+					Return(nil).
+					Times(1)
+			},
+			action: func(reminderService *service.ReminderService) (string, error) {
+				err := reminderService.UpdateIntrusiveSettings(context.Background(), chatID, false, 45*time.Minute)
+
+				return "intrusive updated", err
+			},
+			expected: struct {
+				result          string
+				expectedErrText string
+			}{result: "intrusive updated"},
+		},
+		{
+			name: "acknowledge completed reminder delegates with chat id",
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					AcknowledgeReminder(gomock.Any(), chatID, reminderID, database.ReminderStatusCompleted).
+					Return(nil).
+					Times(1)
+			},
+			action: func(reminderService *service.ReminderService) (string, error) {
+				err := reminderService.AcknowledgeReminder(
+					context.Background(),
+					chatID,
+					reminderID,
+					database.ReminderStatusCompleted,
+				)
+
+				return "completed acknowledged", err
+			},
+			expected: struct {
+				result          string
+				expectedErrText string
+			}{result: "completed acknowledged"},
+		},
+		{
+			name: "acknowledge canceled reminder delegates with chat id",
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					AcknowledgeReminder(gomock.Any(), chatID, reminderID, database.ReminderStatusCanceled).
+					Return(nil).
+					Times(1)
+			},
+			action: func(reminderService *service.ReminderService) (string, error) {
+				err := reminderService.AcknowledgeReminder(
+					context.Background(),
+					chatID,
+					reminderID,
+					database.ReminderStatusCanceled,
+				)
+
+				return "canceled acknowledged", err
+			},
+			expected: struct {
+				result          string
+				expectedErrText string
+			}{result: "canceled acknowledged"},
+		},
+		{
+			name: "find reminder history repository error is wrapped",
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					FindReminderHistoryByChat(gomock.Any(), chatID, 2, 4).
+					Return(nil, errRepository).
+					Times(1)
+			},
+			action: func(reminderService *service.ReminderService) (string, error) {
+				reminders, err := reminderService.FindReminderHistoryByChat(context.Background(), chatID, 2, 4)
+				if reminders == nil {
+					return "", err
+				}
+
+				return "unexpected reminders", err
+			},
+			expected: struct {
+				result          string
+				expectedErrText string
+			}{expectedErrText: "find reminder history: repository"},
+		},
+		{
+			name: "user settings repository error is wrapped",
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					UserSettings(gomock.Any(), chatID).
+					Return(database.UserSettings{}, errRepository).
+					Times(1)
+			},
+			action: func(reminderService *service.ReminderService) (string, error) {
+				userSettings, err := reminderService.UserSettings(context.Background(), chatID)
+				if userSettings.TelegramChatID == 0 {
+					return "", err
+				}
+
+				return "unexpected settings", err
+			},
+			expected: struct {
+				result          string
+				expectedErrText string
+			}{expectedErrText: "load user settings: repository"},
+		},
+		{
+			name: "unsupported acknowledge status returns validation error",
+			before: func(_ *mocks.MockReminderCommandRepository) {
+			},
+			action: func(reminderService *service.ReminderService) (string, error) {
+				err := reminderService.AcknowledgeReminder(
+					context.Background(),
+					chatID,
+					reminderID,
+					database.ReminderStatusSkipped,
+				)
+
+				return "", err
+			},
+			expected: struct {
+				result          string
+				expectedErrText string
+			}{expectedErrText: "acknowledge reminder: unsupported reminder status"},
+		},
+		{
+			name: "acknowledge repository error is wrapped",
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					AcknowledgeReminder(gomock.Any(), chatID, reminderID, database.ReminderStatusCompleted).
+					Return(errRepository).
+					Times(1)
+			},
+			action: func(reminderService *service.ReminderService) (string, error) {
+				err := reminderService.AcknowledgeReminder(
+					context.Background(),
+					chatID,
+					reminderID,
+					database.ReminderStatusCompleted,
+				)
+
+				return "", err
+			},
+			expected: struct {
+				result          string
+				expectedErrText string
+			}{expectedErrText: "acknowledge reminder: repository"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctrl := gomock.NewController(t)
+			repository := mocks.NewMockReminderCommandRepository(ctrl)
+			planner := mocks.NewMockReminderCreationPlanner(ctrl)
+
+			test.before(repository)
+
+			reminderService := service.NewReminderService(repository, planner)
+			result, err := test.action(reminderService)
+
+			if test.expected.expectedErrText != "" {
+				require.EqualErrorf(t, err, test.expected.expectedErrText, "unexpected error")
+				require.Equal(t, test.expected.result, result)
+
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, test.expected.result, result)
+		})
+	}
+}
+
 func TestReminderServiceCreatesWeekdaysReminder(t *testing.T) {
 	t.Parallel()
 

@@ -2,11 +2,12 @@ package commands
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/EgorKo25/EasyNote/src/database"
 	"github.com/EgorKo25/EasyNote/src/service"
-	transporthttp "github.com/EgorKo25/EasyNote/src/transport/http"
+	apphttp "github.com/EgorKo25/EasyNote/src/transport/http"
 	"github.com/EgorKo25/EasyNote/src/transport/http/middleware"
 	"github.com/gin-gonic/gin"
 )
@@ -14,28 +15,6 @@ import (
 type CreateReminderCommand struct {
 	request CreateReminderRequest
 	service *service.ReminderService
-}
-
-type CreateReminderRequest struct {
-	Title          string          `json:"title"`
-	Description    string          `json:"description"`
-	RemindAt       time.Time       `json:"remind_at"`
-	Repeat         *ReminderRepeat `json:"repeat"`
-	TelegramChatID int64           `json:"-"`
-}
-
-type ReminderRepeat struct {
-	Type         string   `json:"type"`
-	IntervalDays *int     `json:"interval_days,omitempty"`
-	WeekdaysMask *int     `json:"weekdays_mask,omitempty"`
-	Dates        []string `json:"dates"`
-	Hour         *int     `json:"hour,omitempty"`
-	Minute       *int     `json:"minute,omitempty"`
-	Timezone     string   `json:"timezone,omitempty"`
-}
-
-type CreateReminderResponse struct {
-	Reminder ReminderDTO `json:"reminder"`
 }
 
 func NewCreateReminderCommand(service *service.ReminderService) *CreateReminderCommand {
@@ -50,7 +29,7 @@ func (c *CreateReminderCommand) Path() string {
 	return "/reminders"
 }
 
-func (c *CreateReminderCommand) Clone() transporthttp.Command {
+func (c *CreateReminderCommand) Clone() apphttp.Command {
 	return &CreateReminderCommand{
 		service: c.service,
 	}
@@ -60,7 +39,7 @@ func (c *CreateReminderCommand) Parse(ctx *gin.Context) error {
 	var request CreateReminderRequest
 
 	if err := ctx.ShouldBindJSON(&request); err != nil {
-		return fmt.Errorf("%w: %v", ErrInvalidRequest, err)
+		return fmt.Errorf("%w: %v", apphttp.ErrInvalidRequest, err)
 	}
 
 	telegramChatID, err := middleware.TelegramChatID(ctx)
@@ -92,7 +71,10 @@ func (c *CreateReminderCommand) Apply(ctx *gin.Context) (any, error) {
 		switch c.request.Repeat.Type {
 		case string(database.ReminderRuleTypeInterval):
 			if c.request.Repeat.IntervalDays == nil {
-				return nil, ErrReminderRepeatIntervalDaysEmpty
+				return nil, apphttp.ErrReminderRepeatIntervalDaysEmpty
+			}
+			if *c.request.Repeat.IntervalDays < 1 {
+				return nil, apphttp.ErrReminderRepeatIntervalDaysInvalid
 			}
 
 			reminder, err = c.service.CreateIntervalReminder(
@@ -105,7 +87,7 @@ func (c *CreateReminderCommand) Apply(ctx *gin.Context) (any, error) {
 			)
 		case string(database.ReminderRuleTypeWeekdays):
 			if c.request.Repeat.WeekdaysMask == nil {
-				return nil, ErrReminderRepeatWeekdaysMaskEmpty
+				return nil, apphttp.ErrReminderRepeatWeekdaysMaskEmpty
 			}
 
 			reminder, err = c.service.CreateWeekdaysReminder(
@@ -117,13 +99,23 @@ func (c *CreateReminderCommand) Apply(ctx *gin.Context) (any, error) {
 				*c.request.Repeat.WeekdaysMask,
 			)
 		case string(database.ReminderRuleTypeCustomDates):
+			if len(c.request.Repeat.Dates) == 0 {
+				return nil, apphttp.ErrReminderRepeatCustomDatesEmpty
+			}
 			if c.request.Repeat.Hour == nil || c.request.Repeat.Minute == nil {
-				return nil, ErrReminderRepeatCustomTimeEmpty
+				return nil, apphttp.ErrReminderRepeatCustomTimeEmpty
+			}
+			if *c.request.Repeat.Hour < 0 || *c.request.Repeat.Hour > 23 ||
+				*c.request.Repeat.Minute < 0 || *c.request.Repeat.Minute > 59 {
+				return nil, apphttp.ErrReminderRepeatCustomTimeInvalid
+			}
+			if strings.TrimSpace(c.request.Repeat.Timezone) == "" {
+				return nil, apphttp.ErrReminderRepeatTimezoneInvalid
 			}
 
 			location, loadLocationErr := time.LoadLocation(c.request.Repeat.Timezone)
 			if loadLocationErr != nil {
-				return nil, fmt.Errorf("%w: %s", ErrReminderRepeatTimezoneInvalid, c.request.Repeat.Timezone)
+				return nil, fmt.Errorf("%w: %s", apphttp.ErrReminderRepeatTimezoneInvalid, c.request.Repeat.Timezone)
 			}
 
 			dates, parseDatesErr := parseReminderRepeatDates(c.request.Repeat.Dates)
@@ -142,7 +134,7 @@ func (c *CreateReminderCommand) Apply(ctx *gin.Context) (any, error) {
 				location,
 			)
 		default:
-			return nil, fmt.Errorf("%w: %s", ErrReminderRepeatTypeUnsupported, c.request.Repeat.Type)
+			return nil, fmt.Errorf("%w: %s", apphttp.ErrReminderRepeatTypeUnsupported, c.request.Repeat.Type)
 		}
 	}
 
@@ -158,7 +150,7 @@ func parseReminderRepeatDates(values []string) ([]time.Time, error) {
 	for _, value := range values {
 		date, err := time.Parse(time.DateOnly, value)
 		if err != nil {
-			return nil, fmt.Errorf("%w: %s", ErrReminderRepeatDateInvalid, value)
+			return nil, fmt.Errorf("%w: %s", apphttp.ErrReminderRepeatDateInvalid, value)
 		}
 
 		dates = append(dates, date)

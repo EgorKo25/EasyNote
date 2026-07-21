@@ -26,6 +26,7 @@ func (m *Manager) Register(cmd apphttp.Command) {
 
 		err := clone.Parse(ctx)
 		if err != nil {
+			_ = ctx.Error(err)
 			apperrors.WriteError(ctx, err)
 
 			return
@@ -33,6 +34,7 @@ func (m *Manager) Register(cmd apphttp.Command) {
 
 		response, err := clone.Apply(ctx)
 		if err != nil {
+			_ = ctx.Error(err)
 			apperrors.WriteError(ctx, err)
 
 			return
