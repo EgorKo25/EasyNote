@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/EgorKo25/EasyNote/src/database"
+	"github.com/EgorKo25/EasyNote/src/service"
 )
 
 type Draft struct {
@@ -25,10 +26,7 @@ type Draft struct {
 	WaitingFor    Field
 }
 
-type TimezoneOption struct {
-	City     string
-	Timezone string
-}
+type TimezoneOption = service.TimezoneOption
 
 func (d Draft) RemindAt(location *time.Location) time.Time {
 	if d.Date.IsZero() {

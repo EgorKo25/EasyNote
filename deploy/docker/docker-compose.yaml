@@ -1,27 +1,16 @@
 services:
-  mihomo:
-    image: metacubex/mihomo:latest
-    container_name: mihomo
-    restart: unless-stopped
-    volumes:
-      - /opt/mihomo:/root/.config/mihomo
-    networks:
-      - easy-note-net
   app:
     image: ${APP_IMAGE:-easynote:local}
     container_name: easy-note-app
     restart: unless-stopped
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?TELEGRAM_BOT_TOKEN is required}
       TZ: ${TZ:-Europe/Moscow}
-      HTTP_PROXY: "http://mihomo:7890"
-      HTTPS_PROXY: "http://mihomo:7890"
-      http_proxy: "http://mihomo:7890"
-      https_proxy: "http://mihomo:7890"
-      NO_PROXY: "localhost,127.0.0.1,postgres,db,easy-note-postgres"
-      no_proxy: "localhost,127.0.0.1,postgres,db,easy-note-postgres"
+
+      HTTP_HOST: 0.0.0.0
+      HTTP_PORT: "8080"
       DATABASE_HOST: postgres
       DATABASE_PORT: "5432"
       DATABASE_USER: ${POSTGRES_USER:-postgres}
@@ -31,6 +20,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    ports:
+      - "${HTTP_HOST_PORT:-8080}:8080"
     volumes:
       - easy_note_logs:/app/logs
 
@@ -39,7 +30,8 @@ services:
     container_name: easy-note-postgres
     restart: unless-stopped
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-notes}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
@@ -57,6 +49,3 @@ services:
 volumes:
   easy_note_postgres_data:
   easy_note_logs:
-
-networks:
-  easy-note-net:

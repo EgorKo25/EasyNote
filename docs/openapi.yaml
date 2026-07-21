@@ -126,6 +126,10 @@ paths:
       responses:
         '200':
           description: Напоминание успешно удалено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmptyResponse'
 
   /api/v1/reminders/{id}/complete:
     post:
@@ -139,6 +143,10 @@ paths:
       responses:
         '200':
           description: Напоминание успешно выполнено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmptyResponse'
 
   /api/v1/reminders/{id}/cancel:
     post:
@@ -152,6 +160,10 @@ paths:
       responses:
         '200':
           description: Напоминание успешно отменено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmptyResponse'
 
   /api/v1/holidays:
     get:
@@ -242,6 +254,10 @@ paths:
       responses:
         '200':
           description: Праздник успешно удалён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmptyResponse'
 
   /api/v1/shopping-lists:
     get:
@@ -427,6 +443,9 @@ components:
         minimum: 0
 
   schemas:
+    EmptyResponse:
+      type: object
+
     HealthResponse:
       type: object
       properties:

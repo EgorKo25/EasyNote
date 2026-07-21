@@ -4,41 +4,58 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/EgorKo25/EasyNote/src/database"
 	"github.com/EgorKo25/EasyNote/src/service"
-	"github.com/EgorKo25/EasyNote/src/transport/http/commands"
-	"github.com/EgorKo25/EasyNote/src/transport/http/middleware"
+	apphttp "github.com/EgorKo25/EasyNote/src/transport/http"
 )
 
 func mapErrorResponse(err error) ErrorResponse {
 	switch {
-	case errors.Is(err, middleware.ErrTelegramChatIDMissing),
-		errors.Is(err, middleware.ErrTelegramChatIDInvalid),
-		errors.Is(err, commands.ErrInvalidRequest),
-		errors.Is(err, commands.ErrInvalidOffset),
-		errors.Is(err, commands.ErrInvalidLimit),
-		errors.Is(err, commands.ErrReminderRepeatIntervalDaysEmpty),
-		errors.Is(err, commands.ErrReminderRepeatWeekdaysMaskEmpty),
-		errors.Is(err, commands.ErrReminderRepeatCustomTimeEmpty),
-		errors.Is(err, commands.ErrReminderRepeatTypeUnsupported),
-		errors.Is(err, commands.ErrReminderRepeatDateInvalid),
-		errors.Is(err, commands.ErrReminderRepeatTimezoneInvalid),
-		errors.Is(err, service.ErrReminderTitleEmpty),
-		errors.Is(err, service.ErrWeekdaysMaskEmpty):
+	case errors.Is(err, apphttp.ErrTelegramChatIDMissing),
+		errors.Is(err, apphttp.ErrTelegramChatIDInvalid),
+		errors.Is(err, apphttp.ErrInvalidRequest),
+		errors.Is(err, apphttp.ErrInvalidID),
+		errors.Is(err, apphttp.ErrInvalidItemID),
+		errors.Is(err, apphttp.ErrInvalidOffset),
+		errors.Is(err, apphttp.ErrInvalidLimit),
+		errors.Is(err, apphttp.ErrReminderRepeatIntervalDaysEmpty),
+		errors.Is(err, apphttp.ErrReminderRepeatIntervalDaysInvalid),
+		errors.Is(err, apphttp.ErrReminderRepeatWeekdaysMaskEmpty),
+		errors.Is(err, apphttp.ErrReminderRepeatCustomDatesEmpty),
+		errors.Is(err, apphttp.ErrReminderRepeatCustomTimeEmpty),
+		errors.Is(err, apphttp.ErrReminderRepeatCustomTimeInvalid),
+		errors.Is(err, apphttp.ErrReminderRepeatTypeUnsupported),
+		errors.Is(err, apphttp.ErrReminderRepeatDateInvalid),
+		errors.Is(err, apphttp.ErrReminderRepeatTimezoneInvalid),
+		errors.Is(err, apphttp.ErrHolidayNameEmpty),
+		errors.Is(err, apphttp.ErrHolidayRecipientNameEmpty),
+		errors.Is(err, apphttp.ErrHolidayDateInvalid),
+		errors.Is(err, apphttp.ErrHolidayRemindAtEmpty),
+		errors.Is(err, apphttp.ErrShoppingListItemsEmpty),
+		errors.Is(err, apphttp.ErrShoppingListItemTextEmpty),
+		errors.Is(err, apphttp.ErrSettingsTimezoneInvalid),
+		errors.Is(err, apphttp.ErrIntrusiveIntervalInvalid):
 		return newErrorResponse(http.StatusBadRequest, err.Error())
 
-	case errors.Is(err, service.ErrReminderNotFound),
-		errors.Is(err, service.ErrHolidayNotFound),
-		errors.Is(err, service.ErrShoppingListNotFound):
-		return newErrorResponse(http.StatusNotFound, err.Error())
+	case errors.Is(err, service.ErrReminderTitleEmpty):
+		return newErrorResponse(http.StatusBadRequest, service.ErrReminderTitleEmpty.Error())
+
+	case errors.Is(err, service.ErrWeekdaysMaskEmpty):
+		return newErrorResponse(http.StatusBadRequest, service.ErrWeekdaysMaskEmpty.Error())
+
+	case errors.Is(err, service.ErrReminderStatusUnsupported):
+		return newErrorResponse(http.StatusBadRequest, service.ErrReminderStatusUnsupported.Error())
+
+	case errors.Is(err, service.ErrReminderNotFound):
+		return newErrorResponse(http.StatusNotFound, service.ErrReminderNotFound.Error())
+
+	case errors.Is(err, service.ErrHolidayNotFound):
+		return newErrorResponse(http.StatusNotFound, service.ErrHolidayNotFound.Error())
+
+	case errors.Is(err, service.ErrShoppingListNotFound):
+		return newErrorResponse(http.StatusNotFound, service.ErrShoppingListNotFound.Error())
 
 	case errors.Is(err, service.ErrAccessDenied):
-		return newErrorResponse(http.StatusForbidden, err.Error())
-
-	case errors.Is(err, database.ErrHolidayNotFound),
-		errors.Is(err, database.ErrReminderNotFound),
-		errors.Is(err, database.ErrShoppingListNotFound):
-		return newErrorResponse(http.StatusNotFound, err.Error())
+		return newErrorResponse(http.StatusForbidden, service.ErrAccessDenied.Error())
 
 	default:
 		return newErrorResponse(http.StatusInternalServerError, "internal server error")

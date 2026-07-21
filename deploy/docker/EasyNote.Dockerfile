@@ -22,4 +22,6 @@ RUN apk add --no-cache ca-certificates tzdata && \
 COPY --from=builder /out/easy-note /app/easy-note
 COPY config ./config
 
+EXPOSE 8080
+
 ENTRYPOINT ["/app/easy-note"]
