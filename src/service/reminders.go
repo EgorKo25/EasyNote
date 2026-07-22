@@ -8,16 +8,16 @@ import (
 	"time"
 
 	"github.com/EgorKo25/EasyNote/src/database"
+	"github.com/EgorKo25/EasyNote/src/domain"
 )
 
 func NewReminderService(repository ReminderCommandRepository, planner ReminderCreationPlanner) *ReminderService {
-	return &ReminderService{repository: repository, ReminderCreationPlanner: planner}
+	return &ReminderService{repository: repository, planner: planner}
 }
 
 type ReminderService struct {
-	ReminderCreationPlanner
-
 	repository ReminderCommandRepository
+	planner    ReminderCreationPlanner
 }
 
 //go:generate go run go.uber.org/mock/mockgen -source=reminders.go -destination=mocks/reminders_mock.go -package=mocks
@@ -110,13 +110,13 @@ func (s *ReminderService) CreateReminder(
 	title string,
 	description string,
 	remindAt time.Time,
-) (database.ReminderView, error) {
+) (domain.ReminderView, error) {
 	title = strings.TrimSpace(title)
 	if title == "" {
-		return database.ReminderView{}, fmt.Errorf("create reminder: %w", ErrReminderTitleEmpty)
+		return domain.ReminderView{}, fmt.Errorf("create reminder: %w", ErrReminderTitleEmpty)
 	}
 
-	reminder, err := s.CreateSingleOccurrence(
+	reminder, err := s.planner.CreateSingleOccurrence(
 		ctx,
 		telegramChatID,
 		title,
@@ -124,10 +124,10 @@ func (s *ReminderService) CreateReminder(
 		remindAt,
 	)
 	if err != nil {
-		return database.ReminderView{}, fmt.Errorf("create reminder: %w", err)
+		return domain.ReminderView{}, fmt.Errorf("create reminder: %w", err)
 	}
 
-	return reminder, nil
+	return mapReminderViewToDomain(reminder), nil
 }
 
 func (s *ReminderService) CreateIntervalReminder(
@@ -137,7 +137,7 @@ func (s *ReminderService) CreateIntervalReminder(
 	description string,
 	remindAt time.Time,
 	intervalDays int,
-) (database.ReminderView, error) {
+) (domain.ReminderView, error) {
 	rule := database.ReminderRule{
 		Type:         database.ReminderRuleTypeInterval,
 		IntervalDays: &intervalDays,
@@ -153,14 +153,14 @@ func (s *ReminderService) CreateWeekdaysReminder(
 	description string,
 	remindAt time.Time,
 	weekdaysMask int,
-) (database.ReminderView, error) {
+) (domain.ReminderView, error) {
 	title = strings.TrimSpace(title)
 	if title == "" {
-		return database.ReminderView{}, fmt.Errorf("create weekdays reminder: %w", ErrReminderTitleEmpty)
+		return domain.ReminderView{}, fmt.Errorf("create weekdays reminder: %w", ErrReminderTitleEmpty)
 	}
 
 	if weekdaysMask <= 0 {
-		return database.ReminderView{}, fmt.Errorf("create weekdays reminder: %w", ErrWeekdaysMaskEmpty)
+		return domain.ReminderView{}, fmt.Errorf("create weekdays reminder: %w", ErrWeekdaysMaskEmpty)
 	}
 
 	rule := database.ReminderRule{
@@ -180,7 +180,7 @@ func (s *ReminderService) CreateCustomDatesReminder(
 	hour int,
 	minute int,
 	location *time.Location,
-) (database.ReminderView, error) {
+) (domain.ReminderView, error) {
 	firstDate := earliestDate(selectedDates)
 	firstRemindAt := time.Date(firstDate.Year(), firstDate.Month(), firstDate.Day(), hour, minute, 0, 0, location)
 	rule := database.ReminderRule{Type: database.ReminderRuleTypeCustomDates}
@@ -204,13 +204,18 @@ func (s *ReminderService) AcknowledgeReminder(
 	ctx context.Context,
 	telegramChatID int64,
 	reminderID int64,
-	status database.ReminderStatus,
+	status domain.ReminderStatus,
 ) error {
-	if status != database.ReminderStatusCompleted && status != database.ReminderStatusCanceled {
+	if status != domain.ReminderStatusCompleted && status != domain.ReminderStatusCanceled {
 		return fmt.Errorf("acknowledge reminder: %w", ErrReminderStatusUnsupported)
 	}
 
-	if err := s.repository.AcknowledgeReminder(ctx, telegramChatID, reminderID, status); err != nil {
+	if err := s.repository.AcknowledgeReminder(
+		ctx,
+		telegramChatID,
+		reminderID,
+		database.ReminderStatus(status),
+	); err != nil {
 		if errors.Is(err, database.ErrReminderNotFound) {
 			return fmt.Errorf("acknowledge reminder: %w", ErrReminderNotFound)
 		}
@@ -225,17 +230,17 @@ func (s *ReminderService) ReminderByID(
 	ctx context.Context,
 	telegramChatID int64,
 	reminderID int64,
-) (database.ReminderView, error) {
+) (domain.ReminderView, error) {
 	reminder, err := s.repository.ReminderByID(ctx, telegramChatID, reminderID)
 	if err != nil {
 		if errors.Is(err, database.ErrReminderNotFound) {
-			return database.ReminderView{}, fmt.Errorf("load reminder by id: %w", ErrReminderNotFound)
+			return domain.ReminderView{}, fmt.Errorf("load reminder by id: %w", ErrReminderNotFound)
 		}
 
-		return database.ReminderView{}, fmt.Errorf("load reminder by id: %w", err)
+		return domain.ReminderView{}, fmt.Errorf("load reminder by id: %w", err)
 	}
 
-	return reminder, nil
+	return mapReminderViewToDomain(reminder), nil
 }
 
 func (s *ReminderService) UpdateReminder(
@@ -245,10 +250,10 @@ func (s *ReminderService) UpdateReminder(
 	title string,
 	description string,
 	remindAt time.Time,
-) (database.ReminderView, error) {
+) (domain.ReminderView, error) {
 	title = strings.TrimSpace(title)
 	if title == "" {
-		return database.ReminderView{}, fmt.Errorf("update reminder: %w", ErrReminderTitleEmpty)
+		return domain.ReminderView{}, fmt.Errorf("update reminder: %w", ErrReminderTitleEmpty)
 	}
 
 	reminder, err := s.repository.UpdateReminder(
@@ -261,47 +266,47 @@ func (s *ReminderService) UpdateReminder(
 	)
 	if err != nil {
 		if errors.Is(err, database.ErrReminderNotFound) {
-			return database.ReminderView{}, fmt.Errorf("update reminder: %w", ErrReminderNotFound)
+			return domain.ReminderView{}, fmt.Errorf("update reminder: %w", ErrReminderNotFound)
 		}
 
-		return database.ReminderView{}, fmt.Errorf("update reminder: %w", err)
+		return domain.ReminderView{}, fmt.Errorf("update reminder: %w", err)
 	}
 
-	return reminder, nil
+	return mapReminderViewToDomain(reminder), nil
 }
 
 func (s *ReminderService) CreateHoliday(
 	ctx context.Context,
-	request database.HolidayRequest,
-) (database.HolidayView, error) {
+	request domain.HolidayRequest,
+) (domain.HolidayView, error) {
 	request.HolidayName = strings.TrimSpace(request.HolidayName)
 	request.RecipientName = strings.TrimSpace(request.RecipientName)
 
-	holiday, err := s.repository.CreateHoliday(ctx, request)
+	holiday, err := s.repository.CreateHoliday(ctx, mapHolidayRequestToDatabase(request))
 	if err != nil {
-		return database.HolidayView{}, fmt.Errorf("create holiday: %w", err)
+		return domain.HolidayView{}, fmt.Errorf("create holiday: %w", err)
 	}
 
-	return holiday, nil
+	return mapHolidayViewToDomain(holiday), nil
 }
 
 func (s *ReminderService) UpdateHoliday(
 	ctx context.Context,
-	request database.HolidayUpdateRequest,
-) (database.HolidayView, error) {
+	request domain.HolidayUpdateRequest,
+) (domain.HolidayView, error) {
 	request.HolidayName = strings.TrimSpace(request.HolidayName)
 	request.RecipientName = strings.TrimSpace(request.RecipientName)
 
-	holiday, err := s.repository.UpdateHoliday(ctx, request)
+	holiday, err := s.repository.UpdateHoliday(ctx, mapHolidayUpdateRequestToDatabase(request))
 	if err != nil {
 		if errors.Is(err, database.ErrHolidayNotFound) {
-			return database.HolidayView{}, fmt.Errorf("update holiday: %w", ErrHolidayNotFound)
+			return domain.HolidayView{}, fmt.Errorf("update holiday: %w", ErrHolidayNotFound)
 		}
 
-		return database.HolidayView{}, fmt.Errorf("update holiday: %w", err)
+		return domain.HolidayView{}, fmt.Errorf("update holiday: %w", err)
 	}
 
-	return holiday, nil
+	return mapHolidayViewToDomain(holiday), nil
 }
 
 func (s *ReminderService) FindRemindersByChat(
@@ -309,13 +314,13 @@ func (s *ReminderService) FindRemindersByChat(
 	telegramChatID int64,
 	limit int,
 	offset int,
-) ([]database.ReminderView, error) {
+) ([]domain.ReminderView, error) {
 	reminders, err := s.repository.FindRemindersByChat(ctx, telegramChatID, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("find reminders: %w", err)
 	}
 
-	return reminders, nil
+	return mapReminderViewsToDomain(reminders), nil
 }
 
 func (s *ReminderService) FindReminderHistoryByChat(
@@ -323,25 +328,25 @@ func (s *ReminderService) FindReminderHistoryByChat(
 	telegramChatID int64,
 	limit int,
 	offset int,
-) ([]database.ReminderView, error) {
+) ([]domain.ReminderView, error) {
 	reminders, err := s.repository.FindReminderHistoryByChat(ctx, telegramChatID, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("find reminder history: %w", err)
 	}
 
-	return reminders, nil
+	return mapReminderViewsToDomain(reminders), nil
 }
 
 func (s *ReminderService) ReminderStatsByChat(
 	ctx context.Context,
 	telegramChatID int64,
-) (database.ReminderStats, error) {
+) (domain.ReminderStats, error) {
 	stats, err := s.repository.ReminderStatsByChat(ctx, telegramChatID)
 	if err != nil {
-		return database.ReminderStats{}, fmt.Errorf("load reminder stats by chat: %w", err)
+		return domain.ReminderStats{}, fmt.Errorf("load reminder stats by chat: %w", err)
 	}
 
-	return stats, nil
+	return mapReminderStatsToDomain(stats), nil
 }
 
 func (s *ReminderService) FindHolidaysByChat(
@@ -349,30 +354,30 @@ func (s *ReminderService) FindHolidaysByChat(
 	telegramChatID int64,
 	limit int,
 	offset int,
-) ([]database.HolidayView, error) {
+) ([]domain.HolidayView, error) {
 	holidays, err := s.repository.FindHolidaysByChat(ctx, telegramChatID, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("find holidays by chat: %w", err)
 	}
 
-	return holidays, nil
+	return mapHolidayViewsToDomain(holidays), nil
 }
 
 func (s *ReminderService) HolidayByID(
 	ctx context.Context,
 	telegramChatID int64,
 	holidayID int64,
-) (database.HolidayView, error) {
+) (domain.HolidayView, error) {
 	holiday, err := s.repository.HolidayByID(ctx, telegramChatID, holidayID)
 	if err != nil {
 		if errors.Is(err, database.ErrHolidayNotFound) {
-			return database.HolidayView{}, fmt.Errorf("load holiday by id: %w", ErrHolidayNotFound)
+			return domain.HolidayView{}, fmt.Errorf("load holiday by id: %w", ErrHolidayNotFound)
 		}
 
-		return database.HolidayView{}, fmt.Errorf("load holiday by id: %w", err)
+		return domain.HolidayView{}, fmt.Errorf("load holiday by id: %w", err)
 	}
 
-	return holiday, nil
+	return mapHolidayViewToDomain(holiday), nil
 }
 
 func (s *ReminderService) DeleteHoliday(ctx context.Context, telegramChatID int64, holidayID int64) error {
@@ -390,14 +395,14 @@ func (s *ReminderService) DeleteHoliday(ctx context.Context, telegramChatID int6
 func (s *ReminderService) CreateShoppingList(
 	ctx context.Context,
 	telegramChatID int64,
-	items []database.ShoppingListItem,
-) (database.ShoppingListView, error) {
-	list, err := s.repository.CreateShoppingList(ctx, telegramChatID, items)
+	items []domain.ShoppingListItem,
+) (domain.ShoppingListView, error) {
+	list, err := s.repository.CreateShoppingList(ctx, telegramChatID, mapShoppingListItemsToDatabase(items))
 	if err != nil {
-		return database.ShoppingListView{}, fmt.Errorf("create shopping list: %w", err)
+		return domain.ShoppingListView{}, fmt.Errorf("create shopping list: %w", err)
 	}
 
-	return list, nil
+	return mapShoppingListViewToDomain(list), nil
 }
 
 func (s *ReminderService) FindShoppingListsByChat(
@@ -405,59 +410,59 @@ func (s *ReminderService) FindShoppingListsByChat(
 	telegramChatID int64,
 	limit int,
 	offset int,
-) ([]database.ShoppingListView, error) {
+) ([]domain.ShoppingListView, error) {
 	lists, err := s.repository.FindShoppingListsByChat(ctx, telegramChatID, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("find shopping lists by chat: %w", err)
 	}
 
-	return lists, nil
+	return mapShoppingListViewsToDomain(lists), nil
 }
 
 func (s *ReminderService) ShoppingListByID(
 	ctx context.Context,
 	telegramChatID int64,
 	listID int64,
-) (database.ShoppingListView, error) {
+) (domain.ShoppingListView, error) {
 	list, err := s.repository.ShoppingListByID(ctx, telegramChatID, listID)
 	if err != nil {
 		if errors.Is(err, database.ErrShoppingListNotFound) {
-			return database.ShoppingListView{}, fmt.Errorf("load shopping list by id: %w", ErrShoppingListNotFound)
+			return domain.ShoppingListView{}, fmt.Errorf("load shopping list by id: %w", ErrShoppingListNotFound)
 		}
 
-		return database.ShoppingListView{}, fmt.Errorf("load shopping list by id: %w", err)
+		return domain.ShoppingListView{}, fmt.Errorf("load shopping list by id: %w", err)
 	}
 
-	return list, nil
+	return mapShoppingListViewToDomain(list), nil
 }
 
 func (s *ReminderService) ToggleShoppingListItem(
 	ctx context.Context,
 	telegramChatID int64,
 	itemID int64,
-) (database.ShoppingListView, error) {
+) (domain.ShoppingListView, error) {
 	list, err := s.repository.ToggleShoppingListItem(ctx, telegramChatID, itemID)
 	if err != nil {
 		if errors.Is(err, database.ErrShoppingListNotFound) {
-			return database.ShoppingListView{}, fmt.Errorf("toggle shopping list item: %w", ErrShoppingListNotFound)
+			return domain.ShoppingListView{}, fmt.Errorf("toggle shopping list item: %w", ErrShoppingListNotFound)
 		}
 
-		return database.ShoppingListView{}, fmt.Errorf("toggle shopping list item: %w", err)
+		return domain.ShoppingListView{}, fmt.Errorf("toggle shopping list item: %w", err)
 	}
 
-	return list, nil
+	return mapShoppingListViewToDomain(list), nil
 }
 
 func (s *ReminderService) UserSettings(
 	ctx context.Context,
 	telegramChatID int64,
-) (database.UserSettings, error) {
+) (domain.UserSettings, error) {
 	settings, err := s.repository.UserSettings(ctx, telegramChatID)
 	if err != nil {
-		return database.UserSettings{}, fmt.Errorf("load user settings: %w", err)
+		return domain.UserSettings{}, fmt.Errorf("load user settings: %w", err)
 	}
 
-	return settings, nil
+	return mapUserSettingsToDomain(settings), nil
 }
 
 func (s *ReminderService) UpdateUserTimezone(ctx context.Context, telegramChatID int64, timezone string) error {
@@ -489,13 +494,13 @@ func (s *ReminderService) createRecurringReminder(
 	remindAt time.Time,
 	rule database.ReminderRule,
 	customDates []time.Time,
-) (database.ReminderView, error) {
+) (domain.ReminderView, error) {
 	title = strings.TrimSpace(title)
 	if title == "" {
-		return database.ReminderView{}, fmt.Errorf("create recurring reminder: %w", ErrReminderTitleEmpty)
+		return domain.ReminderView{}, fmt.Errorf("create recurring reminder: %w", ErrReminderTitleEmpty)
 	}
 
-	reminder, err := s.CreateInitialOccurrenceForRule(ctx, database.RecurringReminderRequest{
+	reminder, err := s.planner.CreateInitialOccurrenceForRule(ctx, database.RecurringReminderRequest{
 		TelegramChatID: telegramChatID,
 		Title:          title,
 		Description:    strings.TrimSpace(description),
@@ -504,10 +509,10 @@ func (s *ReminderService) createRecurringReminder(
 		CustomDates:    customDates,
 	})
 	if err != nil {
-		return database.ReminderView{}, fmt.Errorf("create recurring reminder: %w", err)
+		return domain.ReminderView{}, fmt.Errorf("create recurring reminder: %w", err)
 	}
 
-	return reminder, nil
+	return mapReminderViewToDomain(reminder), nil
 }
 
 func earliestDate(dates []time.Time) time.Time {

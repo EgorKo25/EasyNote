@@ -1,11 +1,12 @@
+//nolint:dupl // Command files intentionally repeat lifecycle boilerplate to keep endpoints explicit.
 package commands
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/EgorKo25/EasyNote/src/service"
 	apphttp "github.com/EgorKo25/EasyNote/src/transport/http"
-	"github.com/EgorKo25/EasyNote/src/transport/http/middleware"
 	"github.com/gin-gonic/gin"
 )
 
@@ -35,12 +36,12 @@ func (c *GetSettingsCommand) Clone() apphttp.Command {
 }
 
 func (c *GetSettingsCommand) Parse(ctx *gin.Context) error {
-	telegramChatID, err := middleware.TelegramChatID(ctx)
+	req, err := parseTelegramChatRequest(ctx)
 	if err != nil {
 		return err
 	}
 
-	c.req = TelegramChatRequest{TelegramChatID: telegramChatID}
+	c.req = req
 
 	return nil
 }
@@ -48,7 +49,7 @@ func (c *GetSettingsCommand) Parse(ctx *gin.Context) error {
 func (c *GetSettingsCommand) Apply(ctx *gin.Context) (any, error) {
 	settings, err := c.service.UserSettings(ctx.Request.Context(), c.req.TelegramChatID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get settings: %w", err)
 	}
 
 	return SettingsResponse{

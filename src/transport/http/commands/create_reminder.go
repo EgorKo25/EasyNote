@@ -5,10 +5,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/EgorKo25/EasyNote/src/database"
+	"github.com/EgorKo25/EasyNote/src/domain"
 	"github.com/EgorKo25/EasyNote/src/service"
 	apphttp "github.com/EgorKo25/EasyNote/src/transport/http"
-	"github.com/EgorKo25/EasyNote/src/transport/http/middleware"
 	"github.com/gin-gonic/gin"
 )
 
@@ -39,10 +38,10 @@ func (c *CreateReminderCommand) Parse(ctx *gin.Context) error {
 	var request CreateReminderRequest
 
 	if err := ctx.ShouldBindJSON(&request); err != nil {
-		return fmt.Errorf("%w: %v", apphttp.ErrInvalidRequest, err)
+		return fmt.Errorf("%w: %w", apphttp.ErrInvalidRequest, err)
 	}
 
-	telegramChatID, err := middleware.TelegramChatID(ctx)
+	telegramChatID, err := telegramChatIDFromContext(ctx)
 	if err != nil {
 		return err
 	}
@@ -54,95 +53,147 @@ func (c *CreateReminderCommand) Parse(ctx *gin.Context) error {
 }
 
 func (c *CreateReminderCommand) Apply(ctx *gin.Context) (any, error) {
-	var reminder database.ReminderView
-	var err error
-
-	telegramChatID := c.request.TelegramChatID
-
 	if c.request.Repeat == nil {
-		reminder, err = c.service.CreateReminder(
+		reminder, err := c.service.CreateReminder(
 			ctx.Request.Context(),
-			telegramChatID,
+			c.request.TelegramChatID,
 			c.request.Title,
 			c.request.Description,
 			c.request.RemindAt,
 		)
-	} else {
-		switch c.request.Repeat.Type {
-		case string(database.ReminderRuleTypeInterval):
-			if c.request.Repeat.IntervalDays == nil {
-				return nil, apphttp.ErrReminderRepeatIntervalDaysEmpty
-			}
-			if *c.request.Repeat.IntervalDays < 1 {
-				return nil, apphttp.ErrReminderRepeatIntervalDaysInvalid
-			}
-
-			reminder, err = c.service.CreateIntervalReminder(
-				ctx.Request.Context(),
-				telegramChatID,
-				c.request.Title,
-				c.request.Description,
-				c.request.RemindAt,
-				*c.request.Repeat.IntervalDays,
-			)
-		case string(database.ReminderRuleTypeWeekdays):
-			if c.request.Repeat.WeekdaysMask == nil {
-				return nil, apphttp.ErrReminderRepeatWeekdaysMaskEmpty
-			}
-
-			reminder, err = c.service.CreateWeekdaysReminder(
-				ctx.Request.Context(),
-				telegramChatID,
-				c.request.Title,
-				c.request.Description,
-				c.request.RemindAt,
-				*c.request.Repeat.WeekdaysMask,
-			)
-		case string(database.ReminderRuleTypeCustomDates):
-			if len(c.request.Repeat.Dates) == 0 {
-				return nil, apphttp.ErrReminderRepeatCustomDatesEmpty
-			}
-			if c.request.Repeat.Hour == nil || c.request.Repeat.Minute == nil {
-				return nil, apphttp.ErrReminderRepeatCustomTimeEmpty
-			}
-			if *c.request.Repeat.Hour < 0 || *c.request.Repeat.Hour > 23 ||
-				*c.request.Repeat.Minute < 0 || *c.request.Repeat.Minute > 59 {
-				return nil, apphttp.ErrReminderRepeatCustomTimeInvalid
-			}
-			if strings.TrimSpace(c.request.Repeat.Timezone) == "" {
-				return nil, apphttp.ErrReminderRepeatTimezoneInvalid
-			}
-
-			location, loadLocationErr := time.LoadLocation(c.request.Repeat.Timezone)
-			if loadLocationErr != nil {
-				return nil, fmt.Errorf("%w: %s", apphttp.ErrReminderRepeatTimezoneInvalid, c.request.Repeat.Timezone)
-			}
-
-			dates, parseDatesErr := parseReminderRepeatDates(c.request.Repeat.Dates)
-			if parseDatesErr != nil {
-				return nil, parseDatesErr
-			}
-
-			reminder, err = c.service.CreateCustomDatesReminder(
-				ctx.Request.Context(),
-				telegramChatID,
-				c.request.Title,
-				c.request.Description,
-				dates,
-				*c.request.Repeat.Hour,
-				*c.request.Repeat.Minute,
-				location,
-			)
-		default:
-			return nil, fmt.Errorf("%w: %s", apphttp.ErrReminderRepeatTypeUnsupported, c.request.Repeat.Type)
+		if err != nil {
+			return nil, fmt.Errorf("create reminder: %w", err)
 		}
+
+		return mapReminderViewToResponse(reminder), nil
 	}
 
+	reminder, err := c.createRepeatReminder(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	return mapReminderViewToResponse(reminder), nil
+}
+
+func (c *CreateReminderCommand) createRepeatReminder(ctx *gin.Context) (domain.ReminderView, error) {
+	switch c.request.Repeat.Type {
+	case string(domain.ReminderRuleTypeInterval):
+		return c.createIntervalReminder(ctx)
+	case string(domain.ReminderRuleTypeWeekdays):
+		return c.createWeekdaysReminder(ctx)
+	case string(domain.ReminderRuleTypeCustomDates):
+		return c.createCustomDatesReminder(ctx)
+	default:
+		return domain.ReminderView{}, fmt.Errorf(
+			"%w: %s",
+			apphttp.ErrReminderRepeatTypeUnsupported,
+			c.request.Repeat.Type,
+		)
+	}
+}
+
+func (c *CreateReminderCommand) createIntervalReminder(ctx *gin.Context) (domain.ReminderView, error) {
+	if c.request.Repeat.IntervalDays == nil {
+		return domain.ReminderView{}, apphttp.ErrReminderRepeatIntervalDaysEmpty
+	}
+
+	if *c.request.Repeat.IntervalDays < 1 {
+		return domain.ReminderView{}, apphttp.ErrReminderRepeatIntervalDaysInvalid
+	}
+
+	reminder, err := c.service.CreateIntervalReminder(
+		ctx.Request.Context(),
+		c.request.TelegramChatID,
+		c.request.Title,
+		c.request.Description,
+		c.request.RemindAt,
+		*c.request.Repeat.IntervalDays,
+	)
+	if err != nil {
+		return domain.ReminderView{}, fmt.Errorf("create interval reminder: %w", err)
+	}
+
+	return reminder, nil
+}
+
+func (c *CreateReminderCommand) createWeekdaysReminder(ctx *gin.Context) (domain.ReminderView, error) {
+	if c.request.Repeat.WeekdaysMask == nil {
+		return domain.ReminderView{}, apphttp.ErrReminderRepeatWeekdaysMaskEmpty
+	}
+
+	reminder, err := c.service.CreateWeekdaysReminder(
+		ctx.Request.Context(),
+		c.request.TelegramChatID,
+		c.request.Title,
+		c.request.Description,
+		c.request.RemindAt,
+		*c.request.Repeat.WeekdaysMask,
+	)
+	if err != nil {
+		return domain.ReminderView{}, fmt.Errorf("create weekdays reminder: %w", err)
+	}
+
+	return reminder, nil
+}
+
+func (c *CreateReminderCommand) createCustomDatesReminder(ctx *gin.Context) (domain.ReminderView, error) {
+	repeat := c.request.Repeat
+
+	if len(repeat.Dates) == 0 {
+		return domain.ReminderView{}, apphttp.ErrReminderRepeatCustomDatesEmpty
+	}
+
+	hour, minute, err := parseReminderRepeatTime(repeat.Hour, repeat.Minute)
+	if err != nil {
+		return domain.ReminderView{}, err
+	}
+
+	if strings.TrimSpace(repeat.Timezone) == "" {
+		return domain.ReminderView{}, apphttp.ErrReminderRepeatTimezoneInvalid
+	}
+
+	location, err := time.LoadLocation(repeat.Timezone)
+	if err != nil {
+		return domain.ReminderView{}, fmt.Errorf(
+			"%w: %s",
+			apphttp.ErrReminderRepeatTimezoneInvalid,
+			repeat.Timezone,
+		)
+	}
+
+	dates, err := parseReminderRepeatDates(repeat.Dates)
+	if err != nil {
+		return domain.ReminderView{}, err
+	}
+
+	reminder, err := c.service.CreateCustomDatesReminder(
+		ctx.Request.Context(),
+		c.request.TelegramChatID,
+		c.request.Title,
+		c.request.Description,
+		dates,
+		hour,
+		minute,
+		location,
+	)
+	if err != nil {
+		return domain.ReminderView{}, fmt.Errorf("create custom dates reminder: %w", err)
+	}
+
+	return reminder, nil
+}
+
+func parseReminderRepeatTime(hour, minute *int) (int, int, error) {
+	if hour == nil || minute == nil {
+		return 0, 0, apphttp.ErrReminderRepeatCustomTimeEmpty
+	}
+
+	if *hour < 0 || *hour > 23 || *minute < 0 || *minute > 59 {
+		return 0, 0, apphttp.ErrReminderRepeatCustomTimeInvalid
+	}
+
+	return *hour, *minute, nil
 }
 
 func parseReminderRepeatDates(values []string) ([]time.Time, error) {

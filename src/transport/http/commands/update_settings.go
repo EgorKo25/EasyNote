@@ -7,7 +7,6 @@ import (
 
 	"github.com/EgorKo25/EasyNote/src/service"
 	apphttp "github.com/EgorKo25/EasyNote/src/transport/http"
-	"github.com/EgorKo25/EasyNote/src/transport/http/middleware"
 	"github.com/gin-gonic/gin"
 )
 
@@ -40,10 +39,10 @@ func (c *UpdateSettingsCommand) Parse(ctx *gin.Context) error {
 	var req UpdateSettingsRequest
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return fmt.Errorf("%w: %v", apphttp.ErrInvalidRequest, err)
+		return fmt.Errorf("%w: %w", apphttp.ErrInvalidRequest, err)
 	}
 
-	telegramChatID, err := middleware.TelegramChatID(ctx)
+	telegramChatID, err := telegramChatIDFromContext(ctx)
 	if err != nil {
 		return err
 	}
@@ -70,12 +69,16 @@ func (c *UpdateSettingsCommand) Parse(ctx *gin.Context) error {
 func (c *UpdateSettingsCommand) Apply(ctx *gin.Context) (any, error) {
 	settings, err := c.service.UserSettings(ctx.Request.Context(), c.req.TelegramChatID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get user settings before update: %w", err)
 	}
 
 	if c.req.Timezone != nil {
-		if err = c.service.UpdateUserTimezone(ctx.Request.Context(), c.req.TelegramChatID, *c.req.Timezone); err != nil {
-			return nil, err
+		if err = c.service.UpdateUserTimezone(
+			ctx.Request.Context(),
+			c.req.TelegramChatID,
+			*c.req.Timezone,
+		); err != nil {
+			return nil, fmt.Errorf("update user timezone: %w", err)
 		}
 	}
 
@@ -97,13 +100,13 @@ func (c *UpdateSettingsCommand) Apply(ctx *gin.Context) (any, error) {
 			intrusiveEnabled,
 			intrusiveInterval,
 		); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("update intrusive settings: %w", err)
 		}
 	}
 
 	settings, err = c.service.UserSettings(ctx.Request.Context(), c.req.TelegramChatID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get user settings after update: %w", err)
 	}
 
 	return SettingsResponse{

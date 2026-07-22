@@ -1,3 +1,4 @@
+//nolint:goconst,wrapcheck,err113 // Tests intentionally keep repeated fixture values and direct action errors.
 package service_test
 
 import (
@@ -7,6 +8,7 @@ import (
 	"time"
 
 	"github.com/EgorKo25/EasyNote/src/database"
+	"github.com/EgorKo25/EasyNote/src/domain"
 	"github.com/EgorKo25/EasyNote/src/service"
 	"github.com/EgorKo25/EasyNote/src/service/mocks"
 	"github.com/stretchr/testify/require"
@@ -45,7 +47,7 @@ func TestReminderServiceCreatesReminder(t *testing.T) {
 		desc     string
 		before   func(planner *mocks.MockReminderCreationPlanner)
 		expected struct {
-			reminder    database.ReminderView
+			reminder    domain.ReminderView
 			expectedErr error
 		}
 	}{
@@ -60,9 +62,9 @@ func TestReminderServiceCreatesReminder(t *testing.T) {
 					Times(1)
 			},
 			expected: struct {
-				reminder    database.ReminderView
+				reminder    domain.ReminderView
 				expectedErr error
-			}{reminder: database.ReminderView{ID: 1, Title: "Pay rent", Description: "Before lunch"}},
+			}{reminder: domain.ReminderView{ID: 1, Title: "Pay rent", Description: "Before lunch"}},
 		},
 		{
 			name:  "trims title before create",
@@ -75,9 +77,9 @@ func TestReminderServiceCreatesReminder(t *testing.T) {
 					Times(1)
 			},
 			expected: struct {
-				reminder    database.ReminderView
+				reminder    domain.ReminderView
 				expectedErr error
-			}{reminder: database.ReminderView{ID: 2, Title: "Pay rent", Description: "Before lunch"}},
+			}{reminder: domain.ReminderView{ID: 2, Title: "Pay rent", Description: "Before lunch"}},
 		},
 		{
 			name:  "trims description before create",
@@ -90,9 +92,9 @@ func TestReminderServiceCreatesReminder(t *testing.T) {
 					Times(1)
 			},
 			expected: struct {
-				reminder    database.ReminderView
+				reminder    domain.ReminderView
 				expectedErr error
-			}{reminder: database.ReminderView{ID: 3, Title: "Pay rent", Description: "Before lunch"}},
+			}{reminder: domain.ReminderView{ID: 3, Title: "Pay rent", Description: "Before lunch"}},
 		},
 		{
 			name:  "creates reminder without description",
@@ -105,9 +107,9 @@ func TestReminderServiceCreatesReminder(t *testing.T) {
 					Times(1)
 			},
 			expected: struct {
-				reminder    database.ReminderView
+				reminder    domain.ReminderView
 				expectedErr error
-			}{reminder: database.ReminderView{ID: 4, Title: "Pay rent"}},
+			}{reminder: domain.ReminderView{ID: 4, Title: "Pay rent"}},
 		},
 		{
 			name:  "empty title returns validation error",
@@ -116,7 +118,7 @@ func TestReminderServiceCreatesReminder(t *testing.T) {
 			before: func(_ *mocks.MockReminderCreationPlanner) {
 			},
 			expected: struct {
-				reminder    database.ReminderView
+				reminder    domain.ReminderView
 				expectedErr error
 			}{expectedErr: errExpectedTitleEmpty},
 		},
@@ -131,7 +133,7 @@ func TestReminderServiceCreatesReminder(t *testing.T) {
 					Times(1)
 			},
 			expected: struct {
-				reminder    database.ReminderView
+				reminder    domain.ReminderView
 				expectedErr error
 			}{expectedErr: errExpectedCreateReminder},
 		},
@@ -181,7 +183,7 @@ func TestReminderServiceUpdatesReminder(t *testing.T) {
 		desc     string
 		before   func(repository *mocks.MockReminderCommandRepository)
 		expected struct {
-			reminder        database.ReminderView
+			reminder        domain.ReminderView
 			expectedErrText string
 		}
 	}{
@@ -196,9 +198,9 @@ func TestReminderServiceUpdatesReminder(t *testing.T) {
 					Times(1)
 			},
 			expected: struct {
-				reminder        database.ReminderView
+				reminder        domain.ReminderView
 				expectedErrText string
-			}{reminder: database.ReminderView{ID: reminderID, Title: "Pay rent", Description: "Before lunch"}},
+			}{reminder: domain.ReminderView{ID: reminderID, Title: "Pay rent", Description: "Before lunch"}},
 		},
 		{
 			name:  "trims title before update",
@@ -211,9 +213,9 @@ func TestReminderServiceUpdatesReminder(t *testing.T) {
 					Times(1)
 			},
 			expected: struct {
-				reminder        database.ReminderView
+				reminder        domain.ReminderView
 				expectedErrText string
-			}{reminder: database.ReminderView{ID: reminderID, Title: "Pay rent", Description: "Before lunch"}},
+			}{reminder: domain.ReminderView{ID: reminderID, Title: "Pay rent", Description: "Before lunch"}},
 		},
 		{
 			name:  "trims description before update",
@@ -226,9 +228,9 @@ func TestReminderServiceUpdatesReminder(t *testing.T) {
 					Times(1)
 			},
 			expected: struct {
-				reminder        database.ReminderView
+				reminder        domain.ReminderView
 				expectedErrText string
-			}{reminder: database.ReminderView{ID: reminderID, Title: "Pay rent", Description: "Before lunch"}},
+			}{reminder: domain.ReminderView{ID: reminderID, Title: "Pay rent", Description: "Before lunch"}},
 		},
 		{
 			name:  "updates reminder without description",
@@ -241,9 +243,9 @@ func TestReminderServiceUpdatesReminder(t *testing.T) {
 					Times(1)
 			},
 			expected: struct {
-				reminder        database.ReminderView
+				reminder        domain.ReminderView
 				expectedErrText string
-			}{reminder: database.ReminderView{ID: reminderID, Title: "Pay rent"}},
+			}{reminder: domain.ReminderView{ID: reminderID, Title: "Pay rent"}},
 		},
 		{
 			name:  "empty title returns validation error",
@@ -252,7 +254,7 @@ func TestReminderServiceUpdatesReminder(t *testing.T) {
 			before: func(_ *mocks.MockReminderCommandRepository) {
 			},
 			expected: struct {
-				reminder        database.ReminderView
+				reminder        domain.ReminderView
 				expectedErrText string
 			}{expectedErrText: "update reminder: reminder title is empty"},
 		},
@@ -267,7 +269,7 @@ func TestReminderServiceUpdatesReminder(t *testing.T) {
 					Times(1)
 			},
 			expected: struct {
-				reminder        database.ReminderView
+				reminder        domain.ReminderView
 				expectedErrText string
 			}{expectedErrText: "update reminder: update reminder repository"},
 		},
@@ -336,7 +338,7 @@ func TestReminderServiceManagesHolidays(t *testing.T) {
 					Times(1)
 			},
 			action: func(reminderService *service.ReminderService) (string, string) {
-				holiday, err := reminderService.CreateHoliday(context.Background(), database.HolidayRequest{
+				holiday, err := reminderService.CreateHoliday(context.Background(), domain.HolidayRequest{
 					TelegramChatID: chatID,
 					HolidayName:    " Birthday ",
 					RecipientName:  " Oleg ",
@@ -369,9 +371,9 @@ func TestReminderServiceManagesHolidays(t *testing.T) {
 					Times(1)
 			},
 			action: func(reminderService *service.ReminderService) (string, string) {
-				holiday, err := reminderService.UpdateHoliday(context.Background(), database.HolidayUpdateRequest{
+				holiday, err := reminderService.UpdateHoliday(context.Background(), domain.HolidayUpdateRequest{
 					ID: holidayID,
-					HolidayRequest: database.HolidayRequest{
+					HolidayRequest: domain.HolidayRequest{
 						TelegramChatID: chatID,
 						HolidayName:    " Anniversary ",
 						RecipientName:  " Anna ",
@@ -453,7 +455,7 @@ func TestReminderServiceManagesHolidays(t *testing.T) {
 					Times(1)
 			},
 			action: func(reminderService *service.ReminderService) (string, string) {
-				holiday, err := reminderService.CreateHoliday(context.Background(), database.HolidayRequest{
+				holiday, err := reminderService.CreateHoliday(context.Background(), domain.HolidayRequest{
 					TelegramChatID: chatID,
 					HolidayName:    "Birthday",
 					RecipientName:  "Oleg",
@@ -544,7 +546,10 @@ func TestReminderServiceManagesShoppingLists(t *testing.T) {
 					Times(1)
 			},
 			action: func(reminderService *service.ReminderService) (string, string) {
-				list, err := reminderService.CreateShoppingList(context.Background(), chatID, items)
+				list, err := reminderService.CreateShoppingList(context.Background(), chatID, []domain.ShoppingListItem{
+					{Text: "Milk", Position: 1},
+					{Text: "Bread", Position: 2},
+				})
 				if len(list.Items) == 2 {
 					return "two items", errorText(err)
 				}
@@ -635,7 +640,7 @@ func TestReminderServiceManagesShoppingLists(t *testing.T) {
 				list, err := reminderService.CreateShoppingList(
 					context.Background(),
 					chatID,
-					[]database.ShoppingListItem{},
+					[]domain.ShoppingListItem{},
 				)
 				if list.ID == listID {
 					return "empty list", errorText(err)
@@ -657,7 +662,10 @@ func TestReminderServiceManagesShoppingLists(t *testing.T) {
 					Times(1)
 			},
 			action: func(reminderService *service.ReminderService) (string, string) {
-				list, err := reminderService.CreateShoppingList(context.Background(), chatID, items)
+				list, err := reminderService.CreateShoppingList(context.Background(), chatID, []domain.ShoppingListItem{
+					{Text: "Milk", Position: 1},
+					{Text: "Bread", Position: 2},
+				})
 				if list.ID == 0 {
 					return "", errorText(err)
 				}
@@ -854,7 +862,7 @@ func TestReminderServiceProvidesReadAndSettingsOperations(t *testing.T) {
 					context.Background(),
 					chatID,
 					reminderID,
-					database.ReminderStatusCompleted,
+					domain.ReminderStatusCompleted,
 				)
 
 				return "completed acknowledged", err
@@ -877,7 +885,7 @@ func TestReminderServiceProvidesReadAndSettingsOperations(t *testing.T) {
 					context.Background(),
 					chatID,
 					reminderID,
-					database.ReminderStatusCanceled,
+					domain.ReminderStatusCanceled,
 				)
 
 				return "canceled acknowledged", err
@@ -938,7 +946,7 @@ func TestReminderServiceProvidesReadAndSettingsOperations(t *testing.T) {
 					context.Background(),
 					chatID,
 					reminderID,
-					database.ReminderStatusSkipped,
+					domain.ReminderStatusSkipped,
 				)
 
 				return "", err
@@ -961,7 +969,7 @@ func TestReminderServiceProvidesReadAndSettingsOperations(t *testing.T) {
 					context.Background(),
 					chatID,
 					reminderID,
-					database.ReminderStatusCompleted,
+					domain.ReminderStatusCompleted,
 				)
 
 				return "", err
@@ -1012,7 +1020,7 @@ func TestReminderServiceCreatesWeekdaysReminder(t *testing.T) {
 		weekdaysMask int
 		before       func(planner *mocks.MockReminderCreationPlanner)
 		expected     struct {
-			reminder        database.ReminderView
+			reminder        domain.ReminderView
 			expectedErrText string
 		}
 	}{
@@ -1033,9 +1041,9 @@ func TestReminderServiceCreatesWeekdaysReminder(t *testing.T) {
 					Times(1)
 			},
 			expected: struct {
-				reminder        database.ReminderView
+				reminder        domain.ReminderView
 				expectedErrText string
-			}{reminder: database.ReminderView{ID: 1, Title: "Work standup"}},
+			}{reminder: domain.ReminderView{ID: 1, Title: "Work standup"}},
 		},
 		{
 			name:         "creates tuesday and thursday reminder with custom mask",
@@ -1054,9 +1062,9 @@ func TestReminderServiceCreatesWeekdaysReminder(t *testing.T) {
 					Times(1)
 			},
 			expected: struct {
-				reminder        database.ReminderView
+				reminder        domain.ReminderView
 				expectedErrText string
-			}{reminder: database.ReminderView{ID: 2, Title: "Training"}},
+			}{reminder: domain.ReminderView{ID: 2, Title: "Training"}},
 		},
 		{
 			name:         "creates weekend reminder with saturday and sunday mask",
@@ -1075,9 +1083,9 @@ func TestReminderServiceCreatesWeekdaysReminder(t *testing.T) {
 					Times(1)
 			},
 			expected: struct {
-				reminder        database.ReminderView
+				reminder        domain.ReminderView
 				expectedErrText string
-			}{reminder: database.ReminderView{ID: 3, Title: "Weekend plan"}},
+			}{reminder: domain.ReminderView{ID: 3, Title: "Weekend plan"}},
 		},
 		{
 			name:         "creates sunday only reminder with single day mask",
@@ -1096,9 +1104,9 @@ func TestReminderServiceCreatesWeekdaysReminder(t *testing.T) {
 					Times(1)
 			},
 			expected: struct {
-				reminder        database.ReminderView
+				reminder        domain.ReminderView
 				expectedErrText string
-			}{reminder: database.ReminderView{ID: 4, Title: "Review"}},
+			}{reminder: domain.ReminderView{ID: 4, Title: "Review"}},
 		},
 		{
 			name:         "empty title returns validation error",
@@ -1108,7 +1116,7 @@ func TestReminderServiceCreatesWeekdaysReminder(t *testing.T) {
 			before: func(_ *mocks.MockReminderCreationPlanner) {
 			},
 			expected: struct {
-				reminder        database.ReminderView
+				reminder        domain.ReminderView
 				expectedErrText string
 			}{expectedErrText: "create weekdays reminder: reminder title is empty"},
 		},
@@ -1120,7 +1128,7 @@ func TestReminderServiceCreatesWeekdaysReminder(t *testing.T) {
 			before: func(_ *mocks.MockReminderCreationPlanner) {
 			},
 			expected: struct {
-				reminder        database.ReminderView
+				reminder        domain.ReminderView
 				expectedErrText string
 			}{expectedErrText: "create weekdays reminder: weekdays mask is empty"},
 		},
@@ -1171,7 +1179,7 @@ func TestReminderServiceCreatesIntervalReminder(t *testing.T) {
 		intervalDays int
 		before       func(planner *mocks.MockReminderCreationPlanner)
 		expected     struct {
-			reminder        database.ReminderView
+			reminder        domain.ReminderView
 			expectedErrText string
 		}
 	}{
@@ -1193,9 +1201,9 @@ func TestReminderServiceCreatesIntervalReminder(t *testing.T) {
 					Times(1)
 			},
 			expected: struct {
-				reminder        database.ReminderView
+				reminder        domain.ReminderView
 				expectedErrText string
-			}{reminder: database.ReminderView{ID: 10, Title: "Medicine"}},
+			}{reminder: domain.ReminderView{ID: 10, Title: "Medicine"}},
 		},
 		{
 			name:         "creates two day interval reminder",
@@ -1214,9 +1222,9 @@ func TestReminderServiceCreatesIntervalReminder(t *testing.T) {
 					Times(1)
 			},
 			expected: struct {
-				reminder        database.ReminderView
+				reminder        domain.ReminderView
 				expectedErrText string
-			}{reminder: database.ReminderView{ID: 11, Title: "Water plants"}},
+			}{reminder: domain.ReminderView{ID: 11, Title: "Water plants"}},
 		},
 		{
 			name:         "creates weekly interval reminder",
@@ -1236,9 +1244,9 @@ func TestReminderServiceCreatesIntervalReminder(t *testing.T) {
 					Times(1)
 			},
 			expected: struct {
-				reminder        database.ReminderView
+				reminder        domain.ReminderView
 				expectedErrText string
-			}{reminder: database.ReminderView{ID: 12, Title: "Report"}},
+			}{reminder: domain.ReminderView{ID: 12, Title: "Report"}},
 		},
 		{
 			name:         "trims interval reminder title and description",
@@ -1258,9 +1266,9 @@ func TestReminderServiceCreatesIntervalReminder(t *testing.T) {
 					Times(1)
 			},
 			expected: struct {
-				reminder        database.ReminderView
+				reminder        domain.ReminderView
 				expectedErrText string
-			}{reminder: database.ReminderView{ID: 13, Title: "Pay rent", Description: "Card"}},
+			}{reminder: domain.ReminderView{ID: 13, Title: "Pay rent", Description: "Card"}},
 		},
 		{
 			name:         "empty interval title returns validation error",
@@ -1270,7 +1278,7 @@ func TestReminderServiceCreatesIntervalReminder(t *testing.T) {
 			before: func(_ *mocks.MockReminderCreationPlanner) {
 			},
 			expected: struct {
-				reminder        database.ReminderView
+				reminder        domain.ReminderView
 				expectedErrText string
 			}{expectedErrText: "create recurring reminder: reminder title is empty"},
 		},
@@ -1286,7 +1294,7 @@ func TestReminderServiceCreatesIntervalReminder(t *testing.T) {
 					Times(1)
 			},
 			expected: struct {
-				reminder        database.ReminderView
+				reminder        domain.ReminderView
 				expectedErrText string
 			}{expectedErrText: "create recurring reminder: create reminder repository"},
 		},
@@ -1341,7 +1349,7 @@ func TestReminderServiceCreatesCustomDatesReminder(t *testing.T) {
 		minute        int
 		before        func(planner *mocks.MockReminderCreationPlanner)
 		expected      struct {
-			reminder        database.ReminderView
+			reminder        domain.ReminderView
 			expectedErrText string
 		}
 	}{
@@ -1366,9 +1374,9 @@ func TestReminderServiceCreatesCustomDatesReminder(t *testing.T) {
 					Times(1)
 			},
 			expected: struct {
-				reminder        database.ReminderView
+				reminder        domain.ReminderView
 				expectedErrText string
-			}{reminder: database.ReminderView{ID: 20, Title: "Trip"}},
+			}{reminder: domain.ReminderView{ID: 20, Title: "Trip"}},
 		},
 		{
 			name:          "creates custom dates reminder with one selected date",
@@ -1389,9 +1397,9 @@ func TestReminderServiceCreatesCustomDatesReminder(t *testing.T) {
 					Times(1)
 			},
 			expected: struct {
-				reminder        database.ReminderView
+				reminder        domain.ReminderView
 				expectedErrText string
-			}{reminder: database.ReminderView{ID: 21, Title: "Doctor"}},
+			}{reminder: domain.ReminderView{ID: 21, Title: "Doctor"}},
 		},
 		{
 			name:          "creates custom dates reminder and trims text",
@@ -1413,9 +1421,9 @@ func TestReminderServiceCreatesCustomDatesReminder(t *testing.T) {
 					Times(1)
 			},
 			expected: struct {
-				reminder        database.ReminderView
+				reminder        domain.ReminderView
 				expectedErrText string
-			}{reminder: database.ReminderView{ID: 22, Title: "Tax", Description: "Forms"}},
+			}{reminder: domain.ReminderView{ID: 22, Title: "Tax", Description: "Forms"}},
 		},
 		{
 			name:          "creates custom dates reminder preserving selected date order",
@@ -1436,9 +1444,9 @@ func TestReminderServiceCreatesCustomDatesReminder(t *testing.T) {
 					Times(1)
 			},
 			expected: struct {
-				reminder        database.ReminderView
+				reminder        domain.ReminderView
 				expectedErrText string
-			}{reminder: database.ReminderView{ID: 23, Title: "Tickets"}},
+			}{reminder: domain.ReminderView{ID: 23, Title: "Tickets"}},
 		},
 		{
 			name:          "planner storage custom dates error is returned",
@@ -1454,7 +1462,7 @@ func TestReminderServiceCreatesCustomDatesReminder(t *testing.T) {
 					Times(1)
 			},
 			expected: struct {
-				reminder        database.ReminderView
+				reminder        domain.ReminderView
 				expectedErrText string
 			}{expectedErrText: "create recurring reminder: create reminder repository"},
 		},

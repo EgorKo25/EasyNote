@@ -9,8 +9,10 @@ RUN go mod download
 
 COPY . .
 
+ARG APP_TARGET=./cmd/backend
+
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-    go build -trimpath -ldflags="-s -w" -o /out/easy-note .
+    go build -trimpath -ldflags="-s -w" -o /out/easy-note ${APP_TARGET}
 
 FROM alpine:3.22
 

@@ -1,5 +1,7 @@
 package ui
 
+import "github.com/EgorKo25/EasyNote/src/telegramprotocol"
+
 const (
 	ButtonStart                 = "Старт"
 	ButtonCreateReminder        = "Создать"
@@ -78,8 +80,8 @@ const (
 	CallbackSettingsIntrusive       = "settings:intrusive"
 	CallbackSettingsIntrusiveOn     = "settings:intrusive:on"
 	CallbackSettingsIntrusiveOff    = "settings:intrusive:off"
-	CallbackReminderDone            = "reminder:done:"
-	CallbackReminderCancelDelivered = "reminder:cancel_delivered:"
+	CallbackReminderDone            = telegramprotocol.ReminderDone
+	CallbackReminderCancelDelivered = telegramprotocol.ReminderCancelDelivered
 	CallbackReminderHistory         = "reminder:history"
 	CallbackNoop                    = "noop"
 	CallbackMainMenu                = "menu:main"

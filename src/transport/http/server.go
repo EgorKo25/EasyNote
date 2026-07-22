@@ -32,7 +32,7 @@ func NewServer(cfg config.HTTP, handler http.Handler) *Server {
 }
 
 func (s *Server) Info() string {
-	return fmt.Sprintf("run http server on %s", s.server.Addr)
+	return "run http server on " + s.server.Addr
 }
 
 func (s *Server) Run(ctx context.Context) error {
@@ -50,7 +50,7 @@ func (s *Server) Run(ctx context.Context) error {
 		return fmt.Errorf("run http server: %w", err)
 
 	case <-ctx.Done():
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), s.cfg.ShutdownTimeout)
+		shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), s.cfg.ShutdownTimeout)
 		defer cancel()
 
 		if err := s.server.Shutdown(shutdownCtx); err != nil {

@@ -1,4 +1,55 @@
-version: 1.4.0
+version: 2.1.0
+
+## v2.1.0 - HTTP API and separated Telegram UI runtime
+
+### What was done
+
+The backend runtime was split from the Telegram UI runtime.
+
+The backend entrypoint now starts PostgreSQL, migrations, services, the HTTP API, scheduler, and a Telegram notification sender used only by scheduler delivery. It no longer starts Telegram bot polling or handles Telegram UI commands directly.
+
+A separate Telegram UI entrypoint/container now starts Telegram bot polling and talks to the backend through an HTTP client. User-facing Telegram screens, reply keyboards, inline keyboards, and draft state stay in the Telegram UI runtime, while persistence and business operations go through backend HTTP endpoints.
+
+The Telegram notification sender was moved out of the UI package into `notification/telegram`. Scheduler notifications keep the old user-facing behavior: the bot refreshes the reply keyboard with `Напоминаю:` and sends reminder notifications with inline `Готово` / `Отменить` actions when intrusive reminders are enabled.
+
+The HTTP transport layer was added on Gin. Routes are registered through command objects, with command parsing and application execution managed by the HTTP manager. The HTTP layer includes request logging, CORS support, Telegram chat id extraction, and a unified JSON error response format.
+
+A handwritten OpenAPI document now describes the backend API and is served locally through Swagger UI in Docker Compose.
+
+Docker Compose now runs backend, Telegram UI, PostgreSQL, and Swagger UI as separate services.
+
+### API changes
+
+Added HTTP API endpoints for:
+
+- health checks and timezone list;
+- active reminder list, reminder history, create/get/update/delete reminder;
+- delivered reminder complete/cancel actions;
+- holiday list/create/get/update/delete;
+- shopping list list/create/get and shopping item toggle;
+- dashboard stats and user settings get/update.
+
+The API uses `X-Telegram-Chat-ID` as the current Telegram user identity header for this Telegram UI integration step.
+
+### Affected files
+
+- `CHANGELIST.md`
+- `README.md`
+- `README_RU.md`
+- `docs/openapi.yaml`
+- `cmd/backend/main.go`
+- `cmd/telegram-ui/main.go`
+- `deploy/docker/EasyNote.Dockerfile`
+- `deploy/docker/docker-compose.local.yaml`
+- `deploy/docker/docker-compose.yaml`
+- `src/config/config.go`
+- `src/domain`
+- `src/notification/telegram`
+- `src/service`
+- `src/telegram`
+- `src/telegram/model`
+- `src/telegramprotocol`
+- `src/transport/http`
 
 ## v1.4.0 - Holidays and shopping lists
 

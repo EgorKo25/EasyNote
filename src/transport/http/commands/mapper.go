@@ -3,11 +3,11 @@ package commands
 import (
 	"time"
 
-	"github.com/EgorKo25/EasyNote/src/database"
+	"github.com/EgorKo25/EasyNote/src/domain"
 	"github.com/EgorKo25/EasyNote/src/service"
 )
 
-func mapRemindersViewToResponse(reminders []database.ReminderView) []ReminderDTO {
+func mapRemindersViewToResponse(reminders []domain.ReminderView) []ReminderDTO {
 	remindersDTO := make([]ReminderDTO, 0, len(reminders))
 
 	for _, rem := range reminders {
@@ -17,31 +17,31 @@ func mapRemindersViewToResponse(reminders []database.ReminderView) []ReminderDTO
 	return remindersDTO
 }
 
-func mapReminderViewToResponse(reminder database.ReminderView) ReminderResponse {
+func mapReminderViewToResponse(reminder domain.ReminderView) ReminderResponse {
 	return ReminderResponse{
 		Reminder: mapReminderViewToDTO(reminder),
 	}
 }
 
-func mapReminderViewToDTO(reminder database.ReminderView) ReminderDTO {
+func mapReminderViewToDTO(reminder domain.ReminderView) ReminderDTO {
 	return ReminderDTO{
 		ID:          reminder.ID,
 		RuleID:      reminder.RuleID,
 		Title:       reminder.Title,
 		Description: reminder.Description,
 		RemindAt:    reminder.RemindAt,
-		Status:      reminder.Status,
+		Status:      string(reminder.Status),
 		CreatedAt:   reminder.CreatedAt,
 	}
 }
 
-func mapHolidayViewToResponse(holiday database.HolidayView) HolidayResponse {
+func mapHolidayViewToResponse(holiday domain.HolidayView) HolidayResponse {
 	return HolidayResponse{
 		Holiday: mapHolidayViewToDTO(holiday),
 	}
 }
 
-func mapHolidaysViewToResponse(holidays []database.HolidayView) []HolidayDTO {
+func mapHolidaysViewToResponse(holidays []domain.HolidayView) []HolidayDTO {
 	holidaysDTO := make([]HolidayDTO, 0, len(holidays))
 
 	for _, holiday := range holidays {
@@ -51,7 +51,7 @@ func mapHolidaysViewToResponse(holidays []database.HolidayView) []HolidayDTO {
 	return holidaysDTO
 }
 
-func mapHolidayViewToDTO(holiday database.HolidayView) HolidayDTO {
+func mapHolidayViewToDTO(holiday domain.HolidayView) HolidayDTO {
 	return HolidayDTO{
 		ID:             holiday.ID,
 		TelegramChatID: holiday.TelegramChatID,
@@ -59,13 +59,13 @@ func mapHolidayViewToDTO(holiday database.HolidayView) HolidayDTO {
 		RecipientName:  holiday.RecipientName,
 		HolidayDate:    holiday.HolidayDate,
 		RemindAt:       holiday.RemindAt,
-		Status:         holiday.Status,
+		Status:         string(holiday.Status),
 		CreatedAt:      holiday.CreatedAt,
 	}
 }
 
-func mapCreateHolidayRequestToDatabaseRequest(request CreateHolidayRequest) database.HolidayRequest {
-	return database.HolidayRequest{
+func mapCreateHolidayRequestToDomainRequest(request CreateHolidayRequest) domain.HolidayRequest {
+	return domain.HolidayRequest{
 		TelegramChatID: request.TelegramChatID,
 		HolidayName:    request.HolidayName,
 		RecipientName:  request.RecipientName,
@@ -74,10 +74,10 @@ func mapCreateHolidayRequestToDatabaseRequest(request CreateHolidayRequest) data
 	}
 }
 
-func mapUpdateHolidayRequestToDatabaseRequest(request UpdateHolidayRequest) database.HolidayUpdateRequest {
-	return database.HolidayUpdateRequest{
+func mapUpdateHolidayRequestToDomainRequest(request UpdateHolidayRequest) domain.HolidayUpdateRequest {
+	return domain.HolidayUpdateRequest{
 		ID: request.HolidayID,
-		HolidayRequest: database.HolidayRequest{
+		HolidayRequest: domain.HolidayRequest{
 			TelegramChatID: request.TelegramChatID,
 			HolidayName:    request.HolidayName,
 			RecipientName:  request.RecipientName,
@@ -87,13 +87,13 @@ func mapUpdateHolidayRequestToDatabaseRequest(request UpdateHolidayRequest) data
 	}
 }
 
-func mapShoppingListViewToResponse(list database.ShoppingListView) ShoppingListResponse {
+func mapShoppingListViewToResponse(list domain.ShoppingListView) ShoppingListResponse {
 	return ShoppingListResponse{
 		ShoppingList: mapShoppingListViewToDTO(list),
 	}
 }
 
-func mapShoppingListsViewToResponse(lists []database.ShoppingListView) []ShoppingListDTO {
+func mapShoppingListsViewToResponse(lists []domain.ShoppingListView) []ShoppingListDTO {
 	listsDTO := make([]ShoppingListDTO, 0, len(lists))
 
 	for _, list := range lists {
@@ -103,7 +103,7 @@ func mapShoppingListsViewToResponse(lists []database.ShoppingListView) []Shoppin
 	return listsDTO
 }
 
-func mapShoppingListViewToDTO(list database.ShoppingListView) ShoppingListDTO {
+func mapShoppingListViewToDTO(list domain.ShoppingListView) ShoppingListDTO {
 	return ShoppingListDTO{
 		ID:             list.ID,
 		TelegramChatID: list.TelegramChatID,
@@ -112,7 +112,7 @@ func mapShoppingListViewToDTO(list database.ShoppingListView) ShoppingListDTO {
 	}
 }
 
-func mapShoppingListItemsToDTO(items []database.ShoppingListItem) []ShoppingListItemDTO {
+func mapShoppingListItemsToDTO(items []domain.ShoppingListItem) []ShoppingListItemDTO {
 	itemsDTO := make([]ShoppingListItemDTO, 0, len(items))
 
 	for _, item := range items {
@@ -122,7 +122,7 @@ func mapShoppingListItemsToDTO(items []database.ShoppingListItem) []ShoppingList
 	return itemsDTO
 }
 
-func mapShoppingListItemToDTO(item database.ShoppingListItem) ShoppingListItemDTO {
+func mapShoppingListItemToDTO(item domain.ShoppingListItem) ShoppingListItemDTO {
 	return ShoppingListItemDTO{
 		ID:        item.ID,
 		ListID:    item.ListID,
@@ -133,20 +133,20 @@ func mapShoppingListItemToDTO(item database.ShoppingListItem) ShoppingListItemDT
 	}
 }
 
-func mapCreateShoppingListItemsToDatabaseItems(items []CreateShoppingListItemRequest) []database.ShoppingListItem {
-	databaseItems := make([]database.ShoppingListItem, 0, len(items))
+func mapCreateShoppingListItemsToDomainItems(items []CreateShoppingListItemRequest) []domain.ShoppingListItem {
+	domainItems := make([]domain.ShoppingListItem, 0, len(items))
 
 	for index, item := range items {
-		databaseItems = append(databaseItems, database.ShoppingListItem{
+		domainItems = append(domainItems, domain.ShoppingListItem{
 			Text:     item.Text,
 			Position: index + 1,
 		})
 	}
 
-	return databaseItems
+	return domainItems
 }
 
-func mapReminderStatsToDTO(stats database.ReminderStats) ReminderStatsDTO {
+func mapReminderStatsToDTO(stats domain.ReminderStats) ReminderStatsDTO {
 	return ReminderStatsDTO{
 		Completed: stats.Completed,
 		Pending:   stats.Pending,
@@ -154,7 +154,7 @@ func mapReminderStatsToDTO(stats database.ReminderStats) ReminderStatsDTO {
 	}
 }
 
-func mapUserSettingsToDTO(settings database.UserSettings) UserSettingsDTO {
+func mapUserSettingsToDTO(settings domain.UserSettings) UserSettingsDTO {
 	return UserSettingsDTO{
 		TelegramChatID:           settings.TelegramChatID,
 		Language:                 settings.Language,

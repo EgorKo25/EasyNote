@@ -1,12 +1,12 @@
+//nolint:dupl // Command files intentionally repeat lifecycle boilerplate to keep endpoints explicit.
 package commands
 
 import (
+	"fmt"
 	"net/http"
-	"strconv"
 
 	"github.com/EgorKo25/EasyNote/src/service"
 	apphttp "github.com/EgorKo25/EasyNote/src/transport/http"
-	"github.com/EgorKo25/EasyNote/src/transport/http/middleware"
 	"github.com/gin-gonic/gin"
 )
 
@@ -14,6 +14,8 @@ type DeleteHolidayCommand struct {
 	req     HolidayRequest
 	service *service.ReminderService
 }
+
+const deleteHolidayPath = "/holidays/:id"
 
 func NewDeleteHolidayCommand(svc *service.ReminderService) *DeleteHolidayCommand {
 	return &DeleteHolidayCommand{
@@ -26,7 +28,7 @@ func (c *DeleteHolidayCommand) Method() string {
 }
 
 func (c *DeleteHolidayCommand) Path() string {
-	return "/holidays/:id"
+	return deleteHolidayPath
 }
 
 func (c *DeleteHolidayCommand) Clone() apphttp.Command {
@@ -36,20 +38,11 @@ func (c *DeleteHolidayCommand) Clone() apphttp.Command {
 }
 
 func (c *DeleteHolidayCommand) Parse(ctx *gin.Context) error {
-	var req HolidayRequest
-
-	telegramChatID, err := middleware.TelegramChatID(ctx)
+	req, err := parseHolidayRequest(ctx)
 	if err != nil {
 		return err
 	}
 
-	holidayID, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
-	if err != nil || holidayID <= 0 {
-		return apphttp.ErrInvalidID
-	}
-
-	req.TelegramChatID = telegramChatID
-	req.HolidayID = holidayID
 	c.req = req
 
 	return nil
@@ -57,7 +50,7 @@ func (c *DeleteHolidayCommand) Parse(ctx *gin.Context) error {
 
 func (c *DeleteHolidayCommand) Apply(ctx *gin.Context) (any, error) {
 	if err := c.service.DeleteHoliday(ctx.Request.Context(), c.req.TelegramChatID, c.req.HolidayID); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("delete holiday: %w", err)
 	}
 
 	return EmptyResponse{}, nil

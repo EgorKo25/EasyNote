@@ -1,10 +1,6 @@
 package commands
 
-import (
-	"time"
-
-	"github.com/EgorKo25/EasyNote/src/database"
-)
+import "time"
 
 type EmptyResponse struct{}
 
@@ -59,13 +55,13 @@ type ReminderRepeat struct {
 }
 
 type ReminderDTO struct {
-	ID          int64                   `json:"id"`
-	RuleID      *int64                  `json:"rule_id"`
-	Title       string                  `json:"title"`
-	Description string                  `json:"description"`
-	RemindAt    time.Time               `json:"remind_at"`
-	Status      database.ReminderStatus `json:"status"`
-	CreatedAt   time.Time               `json:"created_at"`
+	ID          int64     `json:"id"`
+	RuleID      *int64    `json:"rule_id"`
+	Title       string    `json:"title"`
+	Description string    `json:"description"`
+	RemindAt    time.Time `json:"remind_at"`
+	Status      string    `json:"status"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 type ReminderResponse struct {
@@ -101,14 +97,14 @@ type UpdateHolidayRequest struct {
 }
 
 type HolidayDTO struct {
-	ID             int64                  `json:"id"`
-	TelegramChatID int64                  `json:"telegram_chat_id"`
-	HolidayName    string                 `json:"holiday_name"`
-	RecipientName  string                 `json:"recipient_name"`
-	HolidayDate    time.Time              `json:"holiday_date"`
-	RemindAt       time.Time              `json:"remind_at"`
-	Status         database.HolidayStatus `json:"status"`
-	CreatedAt      time.Time              `json:"created_at"`
+	ID             int64     `json:"id"`
+	TelegramChatID int64     `json:"telegram_chat_id"`
+	HolidayName    string    `json:"holiday_name"`
+	RecipientName  string    `json:"recipient_name"`
+	HolidayDate    time.Time `json:"holiday_date"`
+	RemindAt       time.Time `json:"remind_at"`
+	Status         string    `json:"status"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
 type HolidayResponse struct {

@@ -1,13 +1,13 @@
+//nolint:dupl // Command files intentionally repeat lifecycle boilerplate to keep endpoints explicit.
 package commands
 
 import (
+	"fmt"
 	"net/http"
-	"strconv"
 
-	"github.com/EgorKo25/EasyNote/src/database"
+	"github.com/EgorKo25/EasyNote/src/domain"
 	"github.com/EgorKo25/EasyNote/src/service"
 	apphttp "github.com/EgorKo25/EasyNote/src/transport/http"
-	"github.com/EgorKo25/EasyNote/src/transport/http/middleware"
 	"github.com/gin-gonic/gin"
 )
 
@@ -37,20 +37,11 @@ func (c *CompleteReminderCommand) Clone() apphttp.Command {
 }
 
 func (c *CompleteReminderCommand) Parse(ctx *gin.Context) error {
-	var req AcknowledgeReminderRequest
-
-	telegramChatID, err := middleware.TelegramChatID(ctx)
+	req, err := parseAcknowledgeReminderRequest(ctx)
 	if err != nil {
 		return err
 	}
 
-	reminderID, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
-	if err != nil || reminderID <= 0 {
-		return apphttp.ErrInvalidID
-	}
-
-	req.TelegramChatID = telegramChatID
-	req.ReminderID = reminderID
 	c.req = req
 
 	return nil
@@ -61,9 +52,9 @@ func (c *CompleteReminderCommand) Apply(ctx *gin.Context) (any, error) {
 		ctx.Request.Context(),
 		c.req.TelegramChatID,
 		c.req.ReminderID,
-		database.ReminderStatusCompleted,
+		domain.ReminderStatusCompleted,
 	); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("complete reminder: %w", err)
 	}
 
 	return EmptyResponse{}, nil

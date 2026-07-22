@@ -10,9 +10,8 @@ import (
 	"sync"
 
 	"github.com/EgorKo25/EasyNote/src/config"
-	"github.com/EgorKo25/EasyNote/src/database"
 	"github.com/EgorKo25/EasyNote/src/logger"
-	telegramui "github.com/EgorKo25/EasyNote/src/telegram/ui"
+	"github.com/EgorKo25/EasyNote/src/telegramprotocol"
 	"github.com/mymmrac/telego"
 	tu "github.com/mymmrac/telego/telegoutil"
 )
@@ -30,7 +29,7 @@ func NewSender(ctx context.Context, cfg config.Telegram) (*Sender, error) {
 		telego.WithHTTPClient(&http.Client{
 			Timeout: cfg.RequestTimeout,
 		}),
-		telego.WithLogger(logger.Get("telego")),
+		telego.WithDefaultLogger(cfg.DebugMode, true),
 	}
 
 	if cfg.Warnings {
@@ -46,7 +45,7 @@ func NewSender(ctx context.Context, cfg config.Telegram) (*Sender, error) {
 		return nil, fmt.Errorf("create telegram bot: %w", err)
 	}
 
-	return &Sender{bot: bot, cfg: cfg, mainMenuByChat: make(map[int64]int)}, nil
+	return NewWithBot(bot, cfg), nil
 }
 
 type Sender struct {
@@ -56,7 +55,15 @@ type Sender struct {
 	mainMenuByChat map[int64]int
 }
 
-func (s *Sender) SendReminder(ctx context.Context, reminder database.ScheduledReminder) (int, error) {
+func NewWithBot(bot *telego.Bot, cfg config.Telegram) *Sender {
+	return &Sender{bot: bot, cfg: cfg, mainMenuByChat: make(map[int64]int)}
+}
+
+func (s *Sender) Bot() *telego.Bot {
+	return s.bot
+}
+
+func (s *Sender) SendReminder(ctx context.Context, reminder Reminder) (int, error) {
 	text := reminder.Title
 	if reminder.Description != "" {
 		text = fmt.Sprintf("%s\n\n%s", reminder.Title, reminder.Description)
@@ -86,7 +93,7 @@ func (s *Sender) SendReminder(ctx context.Context, reminder database.ScheduledRe
 	return message.MessageID, nil
 }
 
-func (s *Sender) SendHoliday(ctx context.Context, holiday database.ScheduledHoliday) (int, error) {
+func (s *Sender) SendHoliday(ctx context.Context, holiday Holiday) (int, error) {
 	if err := s.refreshMainKeyboard(ctx, holiday.TelegramChatID); err != nil {
 		return 0, fmt.Errorf("send telegram main menu keyboard before holiday %d: %w", holiday.ID, err)
 	}
@@ -114,7 +121,7 @@ func (s *Sender) SendHoliday(ctx context.Context, holiday database.ScheduledHoli
 	return message.MessageID, nil
 }
 
-func (s *Sender) DeleteReminderMessage(ctx context.Context, reminder database.ScheduledReminder) error {
+func (s *Sender) DeleteReminderMessage(ctx context.Context, reminder Reminder) error {
 	if reminder.TelegramMessageID == nil {
 		return nil
 	}
@@ -141,7 +148,7 @@ func (s *Sender) refreshMainKeyboard(ctx context.Context, chatID int64) error {
 	}
 
 	menuMessage, err := s.bot.SendMessage(ctx,
-		tu.Message(tu.ID(chatID), "Напоминаю:").WithReplyMarkup(telegramui.MainKeyboard()),
+		tu.Message(tu.ID(chatID), "Напоминаю:").WithReplyMarkup(notificationMainKeyboard()),
 	)
 	if err != nil {
 		return fmt.Errorf("send telegram main menu keyboard message: %w", err)
@@ -172,15 +179,15 @@ func (s *Sender) setMainMenuMessageID(chatID int64, messageID int) {
 	s.mainMenuByChat[chatID] = messageID
 }
 
-func (s *Sender) reminderMessageParams(reminder database.ScheduledReminder, text string) *telego.SendMessageParams {
+func (s *Sender) reminderMessageParams(reminder Reminder, text string) *telego.SendMessageParams {
 	params := tu.Message(tu.ID(reminder.TelegramChatID), text)
 	if reminder.IntrusiveEnabled {
 		params.WithReplyMarkup(tu.InlineKeyboard(
 			tu.InlineKeyboardRow(
 				tu.InlineKeyboardButton("Готово").
-					WithCallbackData(telegramui.CallbackReminderDone+strconv.FormatInt(reminder.ID, 10)),
+					WithCallbackData(telegramprotocol.ReminderDone+strconv.FormatInt(reminder.ID, 10)),
 				tu.InlineKeyboardButton("Отменить").
-					WithCallbackData(telegramui.CallbackReminderCancelDelivered+strconv.FormatInt(reminder.ID, 10)),
+					WithCallbackData(telegramprotocol.ReminderCancelDelivered+strconv.FormatInt(reminder.ID, 10)),
 			),
 		))
 	}

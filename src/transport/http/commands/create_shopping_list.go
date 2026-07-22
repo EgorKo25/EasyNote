@@ -7,7 +7,6 @@ import (
 
 	"github.com/EgorKo25/EasyNote/src/service"
 	apphttp "github.com/EgorKo25/EasyNote/src/transport/http"
-	"github.com/EgorKo25/EasyNote/src/transport/http/middleware"
 	"github.com/gin-gonic/gin"
 )
 
@@ -40,10 +39,10 @@ func (c *CreateShoppingListCommand) Parse(ctx *gin.Context) error {
 	var req CreateShoppingListRequest
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return fmt.Errorf("%w: %v", apphttp.ErrInvalidRequest, err)
+		return fmt.Errorf("%w: %w", apphttp.ErrInvalidRequest, err)
 	}
 
-	telegramChatID, err := middleware.TelegramChatID(ctx)
+	telegramChatID, err := telegramChatIDFromContext(ctx)
 	if err != nil {
 		return err
 	}
@@ -68,10 +67,10 @@ func (c *CreateShoppingListCommand) Apply(ctx *gin.Context) (any, error) {
 	list, err := c.service.CreateShoppingList(
 		ctx.Request.Context(),
 		c.req.TelegramChatID,
-		mapCreateShoppingListItemsToDatabaseItems(c.req.Items),
+		mapCreateShoppingListItemsToDomainItems(c.req.Items),
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create shopping list: %w", err)
 	}
 
 	return mapShoppingListViewToResponse(list), nil

@@ -32,7 +32,7 @@ func Create(reminderService *service.ReminderService) http.Handler {
 
 func (f *factory) Create() http.Handler {
 	engine := gin.New()
-	engine.Use(middleware.RequestLoggerMiddleware(), gin.Recovery())
+	engine.Use(middleware.CORSMiddleware(), middleware.RequestLoggerMiddleware(), gin.Recovery())
 
 	api := engine.Group(apiV1Prefix)
 

@@ -103,7 +103,7 @@ type LoggerCore struct {
 type Telegram struct {
 	TokenEnv            string        `default:"TELEGRAM_BOT_TOKEN"       validate:"required"       yaml:"token_env"`
 	APIBaseURL          string        `default:"https://api.telegram.org" validate:"required,url"   yaml:"api_base_url"`
-	BackendBaseURL      string        `                                      validate:"omitempty,url" yaml:"backend_base_url" env:"TELEGRAM_BACKEND_BASE_URL"`
+	BackendBaseURL      string        `                                   validate:"omitempty,url"  yaml:"backend_base_url"      env:"TELEGRAM_BACKEND_BASE_URL"`
 	RequestTimeout      time.Duration `default:"10s"                      validate:"required,gt=0"  yaml:"request_timeout"`
 	DebugMode           bool          `default:"false"                                              yaml:"debug_mode"`
 	Warnings            bool          `default:"true"                                               yaml:"warnings"`

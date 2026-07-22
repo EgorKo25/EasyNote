@@ -1,12 +1,12 @@
+//nolint:dupl // Command files intentionally repeat lifecycle boilerplate to keep endpoints explicit.
 package commands
 
 import (
+	"fmt"
 	"net/http"
-	"strconv"
 
 	"github.com/EgorKo25/EasyNote/src/service"
 	apphttp "github.com/EgorKo25/EasyNote/src/transport/http"
-	"github.com/EgorKo25/EasyNote/src/transport/http/middleware"
 	"github.com/gin-gonic/gin"
 )
 
@@ -36,31 +36,9 @@ func (c *GetHolidaysCommand) Clone() apphttp.Command {
 }
 
 func (c *GetHolidaysCommand) Parse(ctx *gin.Context) error {
-	var req PaginationRequest
-
-	telegramChatID, err := middleware.TelegramChatID(ctx)
+	req, err := parsePaginationRequest(ctx)
 	if err != nil {
 		return err
-	}
-
-	req.TelegramChatID = telegramChatID
-	req.Limit = 10
-	req.Offset = 0
-
-	if value := ctx.Query("offset"); value != "" {
-		offset, err := strconv.Atoi(value)
-		if err != nil || offset < 0 {
-			return apphttp.ErrInvalidOffset
-		}
-		req.Offset = offset
-	}
-
-	if value := ctx.Query("limit"); value != "" {
-		limit, err := strconv.Atoi(value)
-		if err != nil || limit < 1 || limit > 100 {
-			return apphttp.ErrInvalidLimit
-		}
-		req.Limit = limit
 	}
 
 	c.req = req
@@ -76,7 +54,7 @@ func (c *GetHolidaysCommand) Apply(ctx *gin.Context) (any, error) {
 		c.req.Offset,
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("find holidays by chat: %w", err)
 	}
 
 	return HolidayListResponse{

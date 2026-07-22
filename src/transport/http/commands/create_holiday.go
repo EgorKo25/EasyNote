@@ -8,7 +8,6 @@ import (
 
 	"github.com/EgorKo25/EasyNote/src/service"
 	apphttp "github.com/EgorKo25/EasyNote/src/transport/http"
-	"github.com/EgorKo25/EasyNote/src/transport/http/middleware"
 	"github.com/gin-gonic/gin"
 )
 
@@ -41,10 +40,10 @@ func (c *CreateHolidayCommand) Parse(ctx *gin.Context) error {
 	var req CreateHolidayRequest
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return fmt.Errorf("%w: %v", apphttp.ErrInvalidRequest, err)
+		return fmt.Errorf("%w: %w", apphttp.ErrInvalidRequest, err)
 	}
 
-	telegramChatID, err := middleware.TelegramChatID(ctx)
+	telegramChatID, err := telegramChatIDFromContext(ctx)
 	if err != nil {
 		return err
 	}
@@ -76,10 +75,10 @@ func (c *CreateHolidayCommand) Parse(ctx *gin.Context) error {
 func (c *CreateHolidayCommand) Apply(ctx *gin.Context) (any, error) {
 	holiday, err := c.service.CreateHoliday(
 		ctx.Request.Context(),
-		mapCreateHolidayRequestToDatabaseRequest(c.req),
+		mapCreateHolidayRequestToDomainRequest(c.req),
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create holiday: %w", err)
 	}
 
 	return mapHolidayViewToResponse(holiday), nil
