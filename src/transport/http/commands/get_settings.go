@@ -15,6 +15,8 @@ type GetSettingsCommand struct {
 	service *service.ReminderService
 }
 
+const getSettingsPath = "/settings"
+
 func NewGetSettingsCommand(svc *service.ReminderService) *GetSettingsCommand {
 	return &GetSettingsCommand{
 		service: svc,
@@ -26,7 +28,7 @@ func (c *GetSettingsCommand) Method() string {
 }
 
 func (c *GetSettingsCommand) Path() string {
-	return "/settings"
+	return getSettingsPath
 }
 
 func (c *GetSettingsCommand) Clone() apphttp.Command {

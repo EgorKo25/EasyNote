@@ -15,6 +15,8 @@ type GetReminderHistoryCommand struct {
 	service *service.ReminderService
 }
 
+const getReminderHistoryPath = "/reminders/history"
+
 func NewGetReminderHistoryCommand(svc *service.ReminderService) *GetReminderHistoryCommand {
 	return &GetReminderHistoryCommand{
 		service: svc,
@@ -26,7 +28,7 @@ func (c *GetReminderHistoryCommand) Method() string {
 }
 
 func (c *GetReminderHistoryCommand) Path() string {
-	return "/reminders/history"
+	return getReminderHistoryPath
 }
 
 func (c *GetReminderHistoryCommand) Clone() apphttp.Command {

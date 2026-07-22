@@ -15,6 +15,8 @@ type GetDashboardCommand struct {
 	service *service.ReminderService
 }
 
+const getDashboardPath = "/dashboard"
+
 func NewGetDashboardCommand(svc *service.ReminderService) *GetDashboardCommand {
 	return &GetDashboardCommand{
 		service: svc,
@@ -26,7 +28,7 @@ func (c *GetDashboardCommand) Method() string {
 }
 
 func (c *GetDashboardCommand) Path() string {
-	return "/dashboard"
+	return getDashboardPath
 }
 
 func (c *GetDashboardCommand) Clone() apphttp.Command {

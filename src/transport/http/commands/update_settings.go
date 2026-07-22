@@ -15,6 +15,8 @@ type UpdateSettingsCommand struct {
 	service *service.ReminderService
 }
 
+const updateSettingsPath = "/settings"
+
 func NewUpdateSettingsCommand(svc *service.ReminderService) *UpdateSettingsCommand {
 	return &UpdateSettingsCommand{
 		service: svc,
@@ -26,7 +28,7 @@ func (c *UpdateSettingsCommand) Method() string {
 }
 
 func (c *UpdateSettingsCommand) Path() string {
-	return "/settings"
+	return updateSettingsPath
 }
 
 func (c *UpdateSettingsCommand) Clone() apphttp.Command {

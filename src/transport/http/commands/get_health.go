@@ -9,6 +9,8 @@ import (
 
 type GetHealthCommand struct{}
 
+const getHealthPath = "/health"
+
 func NewGetHealthCommand() *GetHealthCommand {
 	return &GetHealthCommand{}
 }
@@ -18,7 +20,7 @@ func (c *GetHealthCommand) Method() string {
 }
 
 func (c *GetHealthCommand) Path() string {
-	return "/health"
+	return getHealthPath
 }
 
 func (c *GetHealthCommand) Clone() apphttp.Command {

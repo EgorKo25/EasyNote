@@ -16,6 +16,8 @@ type CompleteReminderCommand struct {
 	service *service.ReminderService
 }
 
+const completeReminderPath = "/reminders/:id/complete"
+
 func NewCompleteReminderCommand(svc *service.ReminderService) *CompleteReminderCommand {
 	return &CompleteReminderCommand{
 		service: svc,
@@ -27,7 +29,7 @@ func (c *CompleteReminderCommand) Method() string {
 }
 
 func (c *CompleteReminderCommand) Path() string {
-	return "/reminders/:id/complete"
+	return completeReminderPath
 }
 
 func (c *CompleteReminderCommand) Clone() apphttp.Command {

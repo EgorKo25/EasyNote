@@ -15,6 +15,8 @@ type GetRemindersCommand struct {
 	service *service.ReminderService
 }
 
+const getRemindersPath = "/reminders"
+
 func NewGetRemindersCommand(svc *service.ReminderService) *GetRemindersCommand {
 	return &GetRemindersCommand{
 		service: svc,
@@ -26,7 +28,7 @@ func (c *GetRemindersCommand) Method() string {
 }
 
 func (c *GetRemindersCommand) Path() string {
-	return "/reminders"
+	return getRemindersPath
 }
 
 func (c *GetRemindersCommand) Clone() apphttp.Command {
