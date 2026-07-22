@@ -3,6 +3,8 @@ services:
     build:
       context: ../..
       dockerfile: deploy/docker/EasyNote.Dockerfile
+      args:
+        APP_TARGET: ./cmd/backend
     image: easynote:local
     pull_policy: build
     container_name: easy-note-local-app
@@ -12,7 +14,14 @@ services:
         required: false
     environment:
       APP_ENVIRONMENT: local
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?TELEGRAM_BOT_TOKEN is required}
       TZ: ${TZ:-Europe/Moscow}
+      HTTP_PROXY: ${HTTP_PROXY:-}
+      HTTPS_PROXY: ${HTTPS_PROXY:-}
+      NO_PROXY: ${NO_PROXY:-app,localhost,127.0.0.1,postgres,easy-note-local-postgres}
+      http_proxy: ${HTTP_PROXY:-}
+      https_proxy: ${HTTPS_PROXY:-}
+      no_proxy: ${NO_PROXY:-app,localhost,127.0.0.1,postgres,easy-note-local-postgres}
 
       HTTP_HOST: 0.0.0.0
       HTTP_PORT: "8080"
@@ -29,6 +38,47 @@ services:
       - "${HTTP_HOST_PORT:-8080}:8080"
     volumes:
       - easy_note_local_logs:/app/logs
+
+  telegram-ui:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/EasyNote.Dockerfile
+      args:
+        APP_TARGET: ./cmd/telegram-ui
+    image: easynote-telegram-ui:local
+    pull_policy: build
+    container_name: easy-note-local-telegram-ui
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      APP_ENVIRONMENT: local
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?TELEGRAM_BOT_TOKEN is required}
+      TELEGRAM_BACKEND_BASE_URL: http://app:8080
+      TZ: ${TZ:-Europe/Moscow}
+      HTTP_PROXY: ${HTTP_PROXY:-}
+      HTTPS_PROXY: ${HTTPS_PROXY:-}
+      NO_PROXY: ${NO_PROXY:-app,localhost,127.0.0.1}
+      http_proxy: ${HTTP_PROXY:-}
+      https_proxy: ${HTTPS_PROXY:-}
+      no_proxy: ${NO_PROXY:-app,localhost,127.0.0.1}
+    depends_on:
+      app:
+        condition: service_started
+    volumes:
+      - easy_note_local_logs:/app/logs
+
+  swagger-ui:
+    image: swaggerapi/swagger-ui:latest
+    container_name: easy-note-local-swagger-ui
+    restart: unless-stopped
+    environment:
+      SWAGGER_JSON: /openapi.yaml
+    ports:
+      - "${SWAGGER_HOST_PORT:-8081}:8080"
+    volumes:
+      - ../../docs/openapi.yaml:/openapi.yaml:ro
 
   postgres:
     image: postgres:16-alpine

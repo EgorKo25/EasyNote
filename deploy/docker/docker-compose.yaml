@@ -7,6 +7,7 @@ services:
       - path: .env
         required: false
     environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?TELEGRAM_BOT_TOKEN is required}
       TZ: ${TZ:-Europe/Moscow}
 
       HTTP_HOST: 0.0.0.0
@@ -25,13 +26,38 @@ services:
     volumes:
       - easy_note_logs:/app/logs
 
-  postgres:
-    image: postgres:16-alpine
-    container_name: easy-note-postgres
+  telegram-ui:
+    image: ${TELEGRAM_UI_IMAGE:-easynote-telegram-ui:local}
+    container_name: easy-note-telegram-ui
     restart: unless-stopped
     env_file:
       - path: .env
         required: false
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?TELEGRAM_BOT_TOKEN is required}
+      TELEGRAM_BACKEND_BASE_URL: ${TELEGRAM_BACKEND_BASE_URL:-http://app:8080}
+      TZ: ${TZ:-Europe/Moscow}
+    depends_on:
+      app:
+        condition: service_started
+    volumes:
+      - easy_note_logs:/app/logs
+
+  swagger-ui:
+    image: swaggerapi/swagger-ui:latest
+    container_name: easy-note-swagger-ui
+    restart: unless-stopped
+    environment:
+      SWAGGER_JSON: /openapi.yaml
+    ports:
+      - "${SWAGGER_HOST_PORT:-8081}:8080"
+    volumes:
+      - ../../docs/openapi.yaml:/openapi.yaml:ro
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: easy-note-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-notes}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}

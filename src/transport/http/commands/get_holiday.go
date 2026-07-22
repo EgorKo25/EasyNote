@@ -1,12 +1,11 @@
 package commands
 
 import (
+	"fmt"
 	"net/http"
-	"strconv"
 
 	"github.com/EgorKo25/EasyNote/src/service"
 	apphttp "github.com/EgorKo25/EasyNote/src/transport/http"
-	"github.com/EgorKo25/EasyNote/src/transport/http/middleware"
 	"github.com/gin-gonic/gin"
 )
 
@@ -14,6 +13,8 @@ type GetHolidayCommand struct {
 	req     HolidayRequest
 	service *service.ReminderService
 }
+
+const getHolidayPath = "/holidays/:id"
 
 func NewGetHolidayCommand(svc *service.ReminderService) *GetHolidayCommand {
 	return &GetHolidayCommand{
@@ -26,7 +27,7 @@ func (c *GetHolidayCommand) Method() string {
 }
 
 func (c *GetHolidayCommand) Path() string {
-	return "/holidays/:id"
+	return getHolidayPath
 }
 
 func (c *GetHolidayCommand) Clone() apphttp.Command {
@@ -36,20 +37,11 @@ func (c *GetHolidayCommand) Clone() apphttp.Command {
 }
 
 func (c *GetHolidayCommand) Parse(ctx *gin.Context) error {
-	var req HolidayRequest
-
-	telegramChatID, err := middleware.TelegramChatID(ctx)
+	req, err := parseHolidayRequest(ctx)
 	if err != nil {
 		return err
 	}
 
-	holidayID, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
-	if err != nil || holidayID <= 0 {
-		return apphttp.ErrInvalidID
-	}
-
-	req.TelegramChatID = telegramChatID
-	req.HolidayID = holidayID
 	c.req = req
 
 	return nil
@@ -62,7 +54,7 @@ func (c *GetHolidayCommand) Apply(ctx *gin.Context) (any, error) {
 		c.req.HolidayID,
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get holiday by id: %w", err)
 	}
 
 	return mapHolidayViewToResponse(holiday), nil

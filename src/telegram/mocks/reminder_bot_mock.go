@@ -14,7 +14,7 @@ import (
 	reflect "reflect"
 	time "time"
 
-	database "github.com/EgorKo25/EasyNote/src/database"
+	model "github.com/EgorKo25/EasyNote/src/telegram/model"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -42,25 +42,25 @@ func (m *MockReminderService) EXPECT() *MockReminderServiceMockRecorder {
 	return m.recorder
 }
 
-// CompleteOccurrence mocks base method.
-func (m *MockReminderService) CompleteOccurrence(ctx context.Context, reminderID int64, status database.ReminderStatus, sentAt *time.Time) error {
+// AcknowledgeReminder mocks base method.
+func (m *MockReminderService) AcknowledgeReminder(ctx context.Context, telegramChatID, reminderID int64, status model.ReminderStatus) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CompleteOccurrence", ctx, reminderID, status, sentAt)
+	ret := m.ctrl.Call(m, "AcknowledgeReminder", ctx, telegramChatID, reminderID, status)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// CompleteOccurrence indicates an expected call of CompleteOccurrence.
-func (mr *MockReminderServiceMockRecorder) CompleteOccurrence(ctx, reminderID, status, sentAt any) *gomock.Call {
+// AcknowledgeReminder indicates an expected call of AcknowledgeReminder.
+func (mr *MockReminderServiceMockRecorder) AcknowledgeReminder(ctx, telegramChatID, reminderID, status any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CompleteOccurrence", reflect.TypeOf((*MockReminderService)(nil).CompleteOccurrence), ctx, reminderID, status, sentAt)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AcknowledgeReminder", reflect.TypeOf((*MockReminderService)(nil).AcknowledgeReminder), ctx, telegramChatID, reminderID, status)
 }
 
 // CreateCustomDatesReminder mocks base method.
-func (m *MockReminderService) CreateCustomDatesReminder(ctx context.Context, telegramChatID int64, title, description string, selectedDates []time.Time, hour, minute int, location *time.Location) (database.ReminderView, error) {
+func (m *MockReminderService) CreateCustomDatesReminder(ctx context.Context, telegramChatID int64, title, description string, selectedDates []time.Time, hour, minute int, location *time.Location) (model.ReminderView, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateCustomDatesReminder", ctx, telegramChatID, title, description, selectedDates, hour, minute, location)
-	ret0, _ := ret[0].(database.ReminderView)
+	ret0, _ := ret[0].(model.ReminderView)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -72,10 +72,10 @@ func (mr *MockReminderServiceMockRecorder) CreateCustomDatesReminder(ctx, telegr
 }
 
 // CreateHoliday mocks base method.
-func (m *MockReminderService) CreateHoliday(ctx context.Context, request database.HolidayRequest) (database.HolidayView, error) {
+func (m *MockReminderService) CreateHoliday(ctx context.Context, request model.HolidayRequest) (model.HolidayView, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateHoliday", ctx, request)
-	ret0, _ := ret[0].(database.HolidayView)
+	ret0, _ := ret[0].(model.HolidayView)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -87,10 +87,10 @@ func (mr *MockReminderServiceMockRecorder) CreateHoliday(ctx, request any) *gomo
 }
 
 // CreateIntervalReminder mocks base method.
-func (m *MockReminderService) CreateIntervalReminder(ctx context.Context, telegramChatID int64, title, description string, remindAt time.Time, intervalDays int) (database.ReminderView, error) {
+func (m *MockReminderService) CreateIntervalReminder(ctx context.Context, telegramChatID int64, title, description string, remindAt time.Time, intervalDays int) (model.ReminderView, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateIntervalReminder", ctx, telegramChatID, title, description, remindAt, intervalDays)
-	ret0, _ := ret[0].(database.ReminderView)
+	ret0, _ := ret[0].(model.ReminderView)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -102,10 +102,10 @@ func (mr *MockReminderServiceMockRecorder) CreateIntervalReminder(ctx, telegramC
 }
 
 // CreateReminder mocks base method.
-func (m *MockReminderService) CreateReminder(ctx context.Context, telegramChatID int64, title, description string, remindAt time.Time) (database.ReminderView, error) {
+func (m *MockReminderService) CreateReminder(ctx context.Context, telegramChatID int64, title, description string, remindAt time.Time) (model.ReminderView, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateReminder", ctx, telegramChatID, title, description, remindAt)
-	ret0, _ := ret[0].(database.ReminderView)
+	ret0, _ := ret[0].(model.ReminderView)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -117,10 +117,10 @@ func (mr *MockReminderServiceMockRecorder) CreateReminder(ctx, telegramChatID, t
 }
 
 // CreateShoppingList mocks base method.
-func (m *MockReminderService) CreateShoppingList(ctx context.Context, telegramChatID int64, items []database.ShoppingListItem) (database.ShoppingListView, error) {
+func (m *MockReminderService) CreateShoppingList(ctx context.Context, telegramChatID int64, items []model.ShoppingListItem) (model.ShoppingListView, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateShoppingList", ctx, telegramChatID, items)
-	ret0, _ := ret[0].(database.ShoppingListView)
+	ret0, _ := ret[0].(model.ShoppingListView)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -132,10 +132,10 @@ func (mr *MockReminderServiceMockRecorder) CreateShoppingList(ctx, telegramChatI
 }
 
 // CreateWeekdaysReminder mocks base method.
-func (m *MockReminderService) CreateWeekdaysReminder(ctx context.Context, telegramChatID int64, title, description string, remindAt time.Time, weekdaysMask int) (database.ReminderView, error) {
+func (m *MockReminderService) CreateWeekdaysReminder(ctx context.Context, telegramChatID int64, title, description string, remindAt time.Time, weekdaysMask int) (model.ReminderView, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateWeekdaysReminder", ctx, telegramChatID, title, description, remindAt, weekdaysMask)
-	ret0, _ := ret[0].(database.ReminderView)
+	ret0, _ := ret[0].(model.ReminderView)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -175,10 +175,10 @@ func (mr *MockReminderServiceMockRecorder) DeleteReminder(ctx, telegramChatID, r
 }
 
 // FindHolidaysByChat mocks base method.
-func (m *MockReminderService) FindHolidaysByChat(ctx context.Context, telegramChatID int64, limit, offset int) ([]database.HolidayView, error) {
+func (m *MockReminderService) FindHolidaysByChat(ctx context.Context, telegramChatID int64, limit, offset int) ([]model.HolidayView, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "FindHolidaysByChat", ctx, telegramChatID, limit, offset)
-	ret0, _ := ret[0].([]database.HolidayView)
+	ret0, _ := ret[0].([]model.HolidayView)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -190,10 +190,10 @@ func (mr *MockReminderServiceMockRecorder) FindHolidaysByChat(ctx, telegramChatI
 }
 
 // FindShoppingListsByChat mocks base method.
-func (m *MockReminderService) FindShoppingListsByChat(ctx context.Context, telegramChatID int64, limit, offset int) ([]database.ShoppingListView, error) {
+func (m *MockReminderService) FindShoppingListsByChat(ctx context.Context, telegramChatID int64, limit, offset int) ([]model.ShoppingListView, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "FindShoppingListsByChat", ctx, telegramChatID, limit, offset)
-	ret0, _ := ret[0].([]database.ShoppingListView)
+	ret0, _ := ret[0].([]model.ShoppingListView)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -205,10 +205,10 @@ func (mr *MockReminderServiceMockRecorder) FindShoppingListsByChat(ctx, telegram
 }
 
 // HolidayByID mocks base method.
-func (m *MockReminderService) HolidayByID(ctx context.Context, telegramChatID, holidayID int64) (database.HolidayView, error) {
+func (m *MockReminderService) HolidayByID(ctx context.Context, telegramChatID, holidayID int64) (model.HolidayView, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HolidayByID", ctx, telegramChatID, holidayID)
-	ret0, _ := ret[0].(database.HolidayView)
+	ret0, _ := ret[0].(model.HolidayView)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -220,10 +220,10 @@ func (mr *MockReminderServiceMockRecorder) HolidayByID(ctx, telegramChatID, holi
 }
 
 // ReminderByID mocks base method.
-func (m *MockReminderService) ReminderByID(ctx context.Context, telegramChatID, reminderID int64) (database.ReminderView, error) {
+func (m *MockReminderService) ReminderByID(ctx context.Context, telegramChatID, reminderID int64) (model.ReminderView, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ReminderByID", ctx, telegramChatID, reminderID)
-	ret0, _ := ret[0].(database.ReminderView)
+	ret0, _ := ret[0].(model.ReminderView)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -235,10 +235,10 @@ func (mr *MockReminderServiceMockRecorder) ReminderByID(ctx, telegramChatID, rem
 }
 
 // ShoppingListByID mocks base method.
-func (m *MockReminderService) ShoppingListByID(ctx context.Context, telegramChatID, listID int64) (database.ShoppingListView, error) {
+func (m *MockReminderService) ShoppingListByID(ctx context.Context, telegramChatID, listID int64) (model.ShoppingListView, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ShoppingListByID", ctx, telegramChatID, listID)
-	ret0, _ := ret[0].(database.ShoppingListView)
+	ret0, _ := ret[0].(model.ShoppingListView)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -250,10 +250,10 @@ func (mr *MockReminderServiceMockRecorder) ShoppingListByID(ctx, telegramChatID,
 }
 
 // ToggleShoppingListItem mocks base method.
-func (m *MockReminderService) ToggleShoppingListItem(ctx context.Context, telegramChatID, itemID int64) (database.ShoppingListView, error) {
+func (m *MockReminderService) ToggleShoppingListItem(ctx context.Context, telegramChatID, itemID int64) (model.ShoppingListView, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ToggleShoppingListItem", ctx, telegramChatID, itemID)
-	ret0, _ := ret[0].(database.ShoppingListView)
+	ret0, _ := ret[0].(model.ShoppingListView)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -265,10 +265,10 @@ func (mr *MockReminderServiceMockRecorder) ToggleShoppingListItem(ctx, telegramC
 }
 
 // UpdateHoliday mocks base method.
-func (m *MockReminderService) UpdateHoliday(ctx context.Context, request database.HolidayUpdateRequest) (database.HolidayView, error) {
+func (m *MockReminderService) UpdateHoliday(ctx context.Context, request model.HolidayUpdateRequest) (model.HolidayView, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateHoliday", ctx, request)
-	ret0, _ := ret[0].(database.HolidayView)
+	ret0, _ := ret[0].(model.HolidayView)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -280,10 +280,10 @@ func (mr *MockReminderServiceMockRecorder) UpdateHoliday(ctx, request any) *gomo
 }
 
 // UpdateReminder mocks base method.
-func (m *MockReminderService) UpdateReminder(ctx context.Context, telegramChatID, reminderID int64, title, description string, remindAt time.Time) (database.ReminderView, error) {
+func (m *MockReminderService) UpdateReminder(ctx context.Context, telegramChatID, reminderID int64, title, description string, remindAt time.Time) (model.ReminderView, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateReminder", ctx, telegramChatID, reminderID, title, description, remindAt)
-	ret0, _ := ret[0].(database.ReminderView)
+	ret0, _ := ret[0].(model.ReminderView)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -319,10 +319,10 @@ func (m *MockReminderRepository) EXPECT() *MockReminderRepositoryMockRecorder {
 }
 
 // FindReminderHistoryByChat mocks base method.
-func (m *MockReminderRepository) FindReminderHistoryByChat(ctx context.Context, telegramChatID int64, limit, offset int) ([]database.ReminderView, error) {
+func (m *MockReminderRepository) FindReminderHistoryByChat(ctx context.Context, telegramChatID int64, limit, offset int) ([]model.ReminderView, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "FindReminderHistoryByChat", ctx, telegramChatID, limit, offset)
-	ret0, _ := ret[0].([]database.ReminderView)
+	ret0, _ := ret[0].([]model.ReminderView)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -334,10 +334,10 @@ func (mr *MockReminderRepositoryMockRecorder) FindReminderHistoryByChat(ctx, tel
 }
 
 // FindRemindersByChat mocks base method.
-func (m *MockReminderRepository) FindRemindersByChat(ctx context.Context, telegramChatID int64, limit, offset int) ([]database.ReminderView, error) {
+func (m *MockReminderRepository) FindRemindersByChat(ctx context.Context, telegramChatID int64, limit, offset int) ([]model.ReminderView, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "FindRemindersByChat", ctx, telegramChatID, limit, offset)
-	ret0, _ := ret[0].([]database.ReminderView)
+	ret0, _ := ret[0].([]model.ReminderView)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -349,10 +349,10 @@ func (mr *MockReminderRepositoryMockRecorder) FindRemindersByChat(ctx, telegramC
 }
 
 // ReminderStatsByChat mocks base method.
-func (m *MockReminderRepository) ReminderStatsByChat(ctx context.Context, telegramChatID int64) (database.ReminderStats, error) {
+func (m *MockReminderRepository) ReminderStatsByChat(ctx context.Context, telegramChatID int64) (model.ReminderStats, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ReminderStatsByChat", ctx, telegramChatID)
-	ret0, _ := ret[0].(database.ReminderStats)
+	ret0, _ := ret[0].(model.ReminderStats)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -392,10 +392,10 @@ func (mr *MockReminderRepositoryMockRecorder) UpdateUserTimezone(ctx, telegramCh
 }
 
 // UserSettings mocks base method.
-func (m *MockReminderRepository) UserSettings(ctx context.Context, telegramChatID int64) (database.UserSettings, error) {
+func (m *MockReminderRepository) UserSettings(ctx context.Context, telegramChatID int64) (model.UserSettings, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UserSettings", ctx, telegramChatID)
-	ret0, _ := ret[0].(database.UserSettings)
+	ret0, _ := ret[0].(model.UserSettings)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

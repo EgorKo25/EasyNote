@@ -11,8 +11,9 @@ import (
 	"time"
 
 	"github.com/EgorKo25/EasyNote/src/config"
-	"github.com/EgorKo25/EasyNote/src/database"
 	"github.com/EgorKo25/EasyNote/src/logger"
+	notificationtelegram "github.com/EgorKo25/EasyNote/src/notification/telegram"
+	telegrammodel "github.com/EgorKo25/EasyNote/src/telegram/model"
 	telegramui "github.com/EgorKo25/EasyNote/src/telegram/ui"
 	"github.com/mymmrac/telego"
 	tu "github.com/mymmrac/telego/telegoutil"
@@ -21,20 +22,22 @@ import (
 var ErrUnsupportedReminderRepeat = errors.New("unsupported reminder repeat")
 var errUnsupportedDeliveredReminderStatus = errors.New("unsupported delivered reminder status")
 
-const draftPastTimeNotice = "Выбранное время уже прошло. Выберите будущее время."
+const (
+	commandStart        = "/start"
+	draftPastTimeNotice = "Выбранное время уже прошло. Выберите будущее время."
+)
 
 func NewReminderBot(
-	sender *Sender,
+	sender *notificationtelegram.Sender,
 	service ReminderService,
 	repository ReminderRepository,
 	cfg config.Telegram,
 ) *ReminderBot {
 	return &ReminderBot{
-		bot:            sender.bot,
+		bot:            sender.Bot(),
 		cfg:            cfg,
 		service:        service,
 		userRepo:       repository,
-		backendClient:  NewBackendClient(cfg.BackendBaseURL, cfg.RequestTimeout),
 		log:            logger.Get("telegram/reminder-bot"),
 		draftByChat:    make(map[int64]reminderDraft),
 		uiByChat:       make(map[int64]int),
@@ -46,12 +49,11 @@ func NewReminderBot(
 }
 
 type ReminderBot struct {
-	bot           *telego.Bot
-	cfg           config.Telegram
-	service       ReminderService
-	userRepo      ReminderRepository
-	backendClient *BackendClient
-	log           logger.Logger
+	bot      *telego.Bot
+	cfg      config.Telegram
+	service  ReminderService
+	userRepo ReminderRepository
+	log      logger.Logger
 
 	mu             sync.Mutex
 	locationMu     sync.RWMutex
@@ -100,7 +102,7 @@ type ReminderService interface {
 		title string,
 		description string,
 		remindAt time.Time,
-	) (database.ReminderView, error)
+	) (telegrammodel.ReminderView, error)
 	CreateIntervalReminder(
 		ctx context.Context,
 		telegramChatID int64,
@@ -108,7 +110,7 @@ type ReminderService interface {
 		description string,
 		remindAt time.Time,
 		intervalDays int,
-	) (database.ReminderView, error)
+	) (telegrammodel.ReminderView, error)
 	CreateWeekdaysReminder(
 		ctx context.Context,
 		telegramChatID int64,
@@ -116,7 +118,7 @@ type ReminderService interface {
 		description string,
 		remindAt time.Time,
 		weekdaysMask int,
-	) (database.ReminderView, error)
+	) (telegrammodel.ReminderView, error)
 	CreateCustomDatesReminder(
 		ctx context.Context,
 		telegramChatID int64,
@@ -126,8 +128,8 @@ type ReminderService interface {
 		hour int,
 		minute int,
 		location *time.Location,
-	) (database.ReminderView, error)
-	ReminderByID(ctx context.Context, telegramChatID int64, reminderID int64) (database.ReminderView, error)
+	) (telegrammodel.ReminderView, error)
+	ReminderByID(ctx context.Context, telegramChatID int64, reminderID int64) (telegrammodel.ReminderView, error)
 	UpdateReminder(
 		ctx context.Context,
 		telegramChatID int64,
@@ -135,41 +137,45 @@ type ReminderService interface {
 		title string,
 		description string,
 		remindAt time.Time,
-	) (database.ReminderView, error)
+	) (telegrammodel.ReminderView, error)
 	DeleteReminder(ctx context.Context, telegramChatID int64, reminderID int64) error
-	CompleteOccurrence(
+	AcknowledgeReminder(
 		ctx context.Context,
+		telegramChatID int64,
 		reminderID int64,
-		status database.ReminderStatus,
-		sentAt *time.Time,
+		status telegrammodel.ReminderStatus,
 	) error
-	CreateHoliday(ctx context.Context, request database.HolidayRequest) (database.HolidayView, error)
-	UpdateHoliday(ctx context.Context, request database.HolidayUpdateRequest) (database.HolidayView, error)
+	CreateHoliday(ctx context.Context, request telegrammodel.HolidayRequest) (telegrammodel.HolidayView, error)
+	UpdateHoliday(ctx context.Context, request telegrammodel.HolidayUpdateRequest) (telegrammodel.HolidayView, error)
 	FindHolidaysByChat(
 		ctx context.Context,
 		telegramChatID int64,
 		limit int,
 		offset int,
-	) ([]database.HolidayView, error)
-	HolidayByID(ctx context.Context, telegramChatID int64, holidayID int64) (database.HolidayView, error)
+	) ([]telegrammodel.HolidayView, error)
+	HolidayByID(ctx context.Context, telegramChatID int64, holidayID int64) (telegrammodel.HolidayView, error)
 	DeleteHoliday(ctx context.Context, telegramChatID int64, holidayID int64) error
 	CreateShoppingList(
 		ctx context.Context,
 		telegramChatID int64,
-		items []database.ShoppingListItem,
-	) (database.ShoppingListView, error)
+		items []telegrammodel.ShoppingListItem,
+	) (telegrammodel.ShoppingListView, error)
 	FindShoppingListsByChat(
 		ctx context.Context,
 		telegramChatID int64,
 		limit int,
 		offset int,
-	) ([]database.ShoppingListView, error)
-	ShoppingListByID(ctx context.Context, telegramChatID int64, listID int64) (database.ShoppingListView, error)
-	ToggleShoppingListItem(ctx context.Context, telegramChatID int64, itemID int64) (database.ShoppingListView, error)
+	) ([]telegrammodel.ShoppingListView, error)
+	ShoppingListByID(ctx context.Context, telegramChatID int64, listID int64) (telegrammodel.ShoppingListView, error)
+	ToggleShoppingListItem(
+		ctx context.Context,
+		telegramChatID int64,
+		itemID int64,
+	) (telegrammodel.ShoppingListView, error)
 }
 
 type ReminderRepository interface {
-	UserSettings(ctx context.Context, telegramChatID int64) (database.UserSettings, error)
+	UserSettings(ctx context.Context, telegramChatID int64) (telegrammodel.UserSettings, error)
 	UpdateUserTimezone(ctx context.Context, telegramChatID int64, timezone string) error
 	UpdateIntrusiveSettings(
 		ctx context.Context,
@@ -177,19 +183,19 @@ type ReminderRepository interface {
 		enabled bool,
 		interval time.Duration,
 	) error
-	ReminderStatsByChat(ctx context.Context, telegramChatID int64) (database.ReminderStats, error)
+	ReminderStatsByChat(ctx context.Context, telegramChatID int64) (telegrammodel.ReminderStats, error)
 	FindRemindersByChat(
 		ctx context.Context,
 		telegramChatID int64,
 		limit int,
 		offset int,
-	) ([]database.ReminderView, error)
+	) ([]telegrammodel.ReminderView, error)
 	FindReminderHistoryByChat(
 		ctx context.Context,
 		telegramChatID int64,
 		limit int,
 		offset int,
-	) ([]database.ReminderView, error)
+	) ([]telegrammodel.ReminderView, error)
 }
 
 type reminderDraft struct {
@@ -198,7 +204,7 @@ type reminderDraft struct {
 	title         string
 	description   string
 	notice        string
-	shoppingItems []database.ShoppingListItem
+	shoppingItems []telegrammodel.ShoppingListItem
 	date          time.Time
 	hour          int
 	minute        int
@@ -350,7 +356,7 @@ func (b *ReminderBot) runMainMessageCommand(ctx context.Context, chatID int64, t
 
 func (b *ReminderBot) runTopLevelMessageCommand(ctx context.Context, chatID int64, text string) (error, bool) {
 	switch text {
-	case "/start", telegramui.ButtonStart:
+	case commandStart, telegramui.ButtonStart:
 		return b.sendStart(ctx, chatID), true
 	case telegramui.ButtonCreateReminder, "➕ " + telegramui.ButtonCreateReminder:
 		return b.sendCreate(ctx, chatID), true
@@ -703,7 +709,7 @@ func (b *ReminderBot) handleReminderActionCallback(
 			messageID,
 			data,
 			telegramui.CallbackReminderDone,
-			database.ReminderStatusCompleted,
+			telegrammodel.ReminderStatusCompleted,
 		)
 	case strings.HasPrefix(data, telegramui.CallbackReminderCancelDelivered):
 		return true, b.acknowledgeReminder(
@@ -712,7 +718,7 @@ func (b *ReminderBot) handleReminderActionCallback(
 			messageID,
 			data,
 			telegramui.CallbackReminderCancelDelivered,
-			database.ReminderStatusCanceled,
+			telegrammodel.ReminderStatusCanceled,
 		)
 	case strings.HasPrefix(data, telegramui.CallbackReminderEditPrefix):
 		reminderID, err := strconv.ParseInt(strings.TrimPrefix(data, telegramui.CallbackReminderEditPrefix), 10, 64)
@@ -900,20 +906,22 @@ func (b *ReminderBot) sendStart(ctx context.Context, chatID int64) error {
 	return b.replaceUI(ctx, chatID, telegramui.MainMenuText(stats), telegramui.MainKeyboard())
 }
 
-func (b *ReminderBot) reminderStats(ctx context.Context, chatID int64) (database.ReminderStats, error) {
-	if b.backendClient != nil {
-		return b.backendClient.Dashboard(ctx, chatID)
+func (b *ReminderBot) reminderStats(ctx context.Context, chatID int64) (telegrammodel.ReminderStats, error) {
+	stats, err := b.userRepo.ReminderStatsByChat(ctx, chatID)
+	if err != nil {
+		return telegrammodel.ReminderStats{}, fmt.Errorf("get reminder stats by chat: %w", err)
 	}
 
-	return b.userRepo.ReminderStatsByChat(ctx, chatID)
+	return stats, nil
 }
 
-func (b *ReminderBot) userSettings(ctx context.Context, chatID int64) (database.UserSettings, error) {
-	if b.backendClient != nil {
-		return b.backendClient.Settings(ctx, chatID)
+func (b *ReminderBot) userSettings(ctx context.Context, chatID int64) (telegrammodel.UserSettings, error) {
+	settings, err := b.userRepo.UserSettings(ctx, chatID)
+	if err != nil {
+		return telegrammodel.UserSettings{}, fmt.Errorf("get user settings: %w", err)
 	}
 
-	return b.userRepo.UserSettings(ctx, chatID)
+	return settings, nil
 }
 
 func (b *ReminderBot) sendCreate(ctx context.Context, chatID int64) error {
@@ -1679,7 +1687,7 @@ func (b *ReminderBot) loadReminderPage(
 	ctx context.Context,
 	chatID int64,
 	list reminderListState,
-) ([]database.ReminderView, error) {
+) ([]telegrammodel.ReminderView, error) {
 	if list.kind == reminderListHistory {
 		reminders, err := b.userRepo.FindReminderHistoryByChat(ctx, chatID, reminderPageSize, list.offset)
 		if err != nil {
@@ -1722,7 +1730,7 @@ func (b *ReminderBot) saveReminderDraft(
 	}
 
 	var (
-		reminder database.ReminderView
+		reminder telegrammodel.ReminderView
 		err      error
 	)
 
@@ -1760,11 +1768,11 @@ func (b *ReminderBot) saveHolidayDraft(
 	}
 
 	var (
-		holiday database.HolidayView
+		holiday telegrammodel.HolidayView
 		err     error
 	)
 
-	request := database.HolidayRequest{
+	request := telegrammodel.HolidayRequest{
 		TelegramChatID: chatID,
 		HolidayName:    draft.title,
 		RecipientName:  draft.description,
@@ -1775,7 +1783,7 @@ func (b *ReminderBot) saveHolidayDraft(
 	if draft.id == 0 {
 		holiday, err = b.service.CreateHoliday(ctx, request)
 	} else {
-		holiday, err = b.service.UpdateHoliday(ctx, database.HolidayUpdateRequest{
+		holiday, err = b.service.UpdateHoliday(ctx, telegrammodel.HolidayUpdateRequest{
 			ID:             draft.id,
 			HolidayRequest: request,
 		})
@@ -1993,14 +2001,14 @@ func (b *ReminderBot) acknowledgeReminder(
 	messageID int,
 	data string,
 	prefix string,
-	status database.ReminderStatus,
+	status telegrammodel.ReminderStatus,
 ) error {
 	reminderID, err := strconv.ParseInt(strings.TrimPrefix(data, prefix), 10, 64)
 	if err != nil {
 		return fmt.Errorf("parse delivered reminder id: %w", err)
 	}
 
-	if status != database.ReminderStatusCompleted && status != database.ReminderStatusCanceled {
+	if status != telegrammodel.ReminderStatusCompleted && status != telegrammodel.ReminderStatusCanceled {
 		return fmt.Errorf(
 			"acknowledge delivered reminder: %w: %s",
 			errUnsupportedDeliveredReminderStatus,
@@ -2008,8 +2016,7 @@ func (b *ReminderBot) acknowledgeReminder(
 		)
 	}
 
-	completedAt := time.Now()
-	if err = b.service.CompleteOccurrence(ctx, reminderID, status, &completedAt); err != nil {
+	if err = b.service.AcknowledgeReminder(ctx, chatID, reminderID, status); err != nil {
 		return fmt.Errorf("acknowledge delivered reminder: %w", err)
 	}
 
@@ -2100,7 +2107,7 @@ func (b *ReminderBot) applyDraftText(ctx context.Context, chatID int64, text str
 	case telegramui.FieldDescription:
 		draft.description = text
 	case telegramui.FieldShoppingItem:
-		draft.shoppingItems = append(draft.shoppingItems, database.ShoppingListItem{
+		draft.shoppingItems = append(draft.shoppingItems, telegrammodel.ShoppingListItem{
 			Text:     strings.TrimSpace(text),
 			Position: len(draft.shoppingItems) + 1,
 		})
@@ -2266,12 +2273,12 @@ func (b *ReminderBot) createDraftReminder(
 	chatID int64,
 	draft reminderDraft,
 	remindAt time.Time,
-) (database.ReminderView, error) {
+) (telegrammodel.ReminderView, error) {
 	switch draft.repeat {
 	case telegramui.RepeatNone:
 		return b.createDraftOneTimeReminder(ctx, chatID, draft, remindAt)
 	case telegramui.RepeatWeekdays:
-		return b.createDraftWeekdaysReminder(ctx, chatID, draft, remindAt, database.WeekdaysMaskWorkdays)
+		return b.createDraftWeekdaysReminder(ctx, chatID, draft, remindAt, telegrammodel.WeekdaysMaskWorkdays)
 	case telegramui.RepeatCustomWeekdays:
 		return b.createDraftWeekdaysReminder(ctx, chatID, draft, remindAt, draft.weekdaysMask)
 	case telegramui.RepeatCustomDates:
@@ -2281,7 +2288,7 @@ func (b *ReminderBot) createDraftReminder(
 	default:
 		intervalDays, ok := intervalDaysForRepeat(draft.repeat)
 		if !ok {
-			return database.ReminderView{}, fmt.Errorf("%w: %s", ErrUnsupportedReminderRepeat, draft.repeat)
+			return telegrammodel.ReminderView{}, fmt.Errorf("%w: %s", ErrUnsupportedReminderRepeat, draft.repeat)
 		}
 
 		return b.createDraftIntervalReminder(ctx, chatID, draft, remindAt, intervalDays)
@@ -2293,10 +2300,10 @@ func (b *ReminderBot) createDraftOneTimeReminder(
 	chatID int64,
 	draft reminderDraft,
 	remindAt time.Time,
-) (database.ReminderView, error) {
+) (telegrammodel.ReminderView, error) {
 	reminder, err := b.service.CreateReminder(ctx, chatID, draft.title, draft.description, remindAt)
 	if err != nil {
-		return database.ReminderView{}, fmt.Errorf("create one-time reminder: %w", err)
+		return telegrammodel.ReminderView{}, fmt.Errorf("create one-time reminder: %w", err)
 	}
 
 	return reminder, nil
@@ -2308,7 +2315,7 @@ func (b *ReminderBot) createDraftWeekdaysReminder(
 	draft reminderDraft,
 	remindAt time.Time,
 	weekdaysMask int,
-) (database.ReminderView, error) {
+) (telegrammodel.ReminderView, error) {
 	reminder, err := b.service.CreateWeekdaysReminder(
 		ctx,
 		chatID,
@@ -2318,7 +2325,7 @@ func (b *ReminderBot) createDraftWeekdaysReminder(
 		weekdaysMask,
 	)
 	if err != nil {
-		return database.ReminderView{}, fmt.Errorf("create weekdays reminder: %w", err)
+		return telegrammodel.ReminderView{}, fmt.Errorf("create weekdays reminder: %w", err)
 	}
 
 	return reminder, nil
@@ -2328,7 +2335,7 @@ func (b *ReminderBot) createDraftCustomDatesReminder(
 	ctx context.Context,
 	chatID int64,
 	draft reminderDraft,
-) (database.ReminderView, error) {
+) (telegrammodel.ReminderView, error) {
 	reminder, err := b.service.CreateCustomDatesReminder(
 		ctx,
 		chatID,
@@ -2340,7 +2347,7 @@ func (b *ReminderBot) createDraftCustomDatesReminder(
 		b.location(chatID),
 	)
 	if err != nil {
-		return database.ReminderView{}, fmt.Errorf("create custom dates reminder: %w", err)
+		return telegrammodel.ReminderView{}, fmt.Errorf("create custom dates reminder: %w", err)
 	}
 
 	return reminder, nil
@@ -2365,7 +2372,7 @@ func (b *ReminderBot) createDraftIntervalReminder(
 	draft reminderDraft,
 	remindAt time.Time,
 	intervalDays int,
-) (database.ReminderView, error) {
+) (telegrammodel.ReminderView, error) {
 	reminder, err := b.service.CreateIntervalReminder(
 		ctx,
 		chatID,
@@ -2375,7 +2382,7 @@ func (b *ReminderBot) createDraftIntervalReminder(
 		intervalDays,
 	)
 	if err != nil {
-		return database.ReminderView{}, fmt.Errorf("create interval reminder: %w", err)
+		return telegrammodel.ReminderView{}, fmt.Errorf("create interval reminder: %w", err)
 	}
 
 	return reminder, nil

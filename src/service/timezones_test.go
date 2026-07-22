@@ -1,3 +1,4 @@
+//nolint:goconst // Tests intentionally repeat timezone fixture values.
 package service_test
 
 import (

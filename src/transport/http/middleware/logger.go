@@ -20,45 +20,64 @@ func RequestLoggerMiddleware() gin.HandlerFunc {
 
 		ctx.Next()
 
-		path := ctx.FullPath()
-		if path == "" {
-			path = ctx.Request.URL.Path
-		}
+		attrs := requestLogAttrs(ctx, start)
+		requestErr := lastRequestError(ctx)
+		logRequest(log, ctx.Writer.Status(), requestErr, attrs)
+	}
+}
 
-		status := ctx.Writer.Status()
-		attrs := []logger.Attr{
-			logger.String("method", ctx.Request.Method),
-			logger.String("path", path),
-			logger.Int("status", status),
-			logger.String("duration", time.Since(start).String()),
-			logger.String("client_ip", ctx.ClientIP()),
-		}
+func requestLogAttrs(ctx *gin.Context, start time.Time) []logger.Attr {
+	path := ctx.FullPath()
+	if path == "" {
+		path = ctx.Request.URL.Path
+	}
 
-		value, exists := ctx.Get(apphttp.TelegramChatIDContextKey)
-		if exists {
-			telegramChatID, ok := value.(int64)
-			if ok {
-				attrs = append(attrs, logger.Int64("telegram_chat_id", telegramChatID))
-			}
-		}
+	status := ctx.Writer.Status()
+	attrs := []logger.Attr{
+		logger.String("method", ctx.Request.Method),
+		logger.String("path", path),
+		logger.Int("status", status),
+		logger.String("duration", time.Since(start).String()),
+		logger.String("client_ip", ctx.ClientIP()),
+	}
 
-		var requestErr error
-		if len(ctx.Errors) > 0 {
-			requestErr = ctx.Errors.Last().Err
-		}
+	return appendTelegramChatID(attrs, ctx)
+}
 
-		switch {
-		case requestErr != nil && status >= http.StatusInternalServerError:
-			log.Error("http request failed", requestErr, attrs...)
-		case requestErr != nil:
-			attrs = append(attrs, logger.String("error", requestErr.Error()))
-			log.Warn("http request failed", attrs...)
-		case status >= http.StatusInternalServerError:
-			log.Error("http request failed", errInternalServerErrorStatus, attrs...)
-		case status >= http.StatusBadRequest:
-			log.Warn("http request failed", attrs...)
-		default:
-			log.Info("http request handled", attrs...)
-		}
+func appendTelegramChatID(attrs []logger.Attr, ctx *gin.Context) []logger.Attr {
+	value, exists := ctx.Get(apphttp.TelegramChatIDContextKey)
+	if !exists {
+		return attrs
+	}
+
+	telegramChatID, ok := value.(int64)
+	if !ok {
+		return attrs
+	}
+
+	return append(attrs, logger.Int64("telegram_chat_id", telegramChatID))
+}
+
+func lastRequestError(ctx *gin.Context) error {
+	if len(ctx.Errors) == 0 {
+		return nil
+	}
+
+	return ctx.Errors.Last().Err
+}
+
+func logRequest(log logger.Logger, status int, requestErr error, attrs []logger.Attr) {
+	switch {
+	case requestErr != nil && status >= http.StatusInternalServerError:
+		log.Error("http request failed", requestErr, attrs...)
+	case requestErr != nil:
+		attrs = append(attrs, logger.String("error", requestErr.Error()))
+		log.Warn("http request failed", attrs...)
+	case status >= http.StatusInternalServerError:
+		log.Error("http request failed", errInternalServerErrorStatus, attrs...)
+	case status >= http.StatusBadRequest:
+		log.Warn("http request failed", attrs...)
+	default:
+		log.Info("http request handled", attrs...)
 	}
 }

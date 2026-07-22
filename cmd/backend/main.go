@@ -7,7 +7,9 @@ import (
 	"github.com/EgorKo25/EasyNote/src/config"
 	"github.com/EgorKo25/EasyNote/src/database/postgresql"
 	"github.com/EgorKo25/EasyNote/src/logger"
+	notificationtelegram "github.com/EgorKo25/EasyNote/src/notification/telegram"
 	"github.com/EgorKo25/EasyNote/src/planner"
+	"github.com/EgorKo25/EasyNote/src/scheduler"
 	"github.com/EgorKo25/EasyNote/src/service"
 	apphttp "github.com/EgorKo25/EasyNote/src/transport/http"
 	httprouter "github.com/EgorKo25/EasyNote/src/transport/http/router"
@@ -44,6 +46,19 @@ func main() {
 
 	reminderPlanner := planner.New(database)
 	reminderService := service.NewReminderService(database, reminderPlanner)
+
+	telegramSender, err := notificationtelegram.NewSender(ctx, cfg.Telegram)
+	if err != nil {
+		log.Error("cannot initialize telegram sender", err)
+		panic(err)
+	}
+
+	reminderRunner := scheduler.NewRunner(
+		database,
+		notificationtelegram.NewSchedulerSender(telegramSender),
+		reminderPlanner,
+		cfg.Scheduler,
+	)
 	httpServer := apphttp.NewServer(cfg.HTTP, httprouter.Create(reminderService))
 
 	runner := background.NewRunner()
@@ -51,6 +66,7 @@ func main() {
 	runner.Run(
 		ctx,
 		httpServer,
+		reminderRunner,
 	)
 
 	if err = runner.Wait(); err != nil {

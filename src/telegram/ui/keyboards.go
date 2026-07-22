@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/EgorKo25/EasyNote/src/database"
 	"github.com/EgorKo25/EasyNote/src/service"
+	telegrammodel "github.com/EgorKo25/EasyNote/src/telegram/model"
 	"github.com/mymmrac/telego"
 	tu "github.com/mymmrac/telego/telegoutil"
 )
@@ -339,7 +339,7 @@ func timeKeyboard(draft Draft, now time.Time) *telego.InlineKeyboardMarkup {
 	)
 }
 
-func ReminderListKeyboard(reminders []database.ReminderView) *telego.ReplyKeyboardMarkup {
+func ReminderListKeyboard(reminders []telegrammodel.ReminderView) *telego.ReplyKeyboardMarkup {
 	rows := make([][]telego.KeyboardButton, 0, len(reminders)+2)
 	for _, reminder := range reminders {
 		rows = append(rows, tu.KeyboardRow(tu.KeyboardButton(ReminderButtonText(reminder))))
@@ -351,7 +351,7 @@ func ReminderListKeyboard(reminders []database.ReminderView) *telego.ReplyKeyboa
 	return tu.Keyboard(rows...).WithResizeKeyboard()
 }
 
-func ReminderDetailsKeyboard(reminder database.ReminderView) *telego.InlineKeyboardMarkup {
+func ReminderDetailsKeyboard(reminder telegrammodel.ReminderView) *telego.InlineKeyboardMarkup {
 	return tu.InlineKeyboard(
 		tu.InlineKeyboardRow(
 			tu.InlineKeyboardButton("Изменить").
@@ -365,7 +365,7 @@ func ReminderDetailsKeyboard(reminder database.ReminderView) *telego.InlineKeybo
 	)
 }
 
-func HolidayListKeyboard(holidays []database.HolidayView) *telego.ReplyKeyboardMarkup {
+func HolidayListKeyboard(holidays []telegrammodel.HolidayView) *telego.ReplyKeyboardMarkup {
 	rows := make([][]telego.KeyboardButton, 0, len(holidays)+2)
 	for _, holiday := range holidays {
 		rows = append(rows, tu.KeyboardRow(tu.KeyboardButton(HolidayButtonText(holiday))))
@@ -377,7 +377,7 @@ func HolidayListKeyboard(holidays []database.HolidayView) *telego.ReplyKeyboardM
 	return tu.Keyboard(rows...).WithResizeKeyboard()
 }
 
-func HolidayDetailsKeyboard(holiday database.HolidayView) *telego.InlineKeyboardMarkup {
+func HolidayDetailsKeyboard(holiday telegrammodel.HolidayView) *telego.InlineKeyboardMarkup {
 	return tu.InlineKeyboard(
 		tu.InlineKeyboardRow(
 			tu.InlineKeyboardButton("Изменить").
@@ -389,7 +389,7 @@ func HolidayDetailsKeyboard(holiday database.HolidayView) *telego.InlineKeyboard
 	)
 }
 
-func ShoppingListKeyboard(lists []database.ShoppingListView) *telego.ReplyKeyboardMarkup {
+func ShoppingListKeyboard(lists []telegrammodel.ShoppingListView) *telego.ReplyKeyboardMarkup {
 	rows := make([][]telego.KeyboardButton, 0, len(lists)+2)
 	for _, list := range lists {
 		rows = append(rows, tu.KeyboardRow(tu.KeyboardButton(ShoppingListButtonText(list))))
@@ -401,7 +401,7 @@ func ShoppingListKeyboard(lists []database.ShoppingListView) *telego.ReplyKeyboa
 	return tu.Keyboard(rows...).WithResizeKeyboard()
 }
 
-func ShoppingListDetailsKeyboard(list database.ShoppingListView) *telego.InlineKeyboardMarkup {
+func ShoppingListDetailsKeyboard(list telegrammodel.ShoppingListView) *telego.InlineKeyboardMarkup {
 	rows := make([][]telego.InlineKeyboardButton, 0, len(list.Items)+1)
 	for _, item := range list.Items {
 		rows = append(rows, tu.InlineKeyboardRow(
@@ -465,19 +465,19 @@ func IntrusiveSettingsKeyboard(enabled bool) *telego.InlineKeyboardMarkup {
 	)
 }
 
-func ReminderButtonText(reminder database.ReminderView) string {
+func ReminderButtonText(reminder telegrammodel.ReminderView) string {
 	return reminder.Title
 }
 
-func HolidayButtonText(holiday database.HolidayView) string {
+func HolidayButtonText(holiday telegrammodel.HolidayView) string {
 	return fmt.Sprintf("%s - %s", holiday.RecipientName, holiday.HolidayName)
 }
 
-func ShoppingListButtonText(list database.ShoppingListView) string {
+func ShoppingListButtonText(list telegrammodel.ShoppingListView) string {
 	return fmt.Sprintf("Список #%d", list.ID)
 }
 
-func ShoppingItemButtonText(item database.ShoppingListItem) string {
+func ShoppingItemButtonText(item telegrammodel.ShoppingListItem) string {
 	if item.Done {
 		return "✓ " + item.Text
 	}

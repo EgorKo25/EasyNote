@@ -1,4 +1,4 @@
-//nolint:testpackage,maintidx // Tests exercise unexported one-tick processing without adding production hooks.
+//nolint:testpackage,maintidx,goconst // Tests exercise unexported one-tick processing without adding production hooks.
 package scheduler
 
 import (

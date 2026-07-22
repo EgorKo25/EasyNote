@@ -1,3 +1,4 @@
+//nolint:goconst // Tests intentionally keep repeated UI fixture text near assertions.
 package ui_test
 
 import (
@@ -6,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/EgorKo25/EasyNote/src/database"
+	telegrammodel "github.com/EgorKo25/EasyNote/src/telegram/model"
 	telegramui "github.com/EgorKo25/EasyNote/src/telegram/ui"
 	"github.com/mymmrac/telego"
 	"github.com/stretchr/testify/require"
@@ -16,7 +17,7 @@ func TestTextRendering(t *testing.T) {
 	t.Parallel()
 
 	location := time.FixedZone("MSK", 3*60*60)
-	reminder := database.ReminderView{
+	reminder := telegrammodel.ReminderView{
 		Title:       "Pay rent",
 		Description: "Before lunch",
 		RemindAt:    time.Date(2026, 6, 2, 6, 30, 0, 0, time.UTC),
@@ -32,7 +33,7 @@ func TestTextRendering(t *testing.T) {
 		{
 			name: "main menu text renders statistics",
 			action: func() string {
-				return telegramui.MainMenuText(database.ReminderStats{Completed: 3, Pending: 2, Skipped: 1})
+				return telegramui.MainMenuText(telegrammodel.ReminderStats{Completed: 3, Pending: 2, Skipped: 1})
 			},
 			expected: struct {
 				text string
@@ -121,7 +122,7 @@ func TestTextRendering(t *testing.T) {
 			action: func() string {
 				return telegramui.DraftText(telegramui.Draft{
 					Kind: telegramui.DraftKindShopping,
-					ShoppingItems: []database.ShoppingListItem{
+					ShoppingItems: []telegrammodel.ShoppingListItem{
 						{Text: "Milk"},
 						{Text: "Bread"},
 					},
@@ -150,8 +151,8 @@ func TestTextRendering(t *testing.T) {
 		{
 			name: "shopping view renders done items struck through",
 			action: func() string {
-				return telegramui.ShoppingListViewText(database.ShoppingListView{
-					Items: []database.ShoppingListItem{
+				return telegramui.ShoppingListViewText(telegrammodel.ShoppingListView{
+					Items: []telegrammodel.ShoppingListItem{
 						{Text: "Milk", Done: true},
 						{Text: "Bread"},
 					},
@@ -173,7 +174,7 @@ func TestTextRendering(t *testing.T) {
 		{
 			name: "holiday list text renders non empty state",
 			action: func() string {
-				return telegramui.HolidaysText([]database.HolidayView{{ID: 1}})
+				return telegramui.HolidaysText([]telegrammodel.HolidayView{{ID: 1}})
 			},
 			expected: struct {
 				text string
@@ -191,7 +192,7 @@ func TestTextRendering(t *testing.T) {
 		{
 			name: "shopping list text renders non empty state",
 			action: func() string {
-				return telegramui.ShoppingListsText([]database.ShoppingListView{{ID: 1}})
+				return telegramui.ShoppingListsText([]telegrammodel.ShoppingListView{{ID: 1}})
 			},
 			expected: struct {
 				text string
@@ -434,7 +435,7 @@ func TestCalendarAndCallbacks(t *testing.T) {
 func TestMenuAndActionKeyboards(t *testing.T) {
 	t.Parallel()
 
-	reminder := database.ReminderView{ID: 7, Title: "Pay rent"}
+	reminder := telegrammodel.ReminderView{ID: 7, Title: "Pay rent"}
 
 	tests := []struct {
 		name     string
@@ -515,7 +516,7 @@ func TestMenuAndActionKeyboards(t *testing.T) {
 		{
 			name: "holiday details keyboard exposes edit delete and back",
 			action: func() [][]string {
-				return keyboardTexts(telegramui.HolidayDetailsKeyboard(database.HolidayView{ID: 7}).InlineKeyboard)
+				return keyboardTexts(telegramui.HolidayDetailsKeyboard(telegrammodel.HolidayView{ID: 7}).InlineKeyboard)
 			},
 			expected: struct {
 				rows [][]string
@@ -524,7 +525,7 @@ func TestMenuAndActionKeyboards(t *testing.T) {
 		{
 			name: "holiday list keyboard renders holiday buttons",
 			action: func() [][]string {
-				return keyboardTexts(telegramui.HolidayListKeyboard([]database.HolidayView{{
+				return keyboardTexts(telegramui.HolidayListKeyboard([]telegrammodel.HolidayView{{
 					HolidayName: "днем рождения", RecipientName: "Олега",
 				}}).Keyboard)
 			},
@@ -535,7 +536,9 @@ func TestMenuAndActionKeyboards(t *testing.T) {
 		{
 			name: "shopping list keyboard renders list buttons",
 			action: func() [][]string {
-				return keyboardTexts(telegramui.ShoppingListKeyboard([]database.ShoppingListView{{ID: 9}}).Keyboard)
+				return keyboardTexts(
+					telegramui.ShoppingListKeyboard([]telegrammodel.ShoppingListView{{ID: 9}}).Keyboard,
+				)
 			},
 			expected: struct {
 				rows [][]string
@@ -544,8 +547,8 @@ func TestMenuAndActionKeyboards(t *testing.T) {
 		{
 			name: "shopping details keyboard renders items as buttons",
 			action: func() [][]string {
-				return keyboardTexts(telegramui.ShoppingListDetailsKeyboard(database.ShoppingListView{
-					Items: []database.ShoppingListItem{{ID: 1, Text: "Milk"}, {ID: 2, Text: "Bread", Done: true}},
+				return keyboardTexts(telegramui.ShoppingListDetailsKeyboard(telegrammodel.ShoppingListView{
+					Items: []telegrammodel.ShoppingListItem{{ID: 1, Text: "Milk"}, {ID: 2, Text: "Bread", Done: true}},
 				}).InlineKeyboard)
 			},
 			expected: struct {
@@ -677,10 +680,10 @@ func TestSettingsHistoryAndStatusTexts(t *testing.T) {
 		{
 			name: "history text renders completed reminder",
 			action: func() string {
-				return telegramui.ReminderHistoryText([]database.ReminderView{{
+				return telegramui.ReminderHistoryText([]telegrammodel.ReminderView{{
 					Title:    "Pay rent",
 					RemindAt: time.Date(2026, 6, 2, 6, 30, 0, 0, time.UTC),
-					Status:   database.ReminderStatusCompleted,
+					Status:   telegrammodel.ReminderStatusCompleted,
 				}})
 			},
 			expected: struct {
@@ -690,7 +693,7 @@ func TestSettingsHistoryAndStatusTexts(t *testing.T) {
 		{
 			name: "settings text renders enabled intrusive settings",
 			action: func() string {
-				return telegramui.SettingsText(database.UserSettings{
+				return telegramui.SettingsText(telegrammodel.UserSettings{
 					Timezone:          "Europe/Moscow",
 					IntrusiveEnabled:  true,
 					IntrusiveInterval: interval,
@@ -706,7 +709,7 @@ func TestSettingsHistoryAndStatusTexts(t *testing.T) {
 		{
 			name: "intrusive settings text renders disabled state",
 			action: func() string {
-				return telegramui.IntrusiveSettingsText(database.UserSettings{
+				return telegramui.IntrusiveSettingsText(telegrammodel.UserSettings{
 					IntrusiveEnabled:  false,
 					IntrusiveInterval: 30 * time.Minute,
 				})
@@ -731,7 +734,7 @@ func TestSettingsHistoryAndStatusTexts(t *testing.T) {
 		{
 			name: "failed status text is localized",
 			action: func() string {
-				return telegramui.ReminderStatusText(database.ReminderStatusFailed)
+				return telegramui.ReminderStatusText(telegrammodel.ReminderStatusFailed)
 			},
 			expected: struct {
 				text string
@@ -740,7 +743,7 @@ func TestSettingsHistoryAndStatusTexts(t *testing.T) {
 		{
 			name: "unknown status text returns raw value",
 			action: func() string {
-				return telegramui.ReminderStatusText(database.ReminderStatus("paused"))
+				return telegramui.ReminderStatusText(telegrammodel.ReminderStatus("paused"))
 			},
 			expected: struct {
 				text string

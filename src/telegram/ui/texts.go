@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/EgorKo25/EasyNote/src/database"
+	telegrammodel "github.com/EgorKo25/EasyNote/src/telegram/model"
 )
 
-func MainMenuText(stats database.ReminderStats) string {
+func MainMenuText(stats telegrammodel.ReminderStats) string {
 	return fmt.Sprintf(
 		"⠀⠀⠀⠀⠀⠀⠀⠀<b>Главное меню</b>\n\n"+
 			"✅ Задачи выполнены: %d\n"+
@@ -25,7 +25,7 @@ func RemindersText() string {
 	return "<b>Напоминания</b>\n\n<i>Выберите список напоминаний.</i>"
 }
 
-func HolidaysText(holidays []database.HolidayView) string {
+func HolidaysText(holidays []telegrammodel.HolidayView) string {
 	if len(holidays) == 0 {
 		return "<b>Праздники</b>\n\n<i>Сохраненных праздников пока нет.</i>"
 	}
@@ -33,7 +33,7 @@ func HolidaysText(holidays []database.HolidayView) string {
 	return "<b>Праздники</b>\n\n<i>Выберите праздник из списка.</i>"
 }
 
-func ShoppingListsText(lists []database.ShoppingListView) string {
+func ShoppingListsText(lists []telegrammodel.ShoppingListView) string {
 	if len(lists) == 0 {
 		return "<b>Списки покупок</b>\n\n<i>Сохраненных списков пока нет.</i>"
 	}
@@ -211,7 +211,7 @@ func draftRequiredFieldsPrompt(hasTitle bool, hasTime bool) string {
 	}
 }
 
-func ReminderViewText(reminder database.ReminderView, location *time.Location) string {
+func ReminderViewText(reminder telegrammodel.ReminderView, location *time.Location) string {
 	description := "Без описания"
 	if reminder.Description != "" {
 		description = html.EscapeString(reminder.Description)
@@ -225,7 +225,7 @@ func ReminderViewText(reminder database.ReminderView, location *time.Location) s
 	)
 }
 
-func ShoppingListViewText(list database.ShoppingListView) string {
+func ShoppingListViewText(list telegrammodel.ShoppingListView) string {
 	items := make([]string, 0, len(list.Items))
 	for index, item := range list.Items {
 		text := html.EscapeString(item.Text)
@@ -239,7 +239,7 @@ func ShoppingListViewText(list database.ShoppingListView) string {
 	return "<b>Необходимо купить:</b>\n\n" + strings.Join(items, "\n")
 }
 
-func ReminderListText(reminders []database.ReminderView) string {
+func ReminderListText(reminders []telegrammodel.ReminderView) string {
 	if len(reminders) == 0 {
 		return "<b>Активные напоминания</b>\n\n<i>Активных напоминаний пока нет.</i>"
 	}
@@ -247,7 +247,7 @@ func ReminderListText(reminders []database.ReminderView) string {
 	return "<b>Список напоминаний</b>\n\n<i>Выберите напоминание из списка.</i>"
 }
 
-func ReminderHistoryText(reminders []database.ReminderView) string {
+func ReminderHistoryText(reminders []telegrammodel.ReminderView) string {
 	if len(reminders) == 0 {
 		return "<b>Прошедшие напоминания</b>\n\n<i>Прошедших напоминаний пока нет.</i>"
 	}
@@ -255,7 +255,7 @@ func ReminderHistoryText(reminders []database.ReminderView) string {
 	return "<b>Прошедшие напоминания</b>\n\n<i>Выберите напоминание из списка.</i>"
 }
 
-func SettingsText(settings database.UserSettings) string {
+func SettingsText(settings telegrammodel.UserSettings) string {
 	return fmt.Sprintf(
 		"<b>Настройки</b>\n\nЯзык: русский\nЧасовой пояс: %s\nНастойчивые напоминания: %s\nИнтервал: %s",
 		html.EscapeString(settings.Timezone),
@@ -264,7 +264,7 @@ func SettingsText(settings database.UserSettings) string {
 	)
 }
 
-func IntrusiveSettingsText(settings database.UserSettings) string {
+func IntrusiveSettingsText(settings telegrammodel.UserSettings) string {
 	return fmt.Sprintf(
 		"<b>Настойчивые напоминания</b>\n\nСостояние: %s\nИнтервал: %s\n\n"+
 			"<i>Вы можете ввести желаемый интервал напоминания с клавиатуры. "+
@@ -315,17 +315,17 @@ func russianPlural(value int, one string, few string, many string) string {
 	}
 }
 
-func ReminderStatusText(status database.ReminderStatus) string {
+func ReminderStatusText(status telegrammodel.ReminderStatus) string {
 	switch status {
-	case database.ReminderStatusCompleted:
+	case telegrammodel.ReminderStatusCompleted:
 		return "Выполнено"
-	case database.ReminderStatusCanceled:
+	case telegrammodel.ReminderStatusCanceled:
 		return "Отменено"
-	case database.ReminderStatusSkipped:
+	case telegrammodel.ReminderStatusSkipped:
 		return "Пропущено"
-	case database.ReminderStatusSent:
+	case telegrammodel.ReminderStatusSent:
 		return "Отправлено"
-	case database.ReminderStatusFailed:
+	case telegrammodel.ReminderStatusFailed:
 		return "Ошибка отправки"
 	default:
 		return string(status)

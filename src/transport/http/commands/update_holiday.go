@@ -3,13 +3,11 @@ package commands
 import (
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/EgorKo25/EasyNote/src/service"
 	apphttp "github.com/EgorKo25/EasyNote/src/transport/http"
-	"github.com/EgorKo25/EasyNote/src/transport/http/middleware"
 	"github.com/gin-gonic/gin"
 )
 
@@ -17,6 +15,8 @@ type UpdateHolidayCommand struct {
 	req     UpdateHolidayRequest
 	service *service.ReminderService
 }
+
+const updateHolidayPath = "/holidays/:id"
 
 func NewUpdateHolidayCommand(svc *service.ReminderService) *UpdateHolidayCommand {
 	return &UpdateHolidayCommand{
@@ -29,7 +29,7 @@ func (c *UpdateHolidayCommand) Method() string {
 }
 
 func (c *UpdateHolidayCommand) Path() string {
-	return "/holidays/:id"
+	return updateHolidayPath
 }
 
 func (c *UpdateHolidayCommand) Clone() apphttp.Command {
@@ -42,17 +42,17 @@ func (c *UpdateHolidayCommand) Parse(ctx *gin.Context) error {
 	var req UpdateHolidayRequest
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		return fmt.Errorf("%w: %v", apphttp.ErrInvalidRequest, err)
+		return fmt.Errorf("%w: %w", apphttp.ErrInvalidRequest, err)
 	}
 
-	telegramChatID, err := middleware.TelegramChatID(ctx)
+	telegramChatID, err := telegramChatIDFromContext(ctx)
 	if err != nil {
 		return err
 	}
 
-	holidayID, err := strconv.ParseInt(ctx.Param("id"), 10, 64)
-	if err != nil || holidayID <= 0 {
-		return apphttp.ErrInvalidID
+	holidayID, err := parsePositiveInt64Param(ctx, "id", apphttp.ErrInvalidID)
+	if err != nil {
+		return err
 	}
 
 	if strings.TrimSpace(req.HolidayName) == "" {
@@ -83,10 +83,10 @@ func (c *UpdateHolidayCommand) Parse(ctx *gin.Context) error {
 func (c *UpdateHolidayCommand) Apply(ctx *gin.Context) (any, error) {
 	holiday, err := c.service.UpdateHoliday(
 		ctx.Request.Context(),
-		mapUpdateHolidayRequestToDatabaseRequest(c.req),
+		mapUpdateHolidayRequestToDomainRequest(c.req),
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("update holiday: %w", err)
 	}
 
 	return mapHolidayViewToResponse(holiday), nil

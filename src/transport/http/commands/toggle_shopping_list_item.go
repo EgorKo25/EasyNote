@@ -1,12 +1,12 @@
+//nolint:dupl // Command files intentionally repeat lifecycle boilerplate to keep endpoints explicit.
 package commands
 
 import (
+	"fmt"
 	"net/http"
-	"strconv"
 
 	"github.com/EgorKo25/EasyNote/src/service"
 	apphttp "github.com/EgorKo25/EasyNote/src/transport/http"
-	"github.com/EgorKo25/EasyNote/src/transport/http/middleware"
 	"github.com/gin-gonic/gin"
 )
 
@@ -36,20 +36,11 @@ func (c *ToggleShoppingListItemCommand) Clone() apphttp.Command {
 }
 
 func (c *ToggleShoppingListItemCommand) Parse(ctx *gin.Context) error {
-	var req ToggleShoppingListItemRequest
-
-	telegramChatID, err := middleware.TelegramChatID(ctx)
+	req, err := parseToggleShoppingListItemRequest(ctx)
 	if err != nil {
 		return err
 	}
 
-	itemID, err := strconv.ParseInt(ctx.Param("item_id"), 10, 64)
-	if err != nil || itemID <= 0 {
-		return apphttp.ErrInvalidItemID
-	}
-
-	req.TelegramChatID = telegramChatID
-	req.ItemID = itemID
 	c.req = req
 
 	return nil
@@ -62,7 +53,7 @@ func (c *ToggleShoppingListItemCommand) Apply(ctx *gin.Context) (any, error) {
 		c.req.ItemID,
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("toggle shopping list item: %w", err)
 	}
 
 	return mapShoppingListViewToResponse(list), nil
