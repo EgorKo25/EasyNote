@@ -1,6 +1,6 @@
 package ui
 
-import "github.com/EgorKo25/EasyNote/src/telegramprotocol"
+import notificationtelegram "github.com/EgorKo25/EasyNote/src/notification/telegram"
 
 const (
 	ButtonStart                 = "Старт"
@@ -80,8 +80,8 @@ const (
 	CallbackSettingsIntrusive       = "settings:intrusive"
 	CallbackSettingsIntrusiveOn     = "settings:intrusive:on"
 	CallbackSettingsIntrusiveOff    = "settings:intrusive:off"
-	CallbackReminderDone            = telegramprotocol.ReminderDone
-	CallbackReminderCancelDelivered = telegramprotocol.ReminderCancelDelivered
+	CallbackReminderDone            = notificationtelegram.ReminderDoneCallback
+	CallbackReminderCancelDelivered = notificationtelegram.ReminderCancelDeliveredCallback
 	CallbackReminderHistory         = "reminder:history"
 	CallbackNoop                    = "noop"
 	CallbackMainMenu                = "menu:main"

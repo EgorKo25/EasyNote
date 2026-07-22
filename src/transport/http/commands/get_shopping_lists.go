@@ -15,6 +15,8 @@ type GetShoppingListsCommand struct {
 	service *service.ReminderService
 }
 
+const getShoppingListsPath = "/shopping-lists"
+
 func NewGetShoppingListsCommand(svc *service.ReminderService) *GetShoppingListsCommand {
 	return &GetShoppingListsCommand{
 		service: svc,
@@ -26,7 +28,7 @@ func (c *GetShoppingListsCommand) Method() string {
 }
 
 func (c *GetShoppingListsCommand) Path() string {
-	return "/shopping-lists"
+	return getShoppingListsPath
 }
 
 func (c *GetShoppingListsCommand) Clone() apphttp.Command {

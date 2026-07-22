@@ -16,6 +16,8 @@ type CreateHolidayCommand struct {
 	service *service.ReminderService
 }
 
+const createHolidayPath = "/holidays"
+
 func NewCreateHolidayCommand(svc *service.ReminderService) *CreateHolidayCommand {
 	return &CreateHolidayCommand{
 		service: svc,
@@ -27,7 +29,7 @@ func (c *CreateHolidayCommand) Method() string {
 }
 
 func (c *CreateHolidayCommand) Path() string {
-	return "/holidays"
+	return createHolidayPath
 }
 
 func (c *CreateHolidayCommand) Clone() apphttp.Command {

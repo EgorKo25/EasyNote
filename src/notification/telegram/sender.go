@@ -11,7 +11,6 @@ import (
 
 	"github.com/EgorKo25/EasyNote/src/config"
 	"github.com/EgorKo25/EasyNote/src/logger"
-	"github.com/EgorKo25/EasyNote/src/telegramprotocol"
 	"github.com/mymmrac/telego"
 	tu "github.com/mymmrac/telego/telegoutil"
 )
@@ -185,9 +184,9 @@ func (s *Sender) reminderMessageParams(reminder Reminder, text string) *telego.S
 		params.WithReplyMarkup(tu.InlineKeyboard(
 			tu.InlineKeyboardRow(
 				tu.InlineKeyboardButton("Готово").
-					WithCallbackData(telegramprotocol.ReminderDone+strconv.FormatInt(reminder.ID, 10)),
+					WithCallbackData(ReminderDoneCallback+strconv.FormatInt(reminder.ID, 10)),
 				tu.InlineKeyboardButton("Отменить").
-					WithCallbackData(telegramprotocol.ReminderCancelDelivered+strconv.FormatInt(reminder.ID, 10)),
+					WithCallbackData(ReminderCancelDeliveredCallback+strconv.FormatInt(reminder.ID, 10)),
 			),
 		))
 	}

@@ -16,6 +16,8 @@ type CancelReminderCommand struct {
 	service *service.ReminderService
 }
 
+const cancelReminderPath = "/reminders/:id/cancel"
+
 func NewCancelReminderCommand(svc *service.ReminderService) *CancelReminderCommand {
 	return &CancelReminderCommand{
 		service: svc,
@@ -27,7 +29,7 @@ func (c *CancelReminderCommand) Method() string {
 }
 
 func (c *CancelReminderCommand) Path() string {
-	return "/reminders/:id/cancel"
+	return cancelReminderPath
 }
 
 func (c *CancelReminderCommand) Clone() apphttp.Command {

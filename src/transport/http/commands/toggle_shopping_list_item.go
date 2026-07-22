@@ -15,6 +15,8 @@ type ToggleShoppingListItemCommand struct {
 	service *service.ReminderService
 }
 
+const toggleShoppingListItemPath = "/shopping-list-items/:item_id/toggle"
+
 func NewToggleShoppingListItemCommand(svc *service.ReminderService) *ToggleShoppingListItemCommand {
 	return &ToggleShoppingListItemCommand{
 		service: svc,
@@ -26,7 +28,7 @@ func (c *ToggleShoppingListItemCommand) Method() string {
 }
 
 func (c *ToggleShoppingListItemCommand) Path() string {
-	return "/shopping-list-items/:item_id/toggle"
+	return toggleShoppingListItemPath
 }
 
 func (c *ToggleShoppingListItemCommand) Clone() apphttp.Command {

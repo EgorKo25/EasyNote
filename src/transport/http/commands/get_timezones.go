@@ -10,6 +10,8 @@ import (
 
 type GetTimezonesCommand struct{}
 
+const getTimezonesPath = "/timezones"
+
 func NewGetTimezonesCommand() *GetTimezonesCommand {
 	return &GetTimezonesCommand{}
 }
@@ -19,7 +21,7 @@ func (c *GetTimezonesCommand) Method() string {
 }
 
 func (c *GetTimezonesCommand) Path() string {
-	return "/timezones"
+	return getTimezonesPath
 }
 
 func (c *GetTimezonesCommand) Clone() apphttp.Command {
