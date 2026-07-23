@@ -6,7 +6,7 @@ Telegram reminder bot for routine tasks.
 
 The source of truth for the application version is `CHANGELIST.md`.
 
-Current version: `1.4.0`.
+Current version: `2.1.0`.
 
 ## Branch Naming
 
@@ -227,7 +227,16 @@ For a manual deployment from a pull request branch, run the same workflow manual
 ## Changelist
 
 <div style="max-height: 420px; overflow-y: auto; border: 1px solid #d0d7de; border-radius: 6px; padding: 16px;">
-<p><strong>version: 1.4.0</strong></p>
+<p><strong>version: 2.1.0</strong></p>
+
+<h2>v2.1.0 - HTTP API and separated Telegram UI runtime</h2>
+<ul>
+  <li>The backend now runs HTTP API, scheduler, PostgreSQL wiring, migrations, services, and Telegram notification delivery without starting Telegram bot polling.</li>
+  <li>Telegram UI now has a separate entrypoint/container and talks to backend through an HTTP client.</li>
+  <li>The Gin HTTP layer registers endpoint commands through the manager and returns unified JSON errors.</li>
+  <li>The handwritten OpenAPI document describes the current backend API and is exposed through Swagger UI in Docker Compose.</li>
+  <li>Docker Compose now separates backend, telegram-ui, postgres, and swagger-ui.</li>
+</ul>
 
 <h2>v1.4.0 - Holidays and shopping lists</h2>
 <ul>

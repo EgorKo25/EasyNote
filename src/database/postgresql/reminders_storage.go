@@ -441,7 +441,7 @@ func (d *Database) AcknowledgeReminder(
 		WHERE n.id = r.note_id
 			AND n.telegram_chat_id = $1
 			AND r.id = $2
-			AND r.status = 'new'
+			AND r.status IN ('new', 'sent')
 	`
 
 	if affectedRows, err := d.pool.Exec(ctx, query, telegramChatID, reminderID, status); err != nil {

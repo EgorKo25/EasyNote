@@ -17,6 +17,14 @@ logger:
       path: ./logs/easy.log
       time_format: utc
 
+http:
+  host: 127.0.0.1
+  port: 8080
+  read_timeout: 5s
+  write_timeout: 10s
+  idle_timeout: 60s
+  shutdown_timeout: 5s
+
 scheduler:
   poll_interval: 1m
   batch_limit: 50
@@ -28,6 +36,7 @@ scheduler:
 telegram:
   token_env: TELEGRAM_BOT_TOKEN
   api_base_url: https://api.telegram.org
+  backend_base_url: ""
   request_timeout: 10s
   debug_mode: false
   warnings: true

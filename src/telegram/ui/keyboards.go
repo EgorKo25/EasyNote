@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/EgorKo25/EasyNote/src/database"
+	"github.com/EgorKo25/EasyNote/src/service"
+	telegrammodel "github.com/EgorKo25/EasyNote/src/telegram/model"
 	"github.com/mymmrac/telego"
 	tu "github.com/mymmrac/telego/telegoutil"
 )
@@ -338,7 +339,7 @@ func timeKeyboard(draft Draft, now time.Time) *telego.InlineKeyboardMarkup {
 	)
 }
 
-func ReminderListKeyboard(reminders []database.ReminderView) *telego.ReplyKeyboardMarkup {
+func ReminderListKeyboard(reminders []telegrammodel.ReminderView) *telego.ReplyKeyboardMarkup {
 	rows := make([][]telego.KeyboardButton, 0, len(reminders)+2)
 	for _, reminder := range reminders {
 		rows = append(rows, tu.KeyboardRow(tu.KeyboardButton(ReminderButtonText(reminder))))
@@ -350,7 +351,7 @@ func ReminderListKeyboard(reminders []database.ReminderView) *telego.ReplyKeyboa
 	return tu.Keyboard(rows...).WithResizeKeyboard()
 }
 
-func ReminderDetailsKeyboard(reminder database.ReminderView) *telego.InlineKeyboardMarkup {
+func ReminderDetailsKeyboard(reminder telegrammodel.ReminderView) *telego.InlineKeyboardMarkup {
 	return tu.InlineKeyboard(
 		tu.InlineKeyboardRow(
 			tu.InlineKeyboardButton("Изменить").
@@ -364,7 +365,7 @@ func ReminderDetailsKeyboard(reminder database.ReminderView) *telego.InlineKeybo
 	)
 }
 
-func HolidayListKeyboard(holidays []database.HolidayView) *telego.ReplyKeyboardMarkup {
+func HolidayListKeyboard(holidays []telegrammodel.HolidayView) *telego.ReplyKeyboardMarkup {
 	rows := make([][]telego.KeyboardButton, 0, len(holidays)+2)
 	for _, holiday := range holidays {
 		rows = append(rows, tu.KeyboardRow(tu.KeyboardButton(HolidayButtonText(holiday))))
@@ -376,7 +377,7 @@ func HolidayListKeyboard(holidays []database.HolidayView) *telego.ReplyKeyboardM
 	return tu.Keyboard(rows...).WithResizeKeyboard()
 }
 
-func HolidayDetailsKeyboard(holiday database.HolidayView) *telego.InlineKeyboardMarkup {
+func HolidayDetailsKeyboard(holiday telegrammodel.HolidayView) *telego.InlineKeyboardMarkup {
 	return tu.InlineKeyboard(
 		tu.InlineKeyboardRow(
 			tu.InlineKeyboardButton("Изменить").
@@ -388,7 +389,7 @@ func HolidayDetailsKeyboard(holiday database.HolidayView) *telego.InlineKeyboard
 	)
 }
 
-func ShoppingListKeyboard(lists []database.ShoppingListView) *telego.ReplyKeyboardMarkup {
+func ShoppingListKeyboard(lists []telegrammodel.ShoppingListView) *telego.ReplyKeyboardMarkup {
 	rows := make([][]telego.KeyboardButton, 0, len(lists)+2)
 	for _, list := range lists {
 		rows = append(rows, tu.KeyboardRow(tu.KeyboardButton(ShoppingListButtonText(list))))
@@ -400,7 +401,7 @@ func ShoppingListKeyboard(lists []database.ShoppingListView) *telego.ReplyKeyboa
 	return tu.Keyboard(rows...).WithResizeKeyboard()
 }
 
-func ShoppingListDetailsKeyboard(list database.ShoppingListView) *telego.InlineKeyboardMarkup {
+func ShoppingListDetailsKeyboard(list telegrammodel.ShoppingListView) *telego.InlineKeyboardMarkup {
 	rows := make([][]telego.InlineKeyboardButton, 0, len(list.Items)+1)
 	for _, item := range list.Items {
 		rows = append(rows, tu.InlineKeyboardRow(
@@ -437,7 +438,7 @@ func SettingsKeyboard() *telego.ReplyKeyboardMarkup {
 
 func TimezoneKeyboard(index int, now time.Time) *telego.ReplyKeyboardMarkup {
 	index = normalizeTimezoneIndex(index)
-	option := timezoneOptions[index]
+	option := service.TimezoneByIndex(index)
 
 	return tu.Keyboard(
 		tu.KeyboardRow(
@@ -464,19 +465,19 @@ func IntrusiveSettingsKeyboard(enabled bool) *telego.InlineKeyboardMarkup {
 	)
 }
 
-func ReminderButtonText(reminder database.ReminderView) string {
+func ReminderButtonText(reminder telegrammodel.ReminderView) string {
 	return reminder.Title
 }
 
-func HolidayButtonText(holiday database.HolidayView) string {
+func HolidayButtonText(holiday telegrammodel.HolidayView) string {
 	return fmt.Sprintf("%s - %s", holiday.RecipientName, holiday.HolidayName)
 }
 
-func ShoppingListButtonText(list database.ShoppingListView) string {
+func ShoppingListButtonText(list telegrammodel.ShoppingListView) string {
 	return fmt.Sprintf("Список #%d", list.ID)
 }
 
-func ShoppingItemButtonText(item database.ShoppingListItem) string {
+func ShoppingItemButtonText(item telegrammodel.ShoppingListItem) string {
 	if item.Done {
 		return "✓ " + item.Text
 	}
@@ -485,21 +486,15 @@ func ShoppingItemButtonText(item database.ShoppingListItem) string {
 }
 
 func TimezoneIndex(timezone string) int {
-	for index, option := range timezoneOptions {
-		if option.Timezone == timezone {
-			return index
-		}
-	}
-
-	return moscowTimezoneIndex()
+	return service.TimezoneIndex(timezone)
 }
 
 func TimezoneByIndex(index int) TimezoneOption {
-	return timezoneOptions[normalizeTimezoneIndex(index)]
+	return service.TimezoneByIndex(index)
 }
 
 func TimezoneIndexByShift(index int, shift int) int {
-	return normalizeTimezoneIndex(index + shift)
+	return service.TimezoneIndexByShift(index, shift)
 }
 
 func TimezoneButtonText(option TimezoneOption, now time.Time) string {
@@ -526,7 +521,7 @@ func TimezoneSelectCallback(index int) string {
 }
 
 func normalizeTimezoneIndex(index int) int {
-	count := len(timezoneOptions)
+	count := len(service.TimezoneOptions())
 	if count == 0 {
 		return 0
 	}
@@ -537,41 +532,4 @@ func normalizeTimezoneIndex(index int) int {
 	}
 
 	return index
-}
-
-func moscowTimezoneIndex() int {
-	for index, option := range timezoneOptions {
-		if option.Timezone == "Europe/Moscow" {
-			return index
-		}
-	}
-
-	return 0
-}
-
-var timezoneOptions = []TimezoneOption{
-	{City: "UTC-11", Timezone: "Etc/GMT+11"},
-	{City: "UTC-10", Timezone: "Etc/GMT+10"},
-	{City: "UTC-09", Timezone: "Etc/GMT+9"},
-	{City: "UTC-08", Timezone: "Etc/GMT+8"},
-	{City: "UTC-07", Timezone: "Etc/GMT+7"},
-	{City: "UTC-06", Timezone: "Etc/GMT+6"},
-	{City: "UTC-05", Timezone: "Etc/GMT+5"},
-	{City: "UTC-04", Timezone: "Etc/GMT+4"},
-	{City: "UTC-03", Timezone: "Etc/GMT+3"},
-	{City: "UTC-02", Timezone: "Etc/GMT+2"},
-	{City: "UTC-01", Timezone: "Etc/GMT+1"},
-	{City: "UTC+00", Timezone: "Etc/GMT"},
-	{City: "UTC+01", Timezone: "Etc/GMT-1"},
-	{City: "Калининград", Timezone: "Europe/Kaliningrad"},
-	{City: "Москва", Timezone: "Europe/Moscow"},
-	{City: "UTC+04", Timezone: "Etc/GMT-4"},
-	{City: "UTC+05", Timezone: "Etc/GMT-5"},
-	{City: "UTC+06", Timezone: "Etc/GMT-6"},
-	{City: "UTC+07", Timezone: "Etc/GMT-7"},
-	{City: "UTC+08", Timezone: "Etc/GMT-8"},
-	{City: "UTC+09", Timezone: "Etc/GMT-9"},
-	{City: "UTC+10", Timezone: "Etc/GMT-10"},
-	{City: "UTC+11", Timezone: "Etc/GMT-11"},
-	{City: "UTC+12", Timezone: "Etc/GMT-12"},
 }

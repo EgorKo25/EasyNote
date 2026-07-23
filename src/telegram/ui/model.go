@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/EgorKo25/EasyNote/src/database"
+	"github.com/EgorKo25/EasyNote/src/service"
+	telegrammodel "github.com/EgorKo25/EasyNote/src/telegram/model"
 )
 
 type Draft struct {
@@ -12,7 +13,7 @@ type Draft struct {
 	Title         string
 	Description   string
 	Notice        string
-	ShoppingItems []database.ShoppingListItem
+	ShoppingItems []telegrammodel.ShoppingListItem
 	Date          time.Time
 	Hour          int
 	Minute        int
@@ -25,10 +26,7 @@ type Draft struct {
 	WaitingFor    Field
 }
 
-type TimezoneOption struct {
-	City     string
-	Timezone string
-}
+type TimezoneOption = service.TimezoneOption
 
 func (d Draft) RemindAt(location *time.Location) time.Time {
 	if d.Date.IsZero() {

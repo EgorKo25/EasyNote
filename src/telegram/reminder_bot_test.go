@@ -11,8 +11,9 @@ import (
 	"time"
 
 	"github.com/EgorKo25/EasyNote/src/config"
-	"github.com/EgorKo25/EasyNote/src/database"
+	notificationtelegram "github.com/EgorKo25/EasyNote/src/notification/telegram"
 	telegrammocks "github.com/EgorKo25/EasyNote/src/telegram/mocks"
+	telegrammodel "github.com/EgorKo25/EasyNote/src/telegram/model"
 	telegramui "github.com/EgorKo25/EasyNote/src/telegram/ui"
 	"github.com/mymmrac/telego"
 	"github.com/mymmrac/telego/telegoapi"
@@ -24,6 +25,33 @@ import (
 var errTelegramAPI = errors.New("telegram api")
 var testTelegramToken = strings.Join([]string{"1234567890", strings.Repeat("a", 35)}, ":")
 
+const (
+	testTextPayRent          = "Pay rent"
+	testTextBeforeLunch      = "Before lunch"
+	testTextCall             = "Call"
+	testTextMilk             = "Milk"
+	testTextTraining         = "Training"
+	testTextUnknown          = "unknown"
+	testHolidayNameBirthday  = "Birthday"
+	testHolidayRecipientOleg = "Oleg"
+	testTimezoneEuropeMoscow = "Europe/Moscow"
+	testTimezoneUTC          = "UTC"
+	testTextCard             = "Card"
+	testTextStandup          = "Standup"
+	testTextMedicine         = "Medicine"
+	testTextTrip             = "Trip"
+	testButtonTitle          = "Название"
+	testRecipientOlega       = "Олега"
+	testHolidayBirthdayRu    = "Днем рождения"
+	testShoppingItemMilkRu   = "Молоко"
+	testShoppingItemBreadRu  = "Хлеб"
+	testHolidayAnniversaryRu = "годовщиной"
+	testRecipientAnnaRu      = "Анну"
+	testBackendPathDashboard = "/api/v1/dashboard"
+	testBackendPathSettings  = "/api/v1/settings"
+	testBackendPathReminders = "/api/v1/reminders"
+)
+
 var (
 	errExpectedSendCaller = errors.New(
 		"send telegram reminder 5: telego: sendMessage: internal execution: request call: telegram api",
@@ -34,8 +62,8 @@ var (
 	errExpectedHolidayCaller = errors.New(
 		"send telegram holiday 5: telego: sendMessage: internal execution: request call: telegram api",
 	)
-	errExpectedHolidayMessage = errors.New(
-		"send telegram main menu keyboard before holiday 6: send telegram main menu keyboard message: telego: sendMessage: internal execution: request call: telegram api",
+	errExpectedHolidayResponse = errors.New(
+		"send telegram holiday 6: telego: sendMessage: api: 400 \"bad request\"",
 	)
 	errExpectedEmptyTokenEnvE = errors.New("telegram token is empty: env EASY_NOTE_TEST_TOKEN_E")
 	errExpectedEmptyTokenEnvF = errors.New("telegram token is empty: env EASY_NOTE_TEST_TOKEN_F")
@@ -80,7 +108,7 @@ func TestReminderDraftAppliesTextInput(t *testing.T) {
 		{
 			name:  "title is saved from user message",
 			draft: reminderDraft{waitingFor: telegramui.FieldTitle},
-			input: "Pay rent",
+			input: testTextPayRent,
 			expected: struct {
 				applied     bool
 				title       string
@@ -91,12 +119,12 @@ func TestReminderDraftAppliesTextInput(t *testing.T) {
 				waitingFor  telegramui.Field
 				screen      telegramui.Screen
 				notice      string
-			}{applied: true, title: "Pay rent", screen: telegramui.ScreenMain},
+			}{applied: true, title: testTextPayRent, screen: telegramui.ScreenMain},
 		},
 		{
 			name:  "description is saved from user message",
 			draft: reminderDraft{waitingFor: telegramui.FieldDescription},
-			input: "Before lunch",
+			input: testTextBeforeLunch,
 			expected: struct {
 				applied     bool
 				title       string
@@ -107,12 +135,12 @@ func TestReminderDraftAppliesTextInput(t *testing.T) {
 				waitingFor  telegramui.Field
 				screen      telegramui.Screen
 				notice      string
-			}{applied: true, description: "Before lunch", screen: telegramui.ScreenMain},
+			}{applied: true, description: testTextBeforeLunch, screen: telegramui.ScreenMain},
 		},
 		{
 			name:  "short title is saved from user message",
 			draft: reminderDraft{waitingFor: telegramui.FieldTitle},
-			input: "Call",
+			input: testTextCall,
 			expected: struct {
 				applied     bool
 				title       string
@@ -123,7 +151,7 @@ func TestReminderDraftAppliesTextInput(t *testing.T) {
 				waitingFor  telegramui.Field
 				screen      telegramui.Screen
 				notice      string
-			}{applied: true, title: "Call", screen: telegramui.ScreenMain},
+			}{applied: true, title: testTextCall, screen: telegramui.ScreenMain},
 		},
 		{
 			name:  "long description is saved from user message",
@@ -144,7 +172,7 @@ func TestReminderDraftAppliesTextInput(t *testing.T) {
 		{
 			name:  "shopping item is appended from user message",
 			draft: reminderDraft{kind: telegramui.DraftKindShopping, waitingFor: telegramui.FieldShoppingItem},
-			input: "Milk",
+			input: testTextMilk,
 			expected: struct {
 				applied     bool
 				title       string
@@ -501,10 +529,10 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 	t.Parallel()
 
 	location := time.FixedZone("MSK", 3*60*60)
-	reminder := database.ReminderView{
+	reminder := telegrammodel.ReminderView{
 		ID:          10,
-		Title:       "Pay rent",
-		Description: "Before lunch",
+		Title:       testTextPayRent,
+		Description: testTextBeforeLunch,
 		RemindAt:    time.Date(2026, 6, 2, 6, 30, 0, 0, time.UTC),
 	}
 
@@ -518,7 +546,7 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 		{
 			name: "main menu text renders statistics",
 			action: func() string {
-				return telegramui.MainMenuText(database.ReminderStats{Completed: 3, Pending: 2, Skipped: 1})
+				return telegramui.MainMenuText(telegrammodel.ReminderStats{Completed: 3, Pending: 2, Skipped: 1})
 			},
 			expected: struct {
 				expectedText string
@@ -533,8 +561,8 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 			name: "draft text shows selected date time and empty repeat",
 			action: func() string {
 				return telegramui.DraftText(uiDraft(reminderDraft{
-					title:       "Pay rent",
-					description: "Before lunch",
+					title:       testTextPayRent,
+					description: testTextBeforeLunch,
 					date:        time.Date(2026, 6, 2, 0, 0, 0, 0, location),
 					hour:        9,
 					minute:      30,
@@ -554,8 +582,8 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 			name: "draft text shows selected custom date count",
 			action: func() string {
 				return telegramui.DraftText(uiDraft(reminderDraft{
-					title:       "Pay rent",
-					description: "Before lunch",
+					title:       testTextPayRent,
+					description: testTextBeforeLunch,
 					repeat:      telegramui.RepeatCustomDates,
 					customDates: []time.Time{
 						time.Date(2026, 6, 2, 0, 0, 0, 0, location),
@@ -638,7 +666,7 @@ func TestReminderUIBuildsExpectedKeyboards(t *testing.T) {
 			expected: struct {
 				rowCount        int
 				firstButtonText string
-			}{rowCount: 4, firstButtonText: "Название"},
+			}{rowCount: 4, firstButtonText: testButtonTitle},
 		},
 		{
 			name: "filled one time draft keyboard offers changing date",
@@ -650,7 +678,7 @@ func TestReminderUIBuildsExpectedKeyboards(t *testing.T) {
 			expected: struct {
 				rowCount        int
 				firstButtonText string
-			}{rowCount: 4, firstButtonText: "Название"},
+			}{rowCount: 4, firstButtonText: testButtonTitle},
 		},
 		{
 			name: "empty recurring draft keyboard explains start date time",
@@ -660,7 +688,7 @@ func TestReminderUIBuildsExpectedKeyboards(t *testing.T) {
 			expected: struct {
 				rowCount        int
 				firstButtonText string
-			}{rowCount: 4, firstButtonText: "Название"},
+			}{rowCount: 4, firstButtonText: testButtonTitle},
 		},
 		{
 			name: "filled recurring draft keyboard offers changing start date time",
@@ -673,7 +701,7 @@ func TestReminderUIBuildsExpectedKeyboards(t *testing.T) {
 			expected: struct {
 				rowCount        int
 				firstButtonText string
-			}{rowCount: 4, firstButtonText: "Название"},
+			}{rowCount: 4, firstButtonText: testButtonTitle},
 		},
 		{
 			name: "date choice keyboard is compact",
@@ -725,15 +753,15 @@ func TestReminderUIBuildsExpectedKeyboards(t *testing.T) {
 		{
 			name: "reminder list keyboard opens reminders by title buttons",
 			action: func() any {
-				return telegramui.ReminderListKeyboard([]database.ReminderView{
-					{ID: 1, Title: "Pay rent"},
+				return telegramui.ReminderListKeyboard([]telegrammodel.ReminderView{
+					{ID: 1, Title: testTextPayRent},
 					{ID: 2, Title: "Call mom"},
 				})
 			},
 			expected: struct {
 				rowCount        int
 				firstButtonText string
-			}{rowCount: 4, firstButtonText: "Pay rent"},
+			}{rowCount: 4, firstButtonText: testTextPayRent},
 		},
 	}
 
@@ -783,8 +811,8 @@ func TestSenderSendsReminder(t *testing.T) {
 	tests := []struct {
 		name     string
 		cfg      config.Telegram
-		reminder database.ScheduledReminder
-		state    func(sender *Sender)
+		reminder notificationtelegram.Reminder
+		state    func(sender *notificationtelegram.Sender)
 		before   func(caller *telegoapimock.MockCaller)
 		expected struct {
 			expectedErr error
@@ -792,10 +820,10 @@ func TestSenderSendsReminder(t *testing.T) {
 	}{
 		{
 			name: "title only reminder is sent",
-			reminder: database.ScheduledReminder{
+			reminder: notificationtelegram.Reminder{
 				ID:             1,
 				TelegramChatID: 100,
-				Title:          "Pay rent",
+				Title:          testTextPayRent,
 			},
 			before: func(caller *telegoapimock.MockCaller) {
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -805,11 +833,11 @@ func TestSenderSendsReminder(t *testing.T) {
 		},
 		{
 			name: "description is appended to reminder text",
-			reminder: database.ScheduledReminder{
+			reminder: notificationtelegram.Reminder{
 				ID:             2,
 				TelegramChatID: 100,
-				Title:          "Pay rent",
-				Description:    "Before lunch",
+				Title:          testTextPayRent,
+				Description:    testTextBeforeLunch,
 			},
 			before: func(caller *telegoapimock.MockCaller) {
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -820,7 +848,7 @@ func TestSenderSendsReminder(t *testing.T) {
 		{
 			name: "parse mode reminder is sent",
 			cfg:  config.Telegram{ParseMode: telego.ModeHTML},
-			reminder: database.ScheduledReminder{
+			reminder: notificationtelegram.Reminder{
 				ID:             3,
 				TelegramChatID: 100,
 				Title:          "<b>Pay rent</b>",
@@ -834,10 +862,10 @@ func TestSenderSendsReminder(t *testing.T) {
 		{
 			name: "silent protected reminder is sent",
 			cfg:  config.Telegram{DisableNotification: true, ProtectContent: true},
-			reminder: database.ScheduledReminder{
+			reminder: notificationtelegram.Reminder{
 				ID:             4,
 				TelegramChatID: 100,
-				Title:          "Pay rent",
+				Title:          testTextPayRent,
 			},
 			before: func(caller *telegoapimock.MockCaller) {
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -847,10 +875,10 @@ func TestSenderSendsReminder(t *testing.T) {
 		},
 		{
 			name: "previous intrusive reminder message is deleted before new reminder is sent",
-			reminder: database.ScheduledReminder{
+			reminder: notificationtelegram.Reminder{
 				ID:                7,
 				TelegramChatID:    100,
-				Title:             "Pay rent",
+				Title:             testTextPayRent,
 				TelegramMessageID: &previousMessageID,
 			},
 			before: func(caller *telegoapimock.MockCaller) {
@@ -860,27 +888,11 @@ func TestSenderSendsReminder(t *testing.T) {
 			},
 		},
 		{
-			name: "previous main menu message is deleted from memory before new reminder is sent",
-			reminder: database.ScheduledReminder{
-				ID:             8,
-				TelegramChatID: 100,
-				Title:          "Pay rent",
-			},
-			state: func(sender *Sender) {
-				sender.setMainMenuMessageID(100, 55)
-			},
-			before: func(caller *telegoapimock.MockCaller) {
-				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(testTelegramResponse(t, telego.Message{MessageID: 8}), nil).
-					Times(3)
-			},
-		},
-		{
 			name: "api caller error is returned",
-			reminder: database.ScheduledReminder{
+			reminder: notificationtelegram.Reminder{
 				ID:             5,
 				TelegramChatID: 100,
-				Title:          "Pay rent",
+				Title:          testTextPayRent,
 			},
 			before: func(caller *telegoapimock.MockCaller) {
 				gomock.InOrder(
@@ -898,10 +910,10 @@ func TestSenderSendsReminder(t *testing.T) {
 		},
 		{
 			name: "api response error is returned",
-			reminder: database.ScheduledReminder{
+			reminder: notificationtelegram.Reminder{
 				ID:             6,
 				TelegramChatID: 100,
-				Title:          "Pay rent",
+				Title:          testTextPayRent,
 			},
 			before: func(caller *telegoapimock.MockCaller) {
 				gomock.InOrder(
@@ -938,7 +950,7 @@ func TestSenderSendsReminder(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			sender := &Sender{bot: bot, cfg: test.cfg}
+			sender := notificationtelegram.NewWithBot(bot, test.cfg)
 			if test.state != nil {
 				test.state(sender)
 			}
@@ -962,8 +974,8 @@ func TestSenderSendsHoliday(t *testing.T) {
 	tests := []struct {
 		name     string
 		cfg      config.Telegram
-		holiday  database.ScheduledHoliday
-		state    func(sender *Sender)
+		holiday  notificationtelegram.Holiday
+		state    func(sender *notificationtelegram.Sender)
 		before   func(caller *telegoapimock.MockCaller)
 		expected struct {
 			expectedErr error
@@ -971,8 +983,11 @@ func TestSenderSendsHoliday(t *testing.T) {
 	}{
 		{
 			name: "holiday is sent",
-			holiday: database.ScheduledHoliday{
-				ID: 1, TelegramChatID: 100, HolidayName: "Birthday", RecipientName: "Oleg",
+			holiday: notificationtelegram.Holiday{
+				ID:             1,
+				TelegramChatID: 100,
+				HolidayName:    testHolidayNameBirthday,
+				RecipientName:  testHolidayRecipientOleg,
 			},
 			before: func(caller *telegoapimock.MockCaller) {
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -983,8 +998,8 @@ func TestSenderSendsHoliday(t *testing.T) {
 		{
 			name: "parse mode holiday is sent",
 			cfg:  config.Telegram{ParseMode: telego.ModeHTML},
-			holiday: database.ScheduledHoliday{
-				ID: 2, TelegramChatID: 100, HolidayName: "<b>Birthday</b>", RecipientName: "Oleg",
+			holiday: notificationtelegram.Holiday{
+				ID: 2, TelegramChatID: 100, HolidayName: "<b>Birthday</b>", RecipientName: testHolidayRecipientOleg,
 			},
 			before: func(caller *telegoapimock.MockCaller) {
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -995,8 +1010,11 @@ func TestSenderSendsHoliday(t *testing.T) {
 		{
 			name: "silent protected holiday is sent",
 			cfg:  config.Telegram{DisableNotification: true, ProtectContent: true},
-			holiday: database.ScheduledHoliday{
-				ID: 3, TelegramChatID: 100, HolidayName: "Birthday", RecipientName: "Oleg",
+			holiday: notificationtelegram.Holiday{
+				ID:             3,
+				TelegramChatID: 100,
+				HolidayName:    testHolidayNameBirthday,
+				RecipientName:  testHolidayRecipientOleg,
 			},
 			before: func(caller *telegoapimock.MockCaller) {
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -1005,23 +1023,12 @@ func TestSenderSendsHoliday(t *testing.T) {
 			},
 		},
 		{
-			name: "previous main menu message is deleted before holiday is sent",
-			holiday: database.ScheduledHoliday{
-				ID: 4, TelegramChatID: 100, HolidayName: "Birthday", RecipientName: "Oleg",
-			},
-			state: func(sender *Sender) {
-				sender.setMainMenuMessageID(100, 55)
-			},
-			before: func(caller *telegoapimock.MockCaller) {
-				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(testTelegramResponse(t, telego.Message{MessageID: 4}), nil).
-					Times(3)
-			},
-		},
-		{
 			name: "holiday send api caller error is returned",
-			holiday: database.ScheduledHoliday{
-				ID: 5, TelegramChatID: 100, HolidayName: "Birthday", RecipientName: "Oleg",
+			holiday: notificationtelegram.Holiday{
+				ID:             5,
+				TelegramChatID: 100,
+				HolidayName:    testHolidayNameBirthday,
+				RecipientName:  testHolidayRecipientOleg,
 			},
 			before: func(caller *telegoapimock.MockCaller) {
 				gomock.InOrder(
@@ -1036,16 +1043,27 @@ func TestSenderSendsHoliday(t *testing.T) {
 			expected: struct{ expectedErr error }{expectedErr: errExpectedHolidayCaller},
 		},
 		{
-			name: "holiday main menu api caller error is returned",
-			holiday: database.ScheduledHoliday{
-				ID: 6, TelegramChatID: 100, HolidayName: "Birthday", RecipientName: "Oleg",
+			name: "holiday api response error is returned",
+			holiday: notificationtelegram.Holiday{
+				ID:             6,
+				TelegramChatID: 100,
+				HolidayName:    testHolidayNameBirthday,
+				RecipientName:  testHolidayRecipientOleg,
 			},
 			before: func(caller *telegoapimock.MockCaller) {
-				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(nil, errTelegramAPI).
-					Times(1)
+				gomock.InOrder(
+					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+						Return(testTelegramResponse(t, telego.Message{MessageID: 6}), nil).
+						Times(1),
+					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+						Return(&telegoapi.Response{
+							Ok:    false,
+							Error: &telegoapi.Error{ErrorCode: 400, Description: "bad request"},
+						}, nil).
+						Times(1),
+				)
 			},
-			expected: struct{ expectedErr error }{expectedErr: errExpectedHolidayMessage},
+			expected: struct{ expectedErr error }{expectedErr: errExpectedHolidayResponse},
 		},
 	}
 
@@ -1064,7 +1082,7 @@ func TestSenderSendsHoliday(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			sender := &Sender{bot: bot, cfg: test.cfg}
+			sender := notificationtelegram.NewWithBot(bot, test.cfg)
 			if test.state != nil {
 				test.state(sender)
 			}
@@ -1132,7 +1150,7 @@ func TestNewSenderValidatesToken(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Setenv(test.tokenEnv, test.token)
 
-			sender, err := NewSender(context.Background(), config.Telegram{
+			sender, err := notificationtelegram.NewSender(context.Background(), config.Telegram{
 				TokenEnv:         test.tokenEnv,
 				APIBaseURL:       "https://api.telegram.org",
 				RequestTimeout:   time.Second,
@@ -1197,8 +1215,8 @@ func TestReminderUIBuildsDraftModel(t *testing.T) {
 		{
 			name: "one-time draft maps text and date",
 			draft: reminderDraft{
-				title:       "Pay rent",
-				description: "Before lunch",
+				title:       testTextPayRent,
+				description: testTextBeforeLunch,
 				date:        time.Date(2026, 6, 2, 0, 0, 0, 0, location),
 				hour:        9,
 				minute:      30,
@@ -1218,8 +1236,8 @@ func TestReminderUIBuildsDraftModel(t *testing.T) {
 				calendarMonth time.Time
 				waitingFor    telegramui.Field
 			}{
-				title:       "Pay rent",
-				description: "Before lunch",
+				title:       testTextPayRent,
+				description: testTextBeforeLunch,
 				date:        time.Date(2026, 6, 2, 0, 0, 0, 0, location),
 				hour:        9,
 				minute:      30,
@@ -1229,7 +1247,7 @@ func TestReminderUIBuildsDraftModel(t *testing.T) {
 		{
 			name: "recurring draft maps repeat and weekdays",
 			draft: reminderDraft{
-				title:        "Training",
+				title:        testTextTraining,
 				repeat:       telegramui.RepeatCustomWeekdays,
 				weekdaysMask: 1 | 8,
 				screen:       telegramui.ScreenWeekdays,
@@ -1248,7 +1266,7 @@ func TestReminderUIBuildsDraftModel(t *testing.T) {
 				calendarMonth time.Time
 				waitingFor    telegramui.Field
 			}{
-				title:        "Training",
+				title:        testTextTraining,
 				repeat:       telegramui.RepeatCustomWeekdays,
 				weekdaysMask: 1 | 8,
 				screen:       telegramui.ScreenWeekdays,
@@ -1376,11 +1394,11 @@ func TestReminderBotHandlesMessages(t *testing.T) {
 	}{
 		{
 			name:    "start command opens main menu",
-			message: telego.Message{MessageID: messageID, Chat: telego.Chat{ID: chatID}, Text: "/start"},
+			message: telego.Message{MessageID: messageID, Chat: telego.Chat{ID: chatID}, Text: commandStart},
 			before: func(caller *telegoapimock.MockCaller, _ *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				repository.EXPECT().
 					ReminderStatsByChat(gomock.Any(), chatID).
-					Return(database.ReminderStats{Completed: 3, Pending: 2, Skipped: 1}, nil).
+					Return(telegrammodel.ReminderStats{Completed: 3, Pending: 2, Skipped: 1}, nil).
 					Times(1)
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(testTelegramResponse(t, telego.Message{MessageID: 1}), nil).
@@ -1415,7 +1433,7 @@ func TestReminderBotHandlesMessages(t *testing.T) {
 		},
 		{
 			name:    "draft title message updates current draft",
-			message: telego.Message{MessageID: messageID, Chat: telego.Chat{ID: chatID}, Text: "Pay rent"},
+			message: telego.Message{MessageID: messageID, Chat: telego.Chat{ID: chatID}, Text: testTextPayRent},
 			draft:   reminderDraft{waitingFor: telegramui.FieldTitle},
 			before: func(caller *telegoapimock.MockCaller, _ *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -1425,11 +1443,11 @@ func TestReminderBotHandlesMessages(t *testing.T) {
 			expected: struct {
 				expectedErr error
 				draftTitle  string
-			}{draftTitle: "Pay rent"},
+			}{draftTitle: testTextPayRent},
 		},
 		{
 			name:    "unknown message returns main menu prompt",
-			message: telego.Message{MessageID: messageID, Chat: telego.Chat{ID: chatID}, Text: "unknown"},
+			message: telego.Message{MessageID: messageID, Chat: telego.Chat{ID: chatID}, Text: testTextUnknown},
 			before: func(caller *telegoapimock.MockCaller, _ *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(testTelegramResponse(t, telego.Message{MessageID: 5}), nil).
@@ -1497,7 +1515,11 @@ func TestReminderBotRunsReplyMessageCommands(t *testing.T) {
 
 	chatID := int64(410)
 	messageID := 77
-	reminder := database.ReminderView{ID: 1, Title: "Pay rent", RemindAt: time.Date(2099, 6, 2, 9, 30, 0, 0, time.UTC)}
+	reminder := telegrammodel.ReminderView{
+		ID:       1,
+		Title:    testTextPayRent,
+		RemindAt: time.Date(2099, 6, 2, 9, 30, 0, 0, time.UTC),
+	}
 
 	tests := []struct {
 		name     string
@@ -1527,7 +1549,7 @@ func TestReminderBotRunsReplyMessageCommands(t *testing.T) {
 			before: func(_ *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				repository.EXPECT().
 					UserSettings(gomock.Any(), chatID).
-					Return(database.UserSettings{Timezone: "UTC"}, nil).
+					Return(telegrammodel.UserSettings{Timezone: testTimezoneUTC}, nil).
 					Times(1)
 			},
 			expected: struct {
@@ -1542,7 +1564,7 @@ func TestReminderBotRunsReplyMessageCommands(t *testing.T) {
 			before: func(_ *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				repository.EXPECT().
 					UserSettings(gomock.Any(), chatID).
-					Return(database.UserSettings{Timezone: "UTC"}, nil).
+					Return(telegrammodel.UserSettings{Timezone: testTimezoneUTC}, nil).
 					Times(1)
 			},
 			expected: struct {
@@ -1569,11 +1591,11 @@ func TestReminderBotRunsReplyMessageCommands(t *testing.T) {
 				gomock.InOrder(
 					repository.EXPECT().
 						UserSettings(gomock.Any(), chatID).
-						Return(database.UserSettings{Timezone: "UTC"}, nil).
+						Return(telegrammodel.UserSettings{Timezone: testTimezoneUTC}, nil).
 						Times(1),
 					repository.EXPECT().
 						FindRemindersByChat(gomock.Any(), chatID, reminderPageSize, 0).
-						Return([]database.ReminderView{reminder}, nil).
+						Return([]telegrammodel.ReminderView{reminder}, nil).
 						Times(1),
 				)
 			},
@@ -1590,14 +1612,14 @@ func TestReminderBotRunsReplyMessageCommands(t *testing.T) {
 				gomock.InOrder(
 					repository.EXPECT().
 						UserSettings(gomock.Any(), chatID).
-						Return(database.UserSettings{Timezone: "UTC"}, nil).
+						Return(telegrammodel.UserSettings{Timezone: testTimezoneUTC}, nil).
 						Times(1),
 					service.EXPECT().
 						FindHolidaysByChat(gomock.Any(), chatID, reminderPageSize, 0).
-						Return([]database.HolidayView{{
+						Return([]telegrammodel.HolidayView{{
 							ID:            2,
 							HolidayName:   "днем рождения",
-							RecipientName: "Олега",
+							RecipientName: testRecipientOlega,
 							RemindAt:      time.Date(2099, 6, 2, 10, 0, 0, 0, time.UTC),
 						}}, nil).
 						Times(1),
@@ -1615,7 +1637,7 @@ func TestReminderBotRunsReplyMessageCommands(t *testing.T) {
 			before: func(service *telegrammocks.MockReminderService, _ *telegrammocks.MockReminderRepository) {
 				service.EXPECT().
 					FindShoppingListsByChat(gomock.Any(), chatID, reminderPageSize, 0).
-					Return([]database.ShoppingListView{{ID: 3}}, nil).
+					Return([]telegrammodel.ShoppingListView{{ID: 3}}, nil).
 					Times(1)
 			},
 			expected: struct {
@@ -1634,11 +1656,11 @@ func TestReminderBotRunsReplyMessageCommands(t *testing.T) {
 				gomock.InOrder(
 					repository.EXPECT().
 						UserSettings(gomock.Any(), chatID).
-						Return(database.UserSettings{Timezone: "UTC"}, nil).
+						Return(telegrammodel.UserSettings{Timezone: testTimezoneUTC}, nil).
 						Times(1),
 					repository.EXPECT().
 						FindRemindersByChat(gomock.Any(), chatID, reminderPageSize, 4).
-						Return([]database.ReminderView{reminder}, nil).
+						Return([]telegrammodel.ReminderView{reminder}, nil).
 						Times(1),
 				)
 			},
@@ -1654,7 +1676,7 @@ func TestReminderBotRunsReplyMessageCommands(t *testing.T) {
 			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				repository.EXPECT().
 					UserSettings(gomock.Any(), chatID).
-					Return(database.UserSettings{Timezone: "UTC"}, nil).
+					Return(telegrammodel.UserSettings{Timezone: testTimezoneUTC}, nil).
 					Times(2)
 			},
 			expected: struct {
@@ -1669,7 +1691,7 @@ func TestReminderBotRunsReplyMessageCommands(t *testing.T) {
 			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				repository.EXPECT().
 					ReminderStatsByChat(gomock.Any(), chatID).
-					Return(database.ReminderStats{Completed: 1, Pending: 2, Skipped: 3}, nil).
+					Return(telegrammodel.ReminderStats{Completed: 1, Pending: 2, Skipped: 3}, nil).
 					Times(1)
 			},
 			expected: struct {
@@ -1688,12 +1710,12 @@ func TestReminderBotRunsReplyMessageCommands(t *testing.T) {
 			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
 					repository.EXPECT().
-						UpdateUserTimezone(gomock.Any(), chatID, "Europe/Moscow").
+						UpdateUserTimezone(gomock.Any(), chatID, testTimezoneEuropeMoscow).
 						Return(nil).
 						Times(1),
 					repository.EXPECT().
 						ReminderStatsByChat(gomock.Any(), chatID).
-						Return(database.ReminderStats{Completed: 1, Pending: 2, Skipped: 3}, nil).
+						Return(telegrammodel.ReminderStats{Completed: 1, Pending: 2, Skipped: 3}, nil).
 						Times(1),
 				)
 			},
@@ -1719,7 +1741,7 @@ func TestReminderBotRunsReplyMessageCommands(t *testing.T) {
 		},
 		{
 			name: "unknown command is not handled",
-			text: "unknown",
+			text: testTextUnknown,
 			before: func(_ *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 			},
 			expected: struct {
@@ -1795,7 +1817,11 @@ func TestReminderBotHandlesReplyNavigationState(t *testing.T) {
 
 	chatID := int64(420)
 	messageID := 88
-	reminder := database.ReminderView{ID: 7, Title: "Pay rent", RemindAt: time.Date(2099, 6, 2, 9, 30, 0, 0, time.UTC)}
+	reminder := telegrammodel.ReminderView{
+		ID:       7,
+		Title:    testTextPayRent,
+		RemindAt: time.Date(2099, 6, 2, 9, 30, 0, 0, time.UTC),
+	}
 
 	tests := []struct {
 		name     string
@@ -1825,14 +1851,17 @@ func TestReminderBotHandlesReplyNavigationState(t *testing.T) {
 			},
 			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
-					repository.EXPECT().UpdateUserTimezone(gomock.Any(), chatID, "Europe/Moscow").Return(nil).Times(1),
 					repository.EXPECT().
-						UserSettings(gomock.Any(), chatID).
-						Return(database.UserSettings{Timezone: "UTC"}, nil).
+						UpdateUserTimezone(gomock.Any(), chatID, testTimezoneEuropeMoscow).
+						Return(nil).
 						Times(1),
 					repository.EXPECT().
 						UserSettings(gomock.Any(), chatID).
-						Return(database.UserSettings{Timezone: "UTC"}, nil).
+						Return(telegrammodel.UserSettings{Timezone: testTimezoneUTC}, nil).
+						Times(1),
+					repository.EXPECT().
+						UserSettings(gomock.Any(), chatID).
+						Return(telegrammodel.UserSettings{Timezone: testTimezoneUTC}, nil).
 						Times(1),
 				)
 			},
@@ -1864,11 +1893,11 @@ func TestReminderBotHandlesReplyNavigationState(t *testing.T) {
 				gomock.InOrder(
 					repository.EXPECT().
 						UserSettings(gomock.Any(), chatID).
-						Return(database.UserSettings{Timezone: "UTC"}, nil).
+						Return(telegrammodel.UserSettings{Timezone: testTimezoneUTC}, nil).
 						Times(1),
 					repository.EXPECT().
 						FindRemindersByChat(gomock.Any(), chatID, reminderPageSize, 0).
-						Return([]database.ReminderView{reminder}, nil).
+						Return([]telegrammodel.ReminderView{reminder}, nil).
 						Times(1),
 				)
 			},
@@ -1908,11 +1937,11 @@ func TestReminderBotHandlesReplyNavigationState(t *testing.T) {
 				gomock.InOrder(
 					repository.EXPECT().
 						UserSettings(gomock.Any(), chatID).
-						Return(database.UserSettings{Timezone: "UTC"}, nil).
+						Return(telegrammodel.UserSettings{Timezone: testTimezoneUTC}, nil).
 						Times(1),
 					repository.EXPECT().
 						FindReminderHistoryByChat(gomock.Any(), chatID, reminderPageSize, 2).
-						Return([]database.ReminderView{reminder}, nil).
+						Return([]telegrammodel.ReminderView{reminder}, nil).
 						Times(1),
 				)
 			},
@@ -2167,7 +2196,7 @@ func TestReplyShiftMinutes(t *testing.T) {
 		},
 		{
 			name: "unknown text is not a shift",
-			text: "unknown",
+			text: testTextUnknown,
 			expected: struct {
 				minutes int
 				handled bool
@@ -2255,17 +2284,17 @@ func TestReminderBotHandlesHolidayAndShoppingViews(t *testing.T) {
 
 	chatID := int64(430)
 	messageID := 91
-	holiday := database.HolidayView{
+	holiday := telegrammodel.HolidayView{
 		ID:            7,
 		HolidayName:   "днем рождения",
-		RecipientName: "Олега",
+		RecipientName: testRecipientOlega,
 		HolidayDate:   time.Date(2099, 6, 2, 0, 0, 0, 0, time.UTC),
 		RemindAt:      time.Date(2099, 6, 2, 10, 15, 0, 0, time.UTC),
 	}
-	shoppingList := database.ShoppingListView{
+	shoppingList := telegrammodel.ShoppingListView{
 		ID: 9,
-		Items: []database.ShoppingListItem{
-			{ID: 1, Text: "Milk", Position: 1},
+		Items: []telegrammodel.ShoppingListItem{
+			{ID: 1, Text: testTextMilk, Position: 1},
 			{ID: 2, Text: "Bread", Position: 2, Done: true},
 		},
 	}
@@ -2285,11 +2314,11 @@ func TestReminderBotHandlesHolidayAndShoppingViews(t *testing.T) {
 				gomock.InOrder(
 					repository.EXPECT().
 						UserSettings(gomock.Any(), chatID).
-						Return(database.UserSettings{Timezone: "UTC"}, nil).
+						Return(telegrammodel.UserSettings{Timezone: testTimezoneUTC}, nil).
 						Times(1),
 					service.EXPECT().
 						FindHolidaysByChat(gomock.Any(), chatID, reminderPageSize, 0).
-						Return([]database.HolidayView{holiday}, nil).
+						Return([]telegrammodel.HolidayView{holiday}, nil).
 						Times(1),
 				)
 			},
@@ -2306,7 +2335,7 @@ func TestReminderBotHandlesHolidayAndShoppingViews(t *testing.T) {
 				gomock.InOrder(
 					service.EXPECT().
 						FindShoppingListsByChat(gomock.Any(), chatID, reminderPageSize, 0).
-						Return([]database.ShoppingListView{shoppingList}, nil).
+						Return([]telegrammodel.ShoppingListView{shoppingList}, nil).
 						Times(1),
 					service.EXPECT().
 						ShoppingListByID(gomock.Any(), chatID, shoppingList.ID).
@@ -2332,7 +2361,7 @@ func TestReminderBotHandlesHolidayAndShoppingViews(t *testing.T) {
 				gomock.InOrder(
 					repository.EXPECT().
 						UserSettings(gomock.Any(), chatID).
-						Return(database.UserSettings{Timezone: "UTC"}, nil).
+						Return(telegrammodel.UserSettings{Timezone: testTimezoneUTC}, nil).
 						Times(1),
 					service.EXPECT().
 						HolidayByID(gomock.Any(), chatID, holiday.ID).
@@ -2360,11 +2389,11 @@ func TestReminderBotHandlesHolidayAndShoppingViews(t *testing.T) {
 						Times(1),
 					repository.EXPECT().
 						UserSettings(gomock.Any(), chatID).
-						Return(database.UserSettings{Timezone: "UTC"}, nil).
+						Return(telegrammodel.UserSettings{Timezone: testTimezoneUTC}, nil).
 						Times(1),
 					service.EXPECT().
 						FindHolidaysByChat(gomock.Any(), chatID, reminderPageSize, 0).
-						Return([]database.HolidayView{holiday}, nil).
+						Return([]telegrammodel.HolidayView{holiday}, nil).
 						Times(1),
 				)
 			},
@@ -2381,11 +2410,11 @@ func TestReminderBotHandlesHolidayAndShoppingViews(t *testing.T) {
 				gomock.InOrder(
 					repository.EXPECT().
 						UserSettings(gomock.Any(), chatID).
-						Return(database.UserSettings{Timezone: "UTC"}, nil).
+						Return(telegrammodel.UserSettings{Timezone: testTimezoneUTC}, nil).
 						Times(1),
 					service.EXPECT().
 						FindHolidaysByChat(gomock.Any(), chatID, reminderPageSize, 0).
-						Return([]database.HolidayView{holiday}, nil).
+						Return([]telegrammodel.HolidayView{holiday}, nil).
 						Times(1),
 				)
 			},
@@ -2419,7 +2448,7 @@ func TestReminderBotHandlesHolidayAndShoppingViews(t *testing.T) {
 			before: func(service *telegrammocks.MockReminderService, _ *telegrammocks.MockReminderRepository) {
 				service.EXPECT().
 					FindShoppingListsByChat(gomock.Any(), chatID, reminderPageSize, 0).
-					Return([]database.ShoppingListView{shoppingList}, nil).
+					Return([]telegrammodel.ShoppingListView{shoppingList}, nil).
 					Times(1)
 			},
 			state: func(bot *ReminderBot) {
@@ -2496,12 +2525,12 @@ func TestReminderBotHandlesUpdates(t *testing.T) {
 		{
 			name: "start message opens main menu",
 			update: telego.Update{
-				Message: &telego.Message{MessageID: messageID, Chat: telego.Chat{ID: chatID}, Text: "/start"},
+				Message: &telego.Message{MessageID: messageID, Chat: telego.Chat{ID: chatID}, Text: commandStart},
 			},
 			before: func(repository *telegrammocks.MockReminderRepository) {
 				repository.EXPECT().
 					ReminderStatsByChat(gomock.Any(), chatID).
-					Return(database.ReminderStats{Completed: 1, Pending: 2, Skipped: 3}, nil).
+					Return(telegrammodel.ReminderStats{Completed: 1, Pending: 2, Skipped: 3}, nil).
 					Times(1)
 			},
 			apiCalls: 2,
@@ -2517,16 +2546,16 @@ func TestReminderBotHandlesUpdates(t *testing.T) {
 		{
 			name: "start message returns stats error",
 			update: telego.Update{
-				Message: &telego.Message{MessageID: messageID, Chat: telego.Chat{ID: chatID}, Text: "/start"},
+				Message: &telego.Message{MessageID: messageID, Chat: telego.Chat{ID: chatID}, Text: commandStart},
 			},
 			before: func(repository *telegrammocks.MockReminderRepository) {
 				repository.EXPECT().
 					ReminderStatsByChat(gomock.Any(), chatID).
-					Return(database.ReminderStats{}, errSettings).
+					Return(telegrammodel.ReminderStats{}, errSettings).
 					Times(1)
 			},
 			apiCalls:        1,
-			expectedErrText: "load reminder stats: settings",
+			expectedErrText: "load reminder stats: get reminder stats by chat: settings",
 		},
 		{
 			name: "unknown message returns telegram api error",
@@ -2652,7 +2681,7 @@ func TestReminderBotCommandCallbacks(t *testing.T) {
 		},
 		{
 			name:  "unknown callback is not handled",
-			data:  "unknown",
+			data:  testTextUnknown,
 			draft: reminderDraft{},
 			expected: struct {
 				handled  bool
@@ -2951,7 +2980,7 @@ func TestReminderBotAppliesSettingsTextInput(t *testing.T) {
 			input: "1",
 			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
-					repository.EXPECT().UserSettings(gomock.Any(), chatID).Return(database.UserSettings{
+					repository.EXPECT().UserSettings(gomock.Any(), chatID).Return(telegrammodel.UserSettings{
 						IntrusiveEnabled: true,
 					}, nil).Times(1),
 					repository.EXPECT().
@@ -2973,7 +3002,7 @@ func TestReminderBotAppliesSettingsTextInput(t *testing.T) {
 			input: "1m",
 			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
-					repository.EXPECT().UserSettings(gomock.Any(), chatID).Return(database.UserSettings{
+					repository.EXPECT().UserSettings(gomock.Any(), chatID).Return(telegrammodel.UserSettings{
 						IntrusiveEnabled: false,
 					}, nil).Times(1),
 					repository.EXPECT().
@@ -2995,7 +3024,7 @@ func TestReminderBotAppliesSettingsTextInput(t *testing.T) {
 			input: "1h30m",
 			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
-					repository.EXPECT().UserSettings(gomock.Any(), chatID).Return(database.UserSettings{
+					repository.EXPECT().UserSettings(gomock.Any(), chatID).Return(telegrammodel.UserSettings{
 						IntrusiveEnabled: true,
 					}, nil).Times(1),
 					repository.EXPECT().
@@ -3085,9 +3114,9 @@ func TestReminderBotHandlesReminderCallbacks(t *testing.T) {
 
 	chatID := int64(320)
 	messageID := 15
-	reminder := database.ReminderView{
+	reminder := telegrammodel.ReminderView{
 		ID:       10,
-		Title:    "Pay rent",
+		Title:    testTextPayRent,
 		RemindAt: time.Date(2099, 6, 2, 9, 30, 0, 0, time.Local),
 	}
 
@@ -3106,7 +3135,7 @@ func TestReminderBotHandlesReminderCallbacks(t *testing.T) {
 			before: func(caller *telegoapimock.MockCaller, _ *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				repository.EXPECT().
 					UserSettings(gomock.Any(), chatID).
-					Return(database.UserSettings{Timezone: "UTC"}, nil).
+					Return(telegrammodel.UserSettings{Timezone: testTimezoneUTC}, nil).
 					Times(1)
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(testTelegramResponse(t, telego.Message{MessageID: messageID}), nil).
@@ -3124,10 +3153,10 @@ func TestReminderBotHandlesReminderCallbacks(t *testing.T) {
 				gomock.InOrder(
 					repository.EXPECT().
 						UserSettings(gomock.Any(), chatID).
-						Return(database.UserSettings{Timezone: "UTC"}, nil).
+						Return(telegrammodel.UserSettings{Timezone: testTimezoneUTC}, nil).
 						Times(1),
 					repository.EXPECT().FindRemindersByChat(gomock.Any(), chatID, gomock.Any(), gomock.Any()).
-						Return([]database.ReminderView{reminder}, nil).
+						Return([]telegrammodel.ReminderView{reminder}, nil).
 						Times(1),
 					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 						Return(testTelegramResponse(t, telego.Message{MessageID: messageID}), nil).
@@ -3142,10 +3171,10 @@ func TestReminderBotHandlesReminderCallbacks(t *testing.T) {
 				gomock.InOrder(
 					repository.EXPECT().
 						UserSettings(gomock.Any(), chatID).
-						Return(database.UserSettings{Timezone: "UTC"}, nil).
+						Return(telegrammodel.UserSettings{Timezone: testTimezoneUTC}, nil).
 						Times(1),
 					repository.EXPECT().FindRemindersByChat(gomock.Any(), chatID, gomock.Any(), gomock.Any()).
-						Return([]database.ReminderView{reminder}, nil).
+						Return([]telegrammodel.ReminderView{reminder}, nil).
 						Times(1),
 					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 						Return(testTelegramResponse(t, telego.Message{MessageID: messageID}), nil).
@@ -3160,7 +3189,7 @@ func TestReminderBotHandlesReminderCallbacks(t *testing.T) {
 				gomock.InOrder(
 					repository.EXPECT().
 						UserSettings(gomock.Any(), chatID).
-						Return(database.UserSettings{Timezone: "UTC"}, nil).
+						Return(telegrammodel.UserSettings{Timezone: testTimezoneUTC}, nil).
 						Times(1),
 					service.EXPECT().
 						ReminderByID(gomock.Any(), chatID, int64(10)).
@@ -3183,10 +3212,10 @@ func TestReminderBotHandlesReminderCallbacks(t *testing.T) {
 				gomock.InOrder(
 					repository.EXPECT().
 						UserSettings(gomock.Any(), chatID).
-						Return(database.UserSettings{Timezone: "UTC"}, nil).
+						Return(telegrammodel.UserSettings{Timezone: testTimezoneUTC}, nil).
 						Times(1),
 					repository.EXPECT().FindRemindersByChat(gomock.Any(), chatID, gomock.Any(), gomock.Any()).
-						Return([]database.ReminderView{reminder}, nil).
+						Return([]telegrammodel.ReminderView{reminder}, nil).
 						Times(1),
 					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 						Return(testTelegramResponse(t, telego.Message{MessageID: messageID}), nil).
@@ -3203,7 +3232,7 @@ func TestReminderBotHandlesReminderCallbacks(t *testing.T) {
 						Return(nil).
 						Times(1),
 					repository.EXPECT().FindRemindersByChat(gomock.Any(), chatID, gomock.Any(), gomock.Any()).
-						Return([]database.ReminderView{}, nil).
+						Return([]telegrammodel.ReminderView{}, nil).
 						Times(1),
 					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 						Return(testTelegramResponse(t, telego.Message{MessageID: messageID}), nil).
@@ -3228,7 +3257,7 @@ func TestReminderBotHandlesReminderCallbacks(t *testing.T) {
 				gomock.InOrder(
 					repository.EXPECT().
 						UserSettings(gomock.Any(), chatID).
-						Return(database.UserSettings{Timezone: "UTC"}, nil).
+						Return(telegrammodel.UserSettings{Timezone: testTimezoneUTC}, nil).
 						Times(1),
 					repository.EXPECT().FindRemindersByChat(gomock.Any(), chatID, gomock.Any(), gomock.Any()).
 						Return(nil, errLoadReminders).
@@ -3293,7 +3322,7 @@ func TestReminderBotAcknowledgesDeliveredReminders(t *testing.T) {
 		name     string
 		data     string
 		prefix   string
-		status   database.ReminderStatus
+		status   telegrammodel.ReminderStatus
 		before   func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository)
 		expected struct {
 			expectedErrText string
@@ -3303,14 +3332,14 @@ func TestReminderBotAcknowledgesDeliveredReminders(t *testing.T) {
 			name:   "completed delivered reminder is acknowledged",
 			data:   telegramui.CallbackReminderDone + "10",
 			prefix: telegramui.CallbackReminderDone,
-			status: database.ReminderStatusCompleted,
+			status: telegrammodel.ReminderStatusCompleted,
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
-					service.EXPECT().CompleteOccurrence(
+					service.EXPECT().AcknowledgeReminder(
 						gomock.Any(),
+						chatID,
 						int64(10),
-						database.ReminderStatusCompleted,
-						gomock.Any(),
+						telegrammodel.ReminderStatusCompleted,
 					).Return(nil).Times(1),
 					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 						Return(testTelegramResponse(t, telego.Message{MessageID: messageID}), nil).
@@ -3322,14 +3351,14 @@ func TestReminderBotAcknowledgesDeliveredReminders(t *testing.T) {
 			name:   "canceled delivered reminder is acknowledged",
 			data:   telegramui.CallbackReminderCancelDelivered + "11",
 			prefix: telegramui.CallbackReminderCancelDelivered,
-			status: database.ReminderStatusCanceled,
+			status: telegrammodel.ReminderStatusCanceled,
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
-					service.EXPECT().CompleteOccurrence(
+					service.EXPECT().AcknowledgeReminder(
 						gomock.Any(),
+						chatID,
 						int64(11),
-						database.ReminderStatusCanceled,
-						gomock.Any(),
+						telegrammodel.ReminderStatusCanceled,
 					).Return(nil).Times(1),
 					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 						Return(testTelegramResponse(t, telego.Message{MessageID: messageID}), nil).
@@ -3341,14 +3370,14 @@ func TestReminderBotAcknowledgesDeliveredReminders(t *testing.T) {
 			name:   "second completed delivered reminder is acknowledged",
 			data:   telegramui.CallbackReminderDone + "12",
 			prefix: telegramui.CallbackReminderDone,
-			status: database.ReminderStatusCompleted,
+			status: telegrammodel.ReminderStatusCompleted,
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
-					service.EXPECT().CompleteOccurrence(
+					service.EXPECT().AcknowledgeReminder(
 						gomock.Any(),
+						chatID,
 						int64(12),
-						database.ReminderStatusCompleted,
-						gomock.Any(),
+						telegrammodel.ReminderStatusCompleted,
 					).Return(nil).Times(1),
 					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 						Return(testTelegramResponse(t, telego.Message{MessageID: messageID}), nil).
@@ -3360,14 +3389,14 @@ func TestReminderBotAcknowledgesDeliveredReminders(t *testing.T) {
 			name:   "second canceled delivered reminder is acknowledged",
 			data:   telegramui.CallbackReminderCancelDelivered + "13",
 			prefix: telegramui.CallbackReminderCancelDelivered,
-			status: database.ReminderStatusCanceled,
+			status: telegrammodel.ReminderStatusCanceled,
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
-					service.EXPECT().CompleteOccurrence(
+					service.EXPECT().AcknowledgeReminder(
 						gomock.Any(),
+						chatID,
 						int64(13),
-						database.ReminderStatusCanceled,
-						gomock.Any(),
+						telegrammodel.ReminderStatusCanceled,
 					).Return(nil).Times(1),
 					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 						Return(testTelegramResponse(t, telego.Message{MessageID: messageID}), nil).
@@ -3379,7 +3408,7 @@ func TestReminderBotAcknowledgesDeliveredReminders(t *testing.T) {
 			name:   "invalid delivered reminder id returns parse error",
 			data:   telegramui.CallbackReminderDone + "bad",
 			prefix: telegramui.CallbackReminderDone,
-			status: database.ReminderStatusCompleted,
+			status: telegrammodel.ReminderStatusCompleted,
 			before: func(_ *telegoapimock.MockCaller, _ *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 			},
 			expected: struct {
@@ -3390,13 +3419,13 @@ func TestReminderBotAcknowledgesDeliveredReminders(t *testing.T) {
 			name:   "complete delivered reminder service error is returned",
 			data:   telegramui.CallbackReminderDone + "14",
 			prefix: telegramui.CallbackReminderDone,
-			status: database.ReminderStatusCompleted,
+			status: telegrammodel.ReminderStatusCompleted,
 			before: func(_ *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
-				service.EXPECT().CompleteOccurrence(
+				service.EXPECT().AcknowledgeReminder(
 					gomock.Any(),
+					chatID,
 					int64(14),
-					database.ReminderStatusCompleted,
-					gomock.Any(),
+					telegrammodel.ReminderStatusCompleted,
 				).
 					Return(errCompleteDelivered).
 					Times(1)
@@ -3409,7 +3438,7 @@ func TestReminderBotAcknowledgesDeliveredReminders(t *testing.T) {
 			name:   "unsupported delivered reminder status is returned",
 			data:   telegramui.CallbackReminderDone + "15",
 			prefix: telegramui.CallbackReminderDone,
-			status: database.ReminderStatusSent,
+			status: telegrammodel.ReminderStatusSent,
 			before: func(_ *telegoapimock.MockCaller, _ *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 			},
 			expected: struct {
@@ -3491,7 +3520,7 @@ func TestReminderBotHandlesSettingsCallbacks(t *testing.T) {
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
 					repository.EXPECT().UserSettings(gomock.Any(), chatID).
-						Return(database.UserSettings{Timezone: "Europe/Moscow"}, nil).
+						Return(telegrammodel.UserSettings{Timezone: testTimezoneEuropeMoscow}, nil).
 						Times(1),
 					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 						Return(testTelegramResponse(t, telego.Message{MessageID: messageID}), nil).
@@ -3538,14 +3567,14 @@ func TestReminderBotHandlesSettingsCallbacks(t *testing.T) {
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
 					repository.EXPECT().
-						UpdateUserTimezone(gomock.Any(), chatID, "Europe/Moscow").
+						UpdateUserTimezone(gomock.Any(), chatID, testTimezoneEuropeMoscow).
 						Return(nil).
 						Times(1),
 					repository.EXPECT().UserSettings(gomock.Any(), chatID).
-						Return(database.UserSettings{Timezone: "Europe/Moscow"}, nil).
+						Return(telegrammodel.UserSettings{Timezone: testTimezoneEuropeMoscow}, nil).
 						Times(1),
 					repository.EXPECT().UserSettings(gomock.Any(), chatID).
-						Return(database.UserSettings{Timezone: "Europe/Moscow"}, nil).
+						Return(telegrammodel.UserSettings{Timezone: testTimezoneEuropeMoscow}, nil).
 						Times(1),
 					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 						Return(testTelegramResponse(t, telego.Message{MessageID: messageID}), nil).
@@ -3563,20 +3592,20 @@ func TestReminderBotHandlesSettingsCallbacks(t *testing.T) {
 			data: telegramui.CallbackSettingsTimezone,
 			before: func(_ *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				repository.EXPECT().UserSettings(gomock.Any(), chatID).
-					Return(database.UserSettings{}, errSettings).
+					Return(telegrammodel.UserSettings{}, errSettings).
 					Times(1)
 			},
 			expected: struct {
 				handled         bool
 				expectedErrText string
 				waitingFor      telegramui.Field
-			}{handled: true, expectedErrText: "load user settings: settings"},
+			}{handled: true, expectedErrText: "load user settings: get user settings: settings"},
 		},
 		{
 			name: "timezone select callback returns service error",
 			data: telegramui.TimezoneSelectCallback(14),
 			before: func(_ *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
-				repository.EXPECT().UpdateUserTimezone(gomock.Any(), chatID, "Europe/Moscow").
+				repository.EXPECT().UpdateUserTimezone(gomock.Any(), chatID, testTimezoneEuropeMoscow).
 					Return(errTimezoneCity).
 					Times(1)
 			},
@@ -3591,12 +3620,12 @@ func TestReminderBotHandlesSettingsCallbacks(t *testing.T) {
 			data: telegramui.CallbackSettingsIntrusive,
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
-					repository.EXPECT().UserSettings(gomock.Any(), chatID).Return(database.UserSettings{
-						Timezone:          "Europe/Moscow",
+					repository.EXPECT().UserSettings(gomock.Any(), chatID).Return(telegrammodel.UserSettings{
+						Timezone:          testTimezoneEuropeMoscow,
 						IntrusiveInterval: 30 * time.Minute,
 					}, nil).Times(1),
-					repository.EXPECT().UserSettings(gomock.Any(), chatID).Return(database.UserSettings{
-						Timezone:          "Europe/Moscow",
+					repository.EXPECT().UserSettings(gomock.Any(), chatID).Return(telegrammodel.UserSettings{
+						Timezone:          testTimezoneEuropeMoscow,
 						IntrusiveInterval: 30 * time.Minute,
 					}, nil).Times(1),
 					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -3615,21 +3644,21 @@ func TestReminderBotHandlesSettingsCallbacks(t *testing.T) {
 			data: telegramui.CallbackSettingsIntrusiveOn,
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
-					repository.EXPECT().UserSettings(gomock.Any(), chatID).Return(database.UserSettings{
-						Timezone:          "Europe/Moscow",
+					repository.EXPECT().UserSettings(gomock.Any(), chatID).Return(telegrammodel.UserSettings{
+						Timezone:          testTimezoneEuropeMoscow,
 						IntrusiveInterval: time.Minute,
 					}, nil).Times(1),
 					repository.EXPECT().
 						UpdateIntrusiveSettings(gomock.Any(), chatID, true, time.Minute).
 						Return(nil).
 						Times(1),
-					repository.EXPECT().UserSettings(gomock.Any(), chatID).Return(database.UserSettings{
-						Timezone:          "Europe/Moscow",
+					repository.EXPECT().UserSettings(gomock.Any(), chatID).Return(telegrammodel.UserSettings{
+						Timezone:          testTimezoneEuropeMoscow,
 						IntrusiveEnabled:  true,
 						IntrusiveInterval: time.Minute,
 					}, nil).Times(1),
-					repository.EXPECT().UserSettings(gomock.Any(), chatID).Return(database.UserSettings{
-						Timezone:          "Europe/Moscow",
+					repository.EXPECT().UserSettings(gomock.Any(), chatID).Return(telegrammodel.UserSettings{
+						Timezone:          testTimezoneEuropeMoscow,
 						IntrusiveEnabled:  true,
 						IntrusiveInterval: time.Minute,
 					}, nil).Times(1),
@@ -3660,8 +3689,8 @@ func TestReminderBotHandlesSettingsCallbacks(t *testing.T) {
 			data: telegramui.CallbackSettingsIntrusiveOff,
 			before: func(_ *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
-					repository.EXPECT().UserSettings(gomock.Any(), chatID).Return(database.UserSettings{
-						Timezone:          "Europe/Moscow",
+					repository.EXPECT().UserSettings(gomock.Any(), chatID).Return(telegrammodel.UserSettings{
+						Timezone:          testTimezoneEuropeMoscow,
 						IntrusiveInterval: 30 * time.Minute,
 					}, nil).Times(1),
 					repository.EXPECT().
@@ -3723,11 +3752,11 @@ func TestReminderBotSendsListsAndSettingsScreens(t *testing.T) {
 	t.Parallel()
 
 	chatID := int64(345)
-	reminder := database.ReminderView{
+	reminder := telegrammodel.ReminderView{
 		ID:       21,
-		Title:    "Pay rent",
+		Title:    testTextPayRent,
 		RemindAt: time.Date(2099, 6, 2, 9, 30, 0, 0, time.UTC),
-		Status:   database.ReminderStatusCompleted,
+		Status:   telegrammodel.ReminderStatusCompleted,
 	}
 
 	tests := []struct {
@@ -3746,11 +3775,11 @@ func TestReminderBotSendsListsAndSettingsScreens(t *testing.T) {
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				repository.EXPECT().
 					UserSettings(gomock.Any(), chatID).
-					Return(database.UserSettings{Timezone: "UTC"}, nil).
+					Return(telegrammodel.UserSettings{Timezone: testTimezoneUTC}, nil).
 					Times(1)
 				repository.EXPECT().
 					FindRemindersByChat(gomock.Any(), chatID, gomock.Any(), gomock.Any()).
-					Return([]database.ReminderView{reminder}, nil).
+					Return([]telegrammodel.ReminderView{reminder}, nil).
 					Times(1)
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(testTelegramResponse(t, telego.Message{MessageID: 41}), nil).
@@ -3766,11 +3795,11 @@ func TestReminderBotSendsListsAndSettingsScreens(t *testing.T) {
 				gomock.InOrder(
 					repository.EXPECT().
 						UserSettings(gomock.Any(), chatID).
-						Return(database.UserSettings{Timezone: "UTC"}, nil).
+						Return(telegrammodel.UserSettings{Timezone: testTimezoneUTC}, nil).
 						Times(1),
 					repository.EXPECT().
 						FindRemindersByChat(gomock.Any(), chatID, gomock.Any(), gomock.Any()).
-						Return([]database.ReminderView{}, nil).
+						Return([]telegrammodel.ReminderView{}, nil).
 						Times(1),
 					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 						Return(testTelegramResponse(t, telego.Message{MessageID: 42}), nil).
@@ -3787,11 +3816,11 @@ func TestReminderBotSendsListsAndSettingsScreens(t *testing.T) {
 				gomock.InOrder(
 					repository.EXPECT().
 						UserSettings(gomock.Any(), chatID).
-						Return(database.UserSettings{Timezone: "UTC"}, nil).
+						Return(telegrammodel.UserSettings{Timezone: testTimezoneUTC}, nil).
 						Times(1),
 					repository.EXPECT().
 						FindReminderHistoryByChat(gomock.Any(), chatID, gomock.Any(), gomock.Any()).
-						Return([]database.ReminderView{reminder}, nil).
+						Return([]telegrammodel.ReminderView{reminder}, nil).
 						Times(1),
 					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 						Return(testTelegramResponse(t, telego.Message{MessageID: 43}), nil).
@@ -3808,15 +3837,15 @@ func TestReminderBotSendsListsAndSettingsScreens(t *testing.T) {
 				gomock.InOrder(
 					repository.EXPECT().
 						UserSettings(gomock.Any(), chatID).
-						Return(database.UserSettings{
-							Timezone:          "UTC",
+						Return(telegrammodel.UserSettings{
+							Timezone:          testTimezoneUTC,
 							IntrusiveInterval: 30 * time.Minute,
 						}, nil).
 						Times(1),
 					repository.EXPECT().
 						UserSettings(gomock.Any(), chatID).
-						Return(database.UserSettings{
-							Timezone:          "UTC",
+						Return(telegrammodel.UserSettings{
+							Timezone:          testTimezoneUTC,
 							IntrusiveInterval: 30 * time.Minute,
 						}, nil).
 						Times(1),
@@ -3835,7 +3864,7 @@ func TestReminderBotSendsListsAndSettingsScreens(t *testing.T) {
 				gomock.InOrder(
 					repository.EXPECT().
 						UserSettings(gomock.Any(), chatID).
-						Return(database.UserSettings{Timezone: "UTC"}, nil).
+						Return(telegrammodel.UserSettings{Timezone: testTimezoneUTC}, nil).
 						Times(1),
 					repository.EXPECT().
 						FindRemindersByChat(gomock.Any(), chatID, gomock.Any(), gomock.Any()).
@@ -3853,12 +3882,14 @@ func TestReminderBotSendsListsAndSettingsScreens(t *testing.T) {
 				return bot.sendSettings(ctx, chatID)
 			},
 			before: func(_ *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
-				repository.EXPECT().UserSettings(gomock.Any(), chatID).Return(database.UserSettings{}, errSettings).
+				repository.EXPECT().
+					UserSettings(gomock.Any(), chatID).
+					Return(telegrammodel.UserSettings{}, errSettings).
 					Times(1)
 			},
 			expected: struct {
 				expectedErrText string
-			}{expectedErrText: "load chat location settings: settings"},
+			}{expectedErrText: "load chat location settings: get user settings: settings"},
 		},
 	}
 
@@ -3923,14 +3954,14 @@ func TestReminderBotSavesDraft(t *testing.T) {
 	}{
 		{
 			name:  "valid future draft is created and draft is deleted",
-			draft: reminderDraft{title: "Pay rent", date: futureDate, hour: 9, minute: 30},
+			draft: reminderDraft{title: testTextPayRent, date: futureDate, hour: 9, minute: 30},
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
 					service.EXPECT().
-						CreateReminder(gomock.Any(), chatID, "Pay rent", "", gomock.Any()).
-						Return(database.ReminderView{
+						CreateReminder(gomock.Any(), chatID, testTextPayRent, "", gomock.Any()).
+						Return(telegrammodel.ReminderView{
 							ID:       11,
-							Title:    "Pay rent",
+							Title:    testTextPayRent,
 							RemindAt: futureDate.Add(9*time.Hour + 30*time.Minute),
 						}, nil).
 						Times(1),
@@ -3942,14 +3973,14 @@ func TestReminderBotSavesDraft(t *testing.T) {
 		},
 		{
 			name:  "valid future draft with description is created",
-			draft: reminderDraft{title: "Call", description: "Mom", date: futureDate, hour: 12},
+			draft: reminderDraft{title: testTextCall, description: "Mom", date: futureDate, hour: 12},
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
 					service.EXPECT().
-						CreateReminder(gomock.Any(), chatID, "Call", "Mom", gomock.Any()).
-						Return(database.ReminderView{
+						CreateReminder(gomock.Any(), chatID, testTextCall, "Mom", gomock.Any()).
+						Return(telegrammodel.ReminderView{
 							ID:          12,
-							Title:       "Call",
+							Title:       testTextCall,
 							Description: "Mom",
 							RemindAt:    futureDate.Add(12 * time.Hour),
 						}, nil).
@@ -3967,7 +3998,7 @@ func TestReminderBotSavesDraft(t *testing.T) {
 				gomock.InOrder(
 					service.EXPECT().
 						CreateReminder(gomock.Any(), chatID, "Report", "", gomock.Any()).
-						Return(database.ReminderView{
+						Return(telegrammodel.ReminderView{
 							ID:       13,
 							Title:    "Report",
 							RemindAt: futureDate.Add(18*time.Hour + 5*time.Minute),
@@ -3986,7 +4017,7 @@ func TestReminderBotSavesDraft(t *testing.T) {
 				gomock.InOrder(
 					service.EXPECT().
 						CreateReminder(gomock.Any(), chatID, "Night task", "", gomock.Any()).
-						Return(database.ReminderView{
+						Return(telegrammodel.ReminderView{
 							ID:       14,
 							Title:    "Night task",
 							RemindAt: futureDate.Add(23*time.Hour + 55*time.Minute),
@@ -4001,7 +4032,7 @@ func TestReminderBotSavesDraft(t *testing.T) {
 		{
 			name: "valid custom weekdays draft is created with selected weekdays mask",
 			draft: reminderDraft{
-				title:        "Training",
+				title:        testTextTraining,
 				date:         futureDate,
 				hour:         7,
 				repeat:       telegramui.RepeatCustomWeekdays,
@@ -4010,10 +4041,10 @@ func TestReminderBotSavesDraft(t *testing.T) {
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
 					service.EXPECT().
-						CreateWeekdaysReminder(gomock.Any(), chatID, "Training", "", gomock.Any(), 2|8).
-						Return(database.ReminderView{
+						CreateWeekdaysReminder(gomock.Any(), chatID, testTextTraining, "", gomock.Any(), 2|8).
+						Return(telegrammodel.ReminderView{
 							ID:       15,
-							Title:    "Training",
+							Title:    testTextTraining,
 							RemindAt: futureDate.Add(7 * time.Hour),
 						}, nil).
 						Times(1),
@@ -4027,8 +4058,8 @@ func TestReminderBotSavesDraft(t *testing.T) {
 			name: "existing reminder draft updates active reminder",
 			draft: reminderDraft{
 				id:          16,
-				title:       "Pay rent",
-				description: "Card",
+				title:       testTextPayRent,
+				description: testTextCard,
 				date:        futureDate,
 				hour:        8,
 				minute:      45,
@@ -4036,11 +4067,11 @@ func TestReminderBotSavesDraft(t *testing.T) {
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
 					service.EXPECT().
-						UpdateReminder(gomock.Any(), chatID, int64(16), "Pay rent", "Card", gomock.Any()).
-						Return(database.ReminderView{
+						UpdateReminder(gomock.Any(), chatID, int64(16), testTextPayRent, testTextCard, gomock.Any()).
+						Return(telegrammodel.ReminderView{
 							ID:          16,
-							Title:       "Pay rent",
-							Description: "Card",
+							Title:       testTextPayRent,
+							Description: testTextCard,
 							RemindAt:    futureDate.Add(8*time.Hour + 45*time.Minute),
 						}, nil).
 						Times(1),
@@ -4054,8 +4085,8 @@ func TestReminderBotSavesDraft(t *testing.T) {
 			name: "valid holiday draft creates holiday reminder",
 			draft: reminderDraft{
 				kind:        telegramui.DraftKindHoliday,
-				title:       "Днем рождения",
-				description: "Олега",
+				title:       testHolidayBirthdayRu,
+				description: testRecipientOlega,
 				date:        futureDate,
 				hour:        10,
 				minute:      15,
@@ -4063,17 +4094,17 @@ func TestReminderBotSavesDraft(t *testing.T) {
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, _ *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
 					service.EXPECT().
-						CreateHoliday(gomock.Any(), database.HolidayRequest{
+						CreateHoliday(gomock.Any(), telegrammodel.HolidayRequest{
 							TelegramChatID: chatID,
-							HolidayName:    "Днем рождения",
-							RecipientName:  "Олега",
+							HolidayName:    testHolidayBirthdayRu,
+							RecipientName:  testRecipientOlega,
 							HolidayDate:    futureDate,
 							RemindAt:       time.Date(2099, 6, 2, 10, 15, 0, 0, time.Local),
 						}).
-						Return(database.HolidayView{
+						Return(telegrammodel.HolidayView{
 							ID:            31,
-							HolidayName:   "Днем рождения",
-							RecipientName: "Олега",
+							HolidayName:   testHolidayBirthdayRu,
+							RecipientName: testRecipientOlega,
 							HolidayDate:   futureDate,
 							RemindAt:      futureDate.Add(10*time.Hour + 15*time.Minute),
 						}, nil).
@@ -4088,23 +4119,23 @@ func TestReminderBotSavesDraft(t *testing.T) {
 			name: "valid shopping draft creates shopping list",
 			draft: reminderDraft{
 				kind: telegramui.DraftKindShopping,
-				shoppingItems: []database.ShoppingListItem{
-					{Text: "Молоко", Position: 1},
-					{Text: "Хлеб", Position: 2},
+				shoppingItems: []telegrammodel.ShoppingListItem{
+					{Text: testShoppingItemMilkRu, Position: 1},
+					{Text: testShoppingItemBreadRu, Position: 2},
 				},
 			},
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, _ *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
 					service.EXPECT().
-						CreateShoppingList(gomock.Any(), chatID, []database.ShoppingListItem{
-							{Text: "Молоко", Position: 1},
-							{Text: "Хлеб", Position: 2},
+						CreateShoppingList(gomock.Any(), chatID, []telegrammodel.ShoppingListItem{
+							{Text: testShoppingItemMilkRu, Position: 1},
+							{Text: testShoppingItemBreadRu, Position: 2},
 						}).
-						Return(database.ShoppingListView{
+						Return(telegrammodel.ShoppingListView{
 							ID: 41,
-							Items: []database.ShoppingListItem{
-								{ID: 1, Text: "Молоко", Position: 1},
-								{ID: 2, Text: "Хлеб", Position: 2},
+							Items: []telegrammodel.ShoppingListItem{
+								{ID: 1, Text: testShoppingItemMilkRu, Position: 1},
+								{ID: 2, Text: testShoppingItemBreadRu, Position: 2},
 							},
 						}, nil).
 						Times(1),
@@ -4119,28 +4150,28 @@ func TestReminderBotSavesDraft(t *testing.T) {
 			draft: reminderDraft{
 				id:          31,
 				kind:        telegramui.DraftKindHoliday,
-				title:       "годовщиной",
-				description: "Анну",
+				title:       testHolidayAnniversaryRu,
+				description: testRecipientAnnaRu,
 				date:        futureDate,
 				hour:        11,
 			},
 			before: func(caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService, _ *telegrammocks.MockReminderRepository) {
 				gomock.InOrder(
 					service.EXPECT().
-						UpdateHoliday(gomock.Any(), database.HolidayUpdateRequest{
+						UpdateHoliday(gomock.Any(), telegrammodel.HolidayUpdateRequest{
 							ID: 31,
-							HolidayRequest: database.HolidayRequest{
+							HolidayRequest: telegrammodel.HolidayRequest{
 								TelegramChatID: chatID,
-								HolidayName:    "годовщиной",
-								RecipientName:  "Анну",
+								HolidayName:    testHolidayAnniversaryRu,
+								RecipientName:  testRecipientAnnaRu,
 								HolidayDate:    futureDate,
 								RemindAt:       time.Date(2099, 6, 2, 11, 0, 0, 0, time.Local),
 							},
 						}).
-						Return(database.HolidayView{
+						Return(telegrammodel.HolidayView{
 							ID:            31,
-							HolidayName:   "годовщиной",
-							RecipientName: "Анну",
+							HolidayName:   testHolidayAnniversaryRu,
+							RecipientName: testRecipientAnnaRu,
 							HolidayDate:   futureDate,
 							RemindAt:      futureDate.Add(11 * time.Hour),
 						}, nil).
@@ -4211,7 +4242,7 @@ func TestReminderBotSavesDraft(t *testing.T) {
 		{
 			name: "custom weekdays draft without selected weekdays stays open",
 			draft: reminderDraft{
-				title:  "Training",
+				title:  testTextTraining,
 				date:   futureDate,
 				hour:   7,
 				repeat: telegramui.RepeatCustomWeekdays,
@@ -4289,81 +4320,81 @@ func TestReminderBotCreatesDraftReminderVariants(t *testing.T) {
 		draft    reminderDraft
 		before   func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository)
 		expected struct {
-			reminder        database.ReminderView
+			reminder        telegrammodel.ReminderView
 			expectedErrText string
 		}
 	}{
 		{
 			name:  "one time draft creates single reminder",
-			draft: reminderDraft{title: "Pay rent", description: "Card"},
+			draft: reminderDraft{title: testTextPayRent, description: testTextCard},
 			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				service.EXPECT().
-					CreateReminder(gomock.Any(), chatID, "Pay rent", "Card", remindAt).
-					Return(database.ReminderView{ID: 21, Title: "Pay rent"}, nil).
+					CreateReminder(gomock.Any(), chatID, testTextPayRent, testTextCard, remindAt).
+					Return(telegrammodel.ReminderView{ID: 21, Title: testTextPayRent}, nil).
 					Times(1)
 			},
 			expected: struct {
-				reminder        database.ReminderView
+				reminder        telegrammodel.ReminderView
 				expectedErrText string
-			}{reminder: database.ReminderView{ID: 21, Title: "Pay rent"}},
+			}{reminder: telegrammodel.ReminderView{ID: 21, Title: testTextPayRent}},
 		},
 		{
 			name:  "workdays draft creates weekdays reminder with workdays mask",
-			draft: reminderDraft{title: "Standup", repeat: telegramui.RepeatWeekdays},
+			draft: reminderDraft{title: testTextStandup, repeat: telegramui.RepeatWeekdays},
 			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				service.EXPECT().
-					CreateWeekdaysReminder(gomock.Any(), chatID, "Standup", "", remindAt, database.WeekdaysMaskWorkdays).
-					Return(database.ReminderView{ID: 22, Title: "Standup"}, nil).
+					CreateWeekdaysReminder(gomock.Any(), chatID, testTextStandup, "", remindAt, telegrammodel.WeekdaysMaskWorkdays).
+					Return(telegrammodel.ReminderView{ID: 22, Title: testTextStandup}, nil).
 					Times(1)
 			},
 			expected: struct {
-				reminder        database.ReminderView
+				reminder        telegrammodel.ReminderView
 				expectedErrText string
-			}{reminder: database.ReminderView{ID: 22, Title: "Standup"}},
+			}{reminder: telegrammodel.ReminderView{ID: 22, Title: testTextStandup}},
 		},
 		{
 			name: "custom weekdays draft creates weekdays reminder with selected mask",
 			draft: reminderDraft{
-				title:        "Training",
+				title:        testTextTraining,
 				repeat:       telegramui.RepeatCustomWeekdays,
-				weekdaysMask: database.WeekdayMaskTuesday | database.WeekdayMaskThursday,
+				weekdaysMask: telegrammodel.WeekdayMaskTuesday | telegrammodel.WeekdayMaskThursday,
 			},
 			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				service.EXPECT().
 					CreateWeekdaysReminder(
 						gomock.Any(),
 						chatID,
-						"Training",
+						testTextTraining,
 						"",
 						remindAt,
-						database.WeekdayMaskTuesday|database.WeekdayMaskThursday,
+						telegrammodel.WeekdayMaskTuesday|telegrammodel.WeekdayMaskThursday,
 					).
-					Return(database.ReminderView{ID: 23, Title: "Training"}, nil).
+					Return(telegrammodel.ReminderView{ID: 23, Title: testTextTraining}, nil).
 					Times(1)
 			},
 			expected: struct {
-				reminder        database.ReminderView
+				reminder        telegrammodel.ReminderView
 				expectedErrText string
-			}{reminder: database.ReminderView{ID: 23, Title: "Training"}},
+			}{reminder: telegrammodel.ReminderView{ID: 23, Title: testTextTraining}},
 		},
 		{
 			name:  "every two days draft creates interval reminder",
-			draft: reminderDraft{title: "Medicine", repeat: telegramui.RepeatEveryTwoDays},
+			draft: reminderDraft{title: testTextMedicine, repeat: telegramui.RepeatEveryTwoDays},
 			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				service.EXPECT().
-					CreateIntervalReminder(gomock.Any(), chatID, "Medicine", "", remindAt, 2).
-					Return(database.ReminderView{ID: 24, Title: "Medicine"}, nil).
+					CreateIntervalReminder(gomock.Any(), chatID, testTextMedicine, "", remindAt, 2).
+					Return(telegrammodel.ReminderView{ID: 24, Title: testTextMedicine}, nil).
 					Times(1)
 			},
 			expected: struct {
-				reminder        database.ReminderView
+				reminder        telegrammodel.ReminderView
 				expectedErrText string
-			}{reminder: database.ReminderView{ID: 24, Title: "Medicine"}},
+			}{reminder: telegrammodel.ReminderView{ID: 24, Title: testTextMedicine}},
 		},
 		{
 			name: "custom dates draft creates custom dates reminder",
 			draft: reminderDraft{
-				title:       "Trip",
+				title:       testTextTrip,
 				description: "Pack",
 				repeat:      telegramui.RepeatCustomDates,
 				customDates: []time.Time{customDate},
@@ -4375,32 +4406,32 @@ func TestReminderBotCreatesDraftReminderVariants(t *testing.T) {
 					CreateCustomDatesReminder(
 						gomock.Any(),
 						chatID,
-						"Trip",
+						testTextTrip,
 						"Pack",
 						[]time.Time{customDate},
 						8,
 						15,
 						time.Local,
 					).
-					Return(database.ReminderView{ID: 25, Title: "Trip"}, nil).
+					Return(telegrammodel.ReminderView{ID: 25, Title: testTextTrip}, nil).
 					Times(1)
 			},
 			expected: struct {
-				reminder        database.ReminderView
+				reminder        telegrammodel.ReminderView
 				expectedErrText string
-			}{reminder: database.ReminderView{ID: 25, Title: "Trip"}},
+			}{reminder: telegrammodel.ReminderView{ID: 25, Title: testTextTrip}},
 		},
 		{
 			name:  "interval service error is returned",
-			draft: reminderDraft{title: "Medicine", repeat: telegramui.RepeatEveryDay},
+			draft: reminderDraft{title: testTextMedicine, repeat: telegramui.RepeatEveryDay},
 			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
 				service.EXPECT().
-					CreateIntervalReminder(gomock.Any(), chatID, "Medicine", "", remindAt, 1).
-					Return(database.ReminderView{}, errCreateDraftReminder).
+					CreateIntervalReminder(gomock.Any(), chatID, testTextMedicine, "", remindAt, 1).
+					Return(telegrammodel.ReminderView{}, errCreateDraftReminder).
 					Times(1)
 			},
 			expected: struct {
-				reminder        database.ReminderView
+				reminder        telegrammodel.ReminderView
 				expectedErrText string
 			}{expectedErrText: "create interval reminder: create draft reminder"},
 		},
@@ -4409,7 +4440,7 @@ func TestReminderBotCreatesDraftReminderVariants(t *testing.T) {
 			draft:  reminderDraft{title: "Unknown", repeat: telegramui.Repeat("unsupported")},
 			before: func(_ *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {},
 			expected: struct {
-				reminder        database.ReminderView
+				reminder        telegrammodel.ReminderView
 				expectedErrText string
 			}{expectedErrText: "unsupported reminder repeat: unsupported"},
 		},
@@ -4465,7 +4496,7 @@ func TestReminderBotConfigurationHelpers(t *testing.T) {
 				require.NoError(t, err)
 
 				bot := NewReminderBot(
-					&Sender{bot: botAPI},
+					notificationtelegram.NewWithBot(botAPI, config.Telegram{}),
 					telegrammocks.NewMockReminderService(ctrl),
 					telegrammocks.NewMockReminderRepository(ctrl),
 					config.Telegram{},

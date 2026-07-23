@@ -58,9 +58,19 @@ func validate(cfg Config) error {
 type Config struct {
 	AppConfig `validate:"required" yaml:"app"`
 	Logger    `validate:"required" yaml:"logger"`
+	HTTP      `validate:"required" yaml:"http"`
 	Scheduler `validate:"required" yaml:"scheduler"`
 	Telegram  `validate:"required" yaml:"telegram"`
 	Database  `validate:"required" yaml:"database"`
+}
+
+type HTTP struct {
+	Host            string        `default:"0.0.0.0" validate:"required"                 yaml:"host"             env:"HTTP_HOST"`
+	Port            int           `default:"8080"    validate:"required,min=1,max=65535" yaml:"port"             env:"HTTP_PORT"`
+	ReadTimeout     time.Duration `default:"5s"      validate:"required,gt=0"            yaml:"read_timeout"`
+	WriteTimeout    time.Duration `default:"10s"     validate:"required,gt=0"            yaml:"write_timeout"`
+	IdleTimeout     time.Duration `default:"60s"     validate:"required,gt=0"            yaml:"idle_timeout"`
+	ShutdownTimeout time.Duration `default:"5s"      validate:"required,gt=0"            yaml:"shutdown_timeout"`
 }
 
 type Scheduler struct {
@@ -93,6 +103,7 @@ type LoggerCore struct {
 type Telegram struct {
 	TokenEnv            string        `default:"TELEGRAM_BOT_TOKEN"       validate:"required"       yaml:"token_env"`
 	APIBaseURL          string        `default:"https://api.telegram.org" validate:"required,url"   yaml:"api_base_url"`
+	BackendBaseURL      string        `                                   validate:"omitempty,url"  yaml:"backend_base_url"      env:"TELEGRAM_BACKEND_BASE_URL"`
 	RequestTimeout      time.Duration `default:"10s"                      validate:"required,gt=0"  yaml:"request_timeout"`
 	DebugMode           bool          `default:"false"                                              yaml:"debug_mode"`
 	Warnings            bool          `default:"true"                                               yaml:"warnings"`

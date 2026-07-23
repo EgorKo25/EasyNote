@@ -110,6 +110,20 @@ func (m *MockReminderCommandRepository) EXPECT() *MockReminderCommandRepositoryM
 	return m.recorder
 }
 
+// AcknowledgeReminder mocks base method.
+func (m *MockReminderCommandRepository) AcknowledgeReminder(ctx context.Context, telegramChatID, reminderID int64, status database.ReminderStatus) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AcknowledgeReminder", ctx, telegramChatID, reminderID, status)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// AcknowledgeReminder indicates an expected call of AcknowledgeReminder.
+func (mr *MockReminderCommandRepositoryMockRecorder) AcknowledgeReminder(ctx, telegramChatID, reminderID, status any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AcknowledgeReminder", reflect.TypeOf((*MockReminderCommandRepository)(nil).AcknowledgeReminder), ctx, telegramChatID, reminderID, status)
+}
+
 // CancelReminder mocks base method.
 func (m *MockReminderCommandRepository) CancelReminder(ctx context.Context, telegramChatID, reminderID int64) error {
 	m.ctrl.T.Helper()
@@ -258,6 +272,21 @@ func (mr *MockReminderCommandRepositoryMockRecorder) ReminderByID(ctx, telegramC
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReminderByID", reflect.TypeOf((*MockReminderCommandRepository)(nil).ReminderByID), ctx, telegramChatID, reminderID)
 }
 
+// ReminderStatsByChat mocks base method.
+func (m *MockReminderCommandRepository) ReminderStatsByChat(ctx context.Context, telegramChatID int64) (database.ReminderStats, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReminderStatsByChat", ctx, telegramChatID)
+	ret0, _ := ret[0].(database.ReminderStats)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReminderStatsByChat indicates an expected call of ReminderStatsByChat.
+func (mr *MockReminderCommandRepositoryMockRecorder) ReminderStatsByChat(ctx, telegramChatID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReminderStatsByChat", reflect.TypeOf((*MockReminderCommandRepository)(nil).ReminderStatsByChat), ctx, telegramChatID)
+}
+
 // ShoppingListByID mocks base method.
 func (m *MockReminderCommandRepository) ShoppingListByID(ctx context.Context, telegramChatID, listID int64) (database.ShoppingListView, error) {
 	m.ctrl.T.Helper()
@@ -303,6 +332,20 @@ func (mr *MockReminderCommandRepositoryMockRecorder) UpdateHoliday(ctx, request 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateHoliday", reflect.TypeOf((*MockReminderCommandRepository)(nil).UpdateHoliday), ctx, request)
 }
 
+// UpdateIntrusiveSettings mocks base method.
+func (m *MockReminderCommandRepository) UpdateIntrusiveSettings(ctx context.Context, telegramChatID int64, enabled bool, interval time.Duration) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateIntrusiveSettings", ctx, telegramChatID, enabled, interval)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateIntrusiveSettings indicates an expected call of UpdateIntrusiveSettings.
+func (mr *MockReminderCommandRepositoryMockRecorder) UpdateIntrusiveSettings(ctx, telegramChatID, enabled, interval any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateIntrusiveSettings", reflect.TypeOf((*MockReminderCommandRepository)(nil).UpdateIntrusiveSettings), ctx, telegramChatID, enabled, interval)
+}
+
 // UpdateReminder mocks base method.
 func (m *MockReminderCommandRepository) UpdateReminder(ctx context.Context, telegramChatID, reminderID int64, title, description string, remindAt time.Time) (database.ReminderView, error) {
 	m.ctrl.T.Helper()
@@ -316,4 +359,33 @@ func (m *MockReminderCommandRepository) UpdateReminder(ctx context.Context, tele
 func (mr *MockReminderCommandRepositoryMockRecorder) UpdateReminder(ctx, telegramChatID, reminderID, title, description, remindAt any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateReminder", reflect.TypeOf((*MockReminderCommandRepository)(nil).UpdateReminder), ctx, telegramChatID, reminderID, title, description, remindAt)
+}
+
+// UpdateUserTimezone mocks base method.
+func (m *MockReminderCommandRepository) UpdateUserTimezone(ctx context.Context, telegramChatID int64, timezone string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateUserTimezone", ctx, telegramChatID, timezone)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateUserTimezone indicates an expected call of UpdateUserTimezone.
+func (mr *MockReminderCommandRepositoryMockRecorder) UpdateUserTimezone(ctx, telegramChatID, timezone any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateUserTimezone", reflect.TypeOf((*MockReminderCommandRepository)(nil).UpdateUserTimezone), ctx, telegramChatID, timezone)
+}
+
+// UserSettings mocks base method.
+func (m *MockReminderCommandRepository) UserSettings(ctx context.Context, telegramChatID int64) (database.UserSettings, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UserSettings", ctx, telegramChatID)
+	ret0, _ := ret[0].(database.UserSettings)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UserSettings indicates an expected call of UserSettings.
+func (mr *MockReminderCommandRepositoryMockRecorder) UserSettings(ctx, telegramChatID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UserSettings", reflect.TypeOf((*MockReminderCommandRepository)(nil).UserSettings), ctx, telegramChatID)
 }
