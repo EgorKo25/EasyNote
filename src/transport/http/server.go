@@ -37,6 +37,7 @@ func (s *Server) Info() string {
 
 func (s *Server) Run(ctx context.Context) error {
 	errCh := make(chan error, 1)
+
 	go func() {
 		errCh <- s.server.ListenAndServe()
 	}()

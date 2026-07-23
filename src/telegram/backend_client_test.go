@@ -1,4 +1,4 @@
-//nolint:lll,testpackage,goconst // Tests cover backend client fixtures with inline JSON and internal response models.
+//nolint:lll,testpackage // Tests cover backend client fixtures with inline JSON and internal response models.
 package telegram
 
 import (
@@ -50,7 +50,7 @@ func TestBackendClientSendsTelegramChatRequests(t *testing.T) {
 				expectedErrText string
 			}{
 				result:         "3/2/1",
-				requestPath:    "/api/v1/dashboard",
+				requestPath:    testBackendPathDashboard,
 				telegramHeader: "123456",
 			},
 		},
@@ -71,7 +71,7 @@ func TestBackendClientSendsTelegramChatRequests(t *testing.T) {
 				expectedErrText string
 			}{
 				result:         "4/5/6",
-				requestPath:    "/api/v1/dashboard",
+				requestPath:    testBackendPathDashboard,
 				telegramHeader: "123456",
 			},
 		},
@@ -91,7 +91,7 @@ func TestBackendClientSendsTelegramChatRequests(t *testing.T) {
 				expectedErrText string
 			}{
 				result:         "Europe/Moscow|30m0s",
-				requestPath:    "/api/v1/settings",
+				requestPath:    testBackendPathSettings,
 				telegramHeader: "123456",
 			},
 		},
@@ -116,7 +116,7 @@ func TestBackendClientSendsTelegramChatRequests(t *testing.T) {
 				expectedErrText string
 			}{
 				result:         "Asia/Novosibirsk|false|45m0s",
-				requestPath:    "/api/v1/settings",
+				requestPath:    testBackendPathSettings,
 				telegramHeader: "123456",
 			},
 		},
@@ -196,7 +196,7 @@ func TestBackendClientSendsTelegramChatRequests(t *testing.T) {
 				expectedErrText string
 			}{
 				result:         "10|Created",
-				requestPath:    "/api/v1/reminders",
+				requestPath:    testBackendPathReminders,
 				telegramHeader: "123456",
 			},
 		},
@@ -216,7 +216,7 @@ func TestBackendClientSendsTelegramChatRequests(t *testing.T) {
 				expectedErrText string
 			}{
 				result:         "11|Interval",
-				requestPath:    "/api/v1/reminders",
+				requestPath:    testBackendPathReminders,
 				telegramHeader: "123456",
 			},
 		},
@@ -236,7 +236,7 @@ func TestBackendClientSendsTelegramChatRequests(t *testing.T) {
 				expectedErrText string
 			}{
 				result:         "12|Weekdays",
-				requestPath:    "/api/v1/reminders",
+				requestPath:    testBackendPathReminders,
 				telegramHeader: "123456",
 			},
 		},
@@ -265,7 +265,7 @@ func TestBackendClientSendsTelegramChatRequests(t *testing.T) {
 				expectedErrText string
 			}{
 				result:         "13|Custom",
-				requestPath:    "/api/v1/reminders",
+				requestPath:    testBackendPathReminders,
 				telegramHeader: "123456",
 			},
 		},
@@ -356,8 +356,8 @@ func TestBackendClientSendsTelegramChatRequests(t *testing.T) {
 			action: func(ctx context.Context, client *BackendClient) (string, error) {
 				holiday, err := client.CreateHoliday(ctx, telegrammodel.HolidayRequest{
 					TelegramChatID: chatID,
-					HolidayName:    "Birthday",
-					RecipientName:  "Oleg",
+					HolidayName:    testHolidayNameBirthday,
+					RecipientName:  testHolidayRecipientOleg,
 					HolidayDate:    holidayDate,
 					RemindAt:       remindAt,
 				})
@@ -469,7 +469,11 @@ func TestBackendClientSendsTelegramChatRequests(t *testing.T) {
 			responseStatus: http.StatusOK,
 			responseBody:   `{"shopping_list":{"id":23,"telegram_chat_id":123456,"created_at":"2026-07-20T09:00:00Z","items":[{"id":24,"list_id":23,"text":"Milk","done":false,"position":1,"created_at":"2026-07-20T09:00:00Z"}]}}`,
 			action: func(ctx context.Context, client *BackendClient) (string, error) {
-				list, err := client.CreateShoppingList(ctx, chatID, []telegrammodel.ShoppingListItem{{Text: "Milk"}})
+				list, err := client.CreateShoppingList(
+					ctx,
+					chatID,
+					[]telegrammodel.ShoppingListItem{{Text: testTextMilk}},
+				)
 
 				return fmt.Sprintf("%d|%s", list.ID, list.Items[0].Text), err
 			},
@@ -549,7 +553,7 @@ func TestBackendClientSendsTelegramChatRequests(t *testing.T) {
 			responseStatus: http.StatusOK,
 			responseBody:   `{"settings":{"telegram_chat_id":123456,"language":"ru","timezone":"Europe/Moscow","intrusive_enabled":true,"intrusive_interval_minutes":30,"updated_at":"2026-07-20T10:00:00Z"}}`,
 			action: func(ctx context.Context, client *BackendClient) (string, error) {
-				err := client.UpdateUserTimezone(ctx, chatID, "Europe/Moscow")
+				err := client.UpdateUserTimezone(ctx, chatID, testTimezoneEuropeMoscow)
 
 				return "timezone updated", err
 			},
@@ -560,7 +564,7 @@ func TestBackendClientSendsTelegramChatRequests(t *testing.T) {
 				expectedErrText string
 			}{
 				result:         "timezone updated",
-				requestPath:    "/api/v1/settings",
+				requestPath:    testBackendPathSettings,
 				telegramHeader: "123456",
 			},
 		},
@@ -580,7 +584,7 @@ func TestBackendClientSendsTelegramChatRequests(t *testing.T) {
 				expectedErrText string
 			}{
 				result:         "intrusive updated",
-				requestPath:    "/api/v1/settings",
+				requestPath:    testBackendPathSettings,
 				telegramHeader: "123456",
 			},
 		},
@@ -619,7 +623,7 @@ func TestBackendClientSendsTelegramChatRequests(t *testing.T) {
 				expectedErrText string
 			}{
 				result:          "0/0/0",
-				requestPath:     "/api/v1/dashboard",
+				requestPath:     testBackendPathDashboard,
 				telegramHeader:  "123456",
 				expectedErrText: "load dashboard from backend: backend request failed with status 500: internal server error",
 			},

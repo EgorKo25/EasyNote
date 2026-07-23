@@ -1,4 +1,4 @@
-//nolint:testpackage,maintidx,goconst // Tests exercise unexported one-tick processing without adding production hooks.
+//nolint:testpackage,maintidx // Tests exercise unexported one-tick processing without adding production hooks.
 package scheduler
 
 import (
@@ -22,6 +22,8 @@ var (
 	errCompleteOccurrence = errors.New("complete reminder")
 )
 
+const testTimezoneUTC = "UTC"
+
 func TestRunnerProcessesReadyReminders(t *testing.T) {
 	t.Parallel()
 
@@ -29,10 +31,10 @@ func TestRunnerProcessesReadyReminders(t *testing.T) {
 	pollInterval := time.Minute
 	retryInterval := 5 * time.Second
 	firstReminder := database.ScheduledReminder{
-		ID: 1, NoteID: 10, TelegramChatID: 100, Title: "first", Timezone: "UTC",
+		ID: 1, NoteID: 10, TelegramChatID: 100, Title: "first", Timezone: testTimezoneUTC,
 	}
 	secondReminder := database.ScheduledReminder{
-		ID: 2, NoteID: 20, TelegramChatID: 200, Title: "second", Timezone: "UTC",
+		ID: 2, NoteID: 20, TelegramChatID: 200, Title: "second", Timezone: testTimezoneUTC,
 	}
 
 	type expected struct {
@@ -597,7 +599,7 @@ func TestRunnerProcessesDueHolidays(t *testing.T) {
 		HolidayName:    "Birthday",
 		RecipientName:  "Oleg",
 		RemindAt:       baseTime,
-		Timezone:       "UTC",
+		Timezone:       testTimezoneUTC,
 	}
 
 	type expected struct {

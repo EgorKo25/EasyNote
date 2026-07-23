@@ -1,4 +1,4 @@
-//nolint:goconst,wrapcheck,err113 // Tests intentionally keep repeated fixture values and direct action errors.
+//nolint:wrapcheck,err113 // Tests intentionally keep direct action errors.
 package service_test
 
 import (
@@ -27,6 +27,32 @@ var (
 	errExpectedReminderNotFound = errors.New("delete reminder: reminder not found")
 )
 
+const (
+	svcTitlePayRent       = "Pay rent"
+	svcDescBeforeLunch    = "Before lunch"
+	svcTitlePayRentSpaced = "  Pay rent  "
+	svcEmptyTitleCase     = "empty title returns validation error"
+	svcHolidayBirthday    = "Birthday"
+	svcHolidayOleg        = "Oleg"
+	svcHolidayAnniversary = "Anniversary"
+	svcItemMilk           = "Milk"
+	svcItemBread          = "Bread"
+	svcTzMoscow           = "Europe/Moscow"
+	svcTitleWorkStandup   = "Work standup"
+	svcTitleTraining      = "Training"
+	svcTitleWeekendPlan   = "Weekend plan"
+	svcTitleReview        = "Review"
+	svcDescWeekly         = "Weekly"
+	svcTitleMedicine      = "Medicine"
+	svcDescMorning        = "Morning"
+	svcTitleWaterPlants   = "Water plants"
+	svcTitleReport        = "Report"
+	svcTitleTrip          = "Trip"
+	svcTitleDoctor        = "Doctor"
+	svcTitleTickets       = "Tickets"
+	svcDescCard           = "Card"
+)
+
 func errorText(err error) string {
 	if err == nil {
 		return ""
@@ -53,68 +79,68 @@ func TestReminderServiceCreatesReminder(t *testing.T) {
 	}{
 		{
 			name:  "creates reminder with description",
-			title: "Pay rent",
-			desc:  "Before lunch",
+			title: svcTitlePayRent,
+			desc:  svcDescBeforeLunch,
 			before: func(planner *mocks.MockReminderCreationPlanner) {
 				planner.EXPECT().
-					CreateSingleOccurrence(gomock.Any(), chatID, "Pay rent", "Before lunch", remindAt).
-					Return(database.ReminderView{ID: 1, Title: "Pay rent", Description: "Before lunch"}, nil).
+					CreateSingleOccurrence(gomock.Any(), chatID, svcTitlePayRent, svcDescBeforeLunch, remindAt).
+					Return(database.ReminderView{ID: 1, Title: svcTitlePayRent, Description: svcDescBeforeLunch}, nil).
 					Times(1)
 			},
 			expected: struct {
 				reminder    domain.ReminderView
 				expectedErr error
-			}{reminder: domain.ReminderView{ID: 1, Title: "Pay rent", Description: "Before lunch"}},
+			}{reminder: domain.ReminderView{ID: 1, Title: svcTitlePayRent, Description: svcDescBeforeLunch}},
 		},
 		{
 			name:  "trims title before create",
-			title: "  Pay rent  ",
-			desc:  "Before lunch",
+			title: svcTitlePayRentSpaced,
+			desc:  svcDescBeforeLunch,
 			before: func(planner *mocks.MockReminderCreationPlanner) {
 				planner.EXPECT().
-					CreateSingleOccurrence(gomock.Any(), chatID, "Pay rent", "Before lunch", remindAt).
-					Return(database.ReminderView{ID: 2, Title: "Pay rent", Description: "Before lunch"}, nil).
+					CreateSingleOccurrence(gomock.Any(), chatID, svcTitlePayRent, svcDescBeforeLunch, remindAt).
+					Return(database.ReminderView{ID: 2, Title: svcTitlePayRent, Description: svcDescBeforeLunch}, nil).
 					Times(1)
 			},
 			expected: struct {
 				reminder    domain.ReminderView
 				expectedErr error
-			}{reminder: domain.ReminderView{ID: 2, Title: "Pay rent", Description: "Before lunch"}},
+			}{reminder: domain.ReminderView{ID: 2, Title: svcTitlePayRent, Description: svcDescBeforeLunch}},
 		},
 		{
 			name:  "trims description before create",
-			title: "Pay rent",
+			title: svcTitlePayRent,
 			desc:  "  Before lunch  ",
 			before: func(planner *mocks.MockReminderCreationPlanner) {
 				planner.EXPECT().
-					CreateSingleOccurrence(gomock.Any(), chatID, "Pay rent", "Before lunch", remindAt).
-					Return(database.ReminderView{ID: 3, Title: "Pay rent", Description: "Before lunch"}, nil).
+					CreateSingleOccurrence(gomock.Any(), chatID, svcTitlePayRent, svcDescBeforeLunch, remindAt).
+					Return(database.ReminderView{ID: 3, Title: svcTitlePayRent, Description: svcDescBeforeLunch}, nil).
 					Times(1)
 			},
 			expected: struct {
 				reminder    domain.ReminderView
 				expectedErr error
-			}{reminder: domain.ReminderView{ID: 3, Title: "Pay rent", Description: "Before lunch"}},
+			}{reminder: domain.ReminderView{ID: 3, Title: svcTitlePayRent, Description: svcDescBeforeLunch}},
 		},
 		{
 			name:  "creates reminder without description",
-			title: "Pay rent",
+			title: svcTitlePayRent,
 			desc:  "",
 			before: func(planner *mocks.MockReminderCreationPlanner) {
 				planner.EXPECT().
-					CreateSingleOccurrence(gomock.Any(), chatID, "Pay rent", "", remindAt).
-					Return(database.ReminderView{ID: 4, Title: "Pay rent"}, nil).
+					CreateSingleOccurrence(gomock.Any(), chatID, svcTitlePayRent, "", remindAt).
+					Return(database.ReminderView{ID: 4, Title: svcTitlePayRent}, nil).
 					Times(1)
 			},
 			expected: struct {
 				reminder    domain.ReminderView
 				expectedErr error
-			}{reminder: domain.ReminderView{ID: 4, Title: "Pay rent"}},
+			}{reminder: domain.ReminderView{ID: 4, Title: svcTitlePayRent}},
 		},
 		{
-			name:  "empty title returns validation error",
+			name:  svcEmptyTitleCase,
 			title: " ",
-			desc:  "Before lunch",
+			desc:  svcDescBeforeLunch,
 			before: func(_ *mocks.MockReminderCreationPlanner) {
 			},
 			expected: struct {
@@ -124,11 +150,11 @@ func TestReminderServiceCreatesReminder(t *testing.T) {
 		},
 		{
 			name:  "repository create error is returned",
-			title: "Pay rent",
-			desc:  "Before lunch",
+			title: svcTitlePayRent,
+			desc:  svcDescBeforeLunch,
 			before: func(planner *mocks.MockReminderCreationPlanner) {
 				planner.EXPECT().
-					CreateSingleOccurrence(gomock.Any(), chatID, "Pay rent", "Before lunch", remindAt).
+					CreateSingleOccurrence(gomock.Any(), chatID, svcTitlePayRent, svcDescBeforeLunch, remindAt).
 					Return(database.ReminderView{}, errCreateReminderRepository).
 					Times(1)
 			},
@@ -189,68 +215,68 @@ func TestReminderServiceUpdatesReminder(t *testing.T) {
 	}{
 		{
 			name:  "updates reminder with description",
-			title: "Pay rent",
-			desc:  "Before lunch",
+			title: svcTitlePayRent,
+			desc:  svcDescBeforeLunch,
 			before: func(repository *mocks.MockReminderCommandRepository) {
 				repository.EXPECT().
-					UpdateReminder(gomock.Any(), chatID, reminderID, "Pay rent", "Before lunch", remindAt).
-					Return(database.ReminderView{ID: reminderID, Title: "Pay rent", Description: "Before lunch"}, nil).
+					UpdateReminder(gomock.Any(), chatID, reminderID, svcTitlePayRent, svcDescBeforeLunch, remindAt).
+					Return(database.ReminderView{ID: reminderID, Title: svcTitlePayRent, Description: svcDescBeforeLunch}, nil).
 					Times(1)
 			},
 			expected: struct {
 				reminder        domain.ReminderView
 				expectedErrText string
-			}{reminder: domain.ReminderView{ID: reminderID, Title: "Pay rent", Description: "Before lunch"}},
+			}{reminder: domain.ReminderView{ID: reminderID, Title: svcTitlePayRent, Description: svcDescBeforeLunch}},
 		},
 		{
 			name:  "trims title before update",
-			title: "  Pay rent  ",
-			desc:  "Before lunch",
+			title: svcTitlePayRentSpaced,
+			desc:  svcDescBeforeLunch,
 			before: func(repository *mocks.MockReminderCommandRepository) {
 				repository.EXPECT().
-					UpdateReminder(gomock.Any(), chatID, reminderID, "Pay rent", "Before lunch", remindAt).
-					Return(database.ReminderView{ID: reminderID, Title: "Pay rent", Description: "Before lunch"}, nil).
+					UpdateReminder(gomock.Any(), chatID, reminderID, svcTitlePayRent, svcDescBeforeLunch, remindAt).
+					Return(database.ReminderView{ID: reminderID, Title: svcTitlePayRent, Description: svcDescBeforeLunch}, nil).
 					Times(1)
 			},
 			expected: struct {
 				reminder        domain.ReminderView
 				expectedErrText string
-			}{reminder: domain.ReminderView{ID: reminderID, Title: "Pay rent", Description: "Before lunch"}},
+			}{reminder: domain.ReminderView{ID: reminderID, Title: svcTitlePayRent, Description: svcDescBeforeLunch}},
 		},
 		{
 			name:  "trims description before update",
-			title: "Pay rent",
+			title: svcTitlePayRent,
 			desc:  "  Before lunch  ",
 			before: func(repository *mocks.MockReminderCommandRepository) {
 				repository.EXPECT().
-					UpdateReminder(gomock.Any(), chatID, reminderID, "Pay rent", "Before lunch", remindAt).
-					Return(database.ReminderView{ID: reminderID, Title: "Pay rent", Description: "Before lunch"}, nil).
+					UpdateReminder(gomock.Any(), chatID, reminderID, svcTitlePayRent, svcDescBeforeLunch, remindAt).
+					Return(database.ReminderView{ID: reminderID, Title: svcTitlePayRent, Description: svcDescBeforeLunch}, nil).
 					Times(1)
 			},
 			expected: struct {
 				reminder        domain.ReminderView
 				expectedErrText string
-			}{reminder: domain.ReminderView{ID: reminderID, Title: "Pay rent", Description: "Before lunch"}},
+			}{reminder: domain.ReminderView{ID: reminderID, Title: svcTitlePayRent, Description: svcDescBeforeLunch}},
 		},
 		{
 			name:  "updates reminder without description",
-			title: "Pay rent",
+			title: svcTitlePayRent,
 			desc:  "",
 			before: func(repository *mocks.MockReminderCommandRepository) {
 				repository.EXPECT().
-					UpdateReminder(gomock.Any(), chatID, reminderID, "Pay rent", "", remindAt).
-					Return(database.ReminderView{ID: reminderID, Title: "Pay rent"}, nil).
+					UpdateReminder(gomock.Any(), chatID, reminderID, svcTitlePayRent, "", remindAt).
+					Return(database.ReminderView{ID: reminderID, Title: svcTitlePayRent}, nil).
 					Times(1)
 			},
 			expected: struct {
 				reminder        domain.ReminderView
 				expectedErrText string
-			}{reminder: domain.ReminderView{ID: reminderID, Title: "Pay rent"}},
+			}{reminder: domain.ReminderView{ID: reminderID, Title: svcTitlePayRent}},
 		},
 		{
-			name:  "empty title returns validation error",
+			name:  svcEmptyTitleCase,
 			title: " ",
-			desc:  "Before lunch",
+			desc:  svcDescBeforeLunch,
 			before: func(_ *mocks.MockReminderCommandRepository) {
 			},
 			expected: struct {
@@ -260,11 +286,11 @@ func TestReminderServiceUpdatesReminder(t *testing.T) {
 		},
 		{
 			name:  "repository update error is returned",
-			title: "Pay rent",
-			desc:  "Before lunch",
+			title: svcTitlePayRent,
+			desc:  svcDescBeforeLunch,
 			before: func(repository *mocks.MockReminderCommandRepository) {
 				repository.EXPECT().
-					UpdateReminder(gomock.Any(), chatID, reminderID, "Pay rent", "Before lunch", remindAt).
+					UpdateReminder(gomock.Any(), chatID, reminderID, svcTitlePayRent, svcDescBeforeLunch, remindAt).
 					Return(database.ReminderView{}, errUpdateReminderRepository).
 					Times(1)
 			},
@@ -329,12 +355,12 @@ func TestReminderServiceManagesHolidays(t *testing.T) {
 				repository.EXPECT().
 					CreateHoliday(gomock.Any(), database.HolidayRequest{
 						TelegramChatID: chatID,
-						HolidayName:    "Birthday",
-						RecipientName:  "Oleg",
+						HolidayName:    svcHolidayBirthday,
+						RecipientName:  svcHolidayOleg,
 						HolidayDate:    holidayDate,
 						RemindAt:       remindAt,
 					}).
-					Return(database.HolidayView{ID: holidayID, HolidayName: "Birthday"}, nil).
+					Return(database.HolidayView{ID: holidayID, HolidayName: svcHolidayBirthday}, nil).
 					Times(1)
 			},
 			action: func(reminderService *service.ReminderService) (string, string) {
@@ -351,7 +377,7 @@ func TestReminderServiceManagesHolidays(t *testing.T) {
 			expected: struct {
 				result          string
 				expectedErrText string
-			}{result: "Birthday"},
+			}{result: svcHolidayBirthday},
 		},
 		{
 			name: "update holiday trims name fields and returns updated holiday",
@@ -361,13 +387,13 @@ func TestReminderServiceManagesHolidays(t *testing.T) {
 						ID: holidayID,
 						HolidayRequest: database.HolidayRequest{
 							TelegramChatID: chatID,
-							HolidayName:    "Anniversary",
+							HolidayName:    svcHolidayAnniversary,
 							RecipientName:  "Anna",
 							HolidayDate:    holidayDate,
 							RemindAt:       remindAt,
 						},
 					}).
-					Return(database.HolidayView{ID: holidayID, HolidayName: "Anniversary"}, nil).
+					Return(database.HolidayView{ID: holidayID, HolidayName: svcHolidayAnniversary}, nil).
 					Times(1)
 			},
 			action: func(reminderService *service.ReminderService) (string, string) {
@@ -387,7 +413,7 @@ func TestReminderServiceManagesHolidays(t *testing.T) {
 			expected: struct {
 				result          string
 				expectedErrText string
-			}{result: "Anniversary"},
+			}{result: svcHolidayAnniversary},
 		},
 		{
 			name: "find holidays returns repository page",
@@ -415,7 +441,7 @@ func TestReminderServiceManagesHolidays(t *testing.T) {
 			before: func(repository *mocks.MockReminderCommandRepository) {
 				repository.EXPECT().
 					HolidayByID(gomock.Any(), chatID, holidayID).
-					Return(database.HolidayView{ID: holidayID, RecipientName: "Oleg"}, nil).
+					Return(database.HolidayView{ID: holidayID, RecipientName: svcHolidayOleg}, nil).
 					Times(1)
 			},
 			action: func(reminderService *service.ReminderService) (string, string) {
@@ -426,7 +452,7 @@ func TestReminderServiceManagesHolidays(t *testing.T) {
 			expected: struct {
 				result          string
 				expectedErrText string
-			}{result: "Oleg"},
+			}{result: svcHolidayOleg},
 		},
 		{
 			name: "delete holiday returns nil after repository delete",
@@ -457,8 +483,8 @@ func TestReminderServiceManagesHolidays(t *testing.T) {
 			action: func(reminderService *service.ReminderService) (string, string) {
 				holiday, err := reminderService.CreateHoliday(context.Background(), domain.HolidayRequest{
 					TelegramChatID: chatID,
-					HolidayName:    "Birthday",
-					RecipientName:  "Oleg",
+					HolidayName:    svcHolidayBirthday,
+					RecipientName:  svcHolidayOleg,
 					HolidayDate:    holidayDate,
 					RemindAt:       remindAt,
 				})
@@ -525,7 +551,7 @@ func TestReminderServiceManagesShoppingLists(t *testing.T) {
 	chatID := int64(100)
 	listID := int64(9)
 	itemID := int64(10)
-	items := []database.ShoppingListItem{{Text: "Milk", Position: 1}, {Text: "Bread", Position: 2}}
+	items := []database.ShoppingListItem{{Text: svcItemMilk, Position: 1}, {Text: svcItemBread, Position: 2}}
 	unexpectedList := "unexpected list"
 
 	tests := []struct {
@@ -547,8 +573,8 @@ func TestReminderServiceManagesShoppingLists(t *testing.T) {
 			},
 			action: func(reminderService *service.ReminderService) (string, string) {
 				list, err := reminderService.CreateShoppingList(context.Background(), chatID, []domain.ShoppingListItem{
-					{Text: "Milk", Position: 1},
-					{Text: "Bread", Position: 2},
+					{Text: svcItemMilk, Position: 1},
+					{Text: svcItemBread, Position: 2},
 				})
 				if len(list.Items) == 2 {
 					return "two items", errorText(err)
@@ -610,7 +636,7 @@ func TestReminderServiceManagesShoppingLists(t *testing.T) {
 					ToggleShoppingListItem(gomock.Any(), chatID, itemID).
 					Return(database.ShoppingListView{ID: listID, Items: []database.ShoppingListItem{{
 						ID:   itemID,
-						Text: "Milk",
+						Text: svcItemMilk,
 						Done: true,
 					}}}, nil).
 					Times(1)
@@ -663,8 +689,8 @@ func TestReminderServiceManagesShoppingLists(t *testing.T) {
 			},
 			action: func(reminderService *service.ReminderService) (string, string) {
 				list, err := reminderService.CreateShoppingList(context.Background(), chatID, []domain.ShoppingListItem{
-					{Text: "Milk", Position: 1},
-					{Text: "Bread", Position: 2},
+					{Text: svcItemMilk, Position: 1},
+					{Text: svcItemBread, Position: 2},
 				})
 				if list.ID == 0 {
 					return "", errorText(err)
@@ -734,7 +760,7 @@ func TestReminderServiceProvidesReadAndSettingsOperations(t *testing.T) {
 	settings := database.UserSettings{
 		TelegramChatID:    chatID,
 		Language:          "ru",
-		Timezone:          "Europe/Moscow",
+		Timezone:          svcTzMoscow,
 		IntrusiveEnabled:  true,
 		IntrusiveInterval: 30 * time.Minute,
 		UpdatedAt:         time.Date(2026, 7, 16, 12, 0, 0, 0, time.UTC),
@@ -1026,7 +1052,7 @@ func TestReminderServiceCreatesWeekdaysReminder(t *testing.T) {
 	}{
 		{
 			name:         "creates workdays reminder with default workdays mask",
-			title:        "Work standup",
+			title:        svcTitleWorkStandup,
 			desc:         "Daily sync",
 			weekdaysMask: database.WeekdaysMaskWorkdays,
 			before: func(planner *mocks.MockReminderCreationPlanner) {
@@ -1036,18 +1062,18 @@ func TestReminderServiceCreatesWeekdaysReminder(t *testing.T) {
 						t.Helper()
 						require.Equal(t, database.WeekdaysMaskWorkdays, *request.Rule.WeekdaysMask)
 
-						return database.ReminderView{ID: 1, Title: "Work standup"}, nil
+						return database.ReminderView{ID: 1, Title: svcTitleWorkStandup}, nil
 					}).
 					Times(1)
 			},
 			expected: struct {
 				reminder        domain.ReminderView
 				expectedErrText string
-			}{reminder: domain.ReminderView{ID: 1, Title: "Work standup"}},
+			}{reminder: domain.ReminderView{ID: 1, Title: svcTitleWorkStandup}},
 		},
 		{
 			name:         "creates tuesday and thursday reminder with custom mask",
-			title:        "Training",
+			title:        svcTitleTraining,
 			desc:         "Gym",
 			weekdaysMask: 2 | 8,
 			before: func(planner *mocks.MockReminderCreationPlanner) {
@@ -1057,18 +1083,18 @@ func TestReminderServiceCreatesWeekdaysReminder(t *testing.T) {
 						t.Helper()
 						require.Equal(t, 2|8, *request.Rule.WeekdaysMask)
 
-						return database.ReminderView{ID: 2, Title: "Training"}, nil
+						return database.ReminderView{ID: 2, Title: svcTitleTraining}, nil
 					}).
 					Times(1)
 			},
 			expected: struct {
 				reminder        domain.ReminderView
 				expectedErrText string
-			}{reminder: domain.ReminderView{ID: 2, Title: "Training"}},
+			}{reminder: domain.ReminderView{ID: 2, Title: svcTitleTraining}},
 		},
 		{
 			name:         "creates weekend reminder with saturday and sunday mask",
-			title:        "Weekend plan",
+			title:        svcTitleWeekendPlan,
 			desc:         "",
 			weekdaysMask: 32 | 64,
 			before: func(planner *mocks.MockReminderCreationPlanner) {
@@ -1078,19 +1104,19 @@ func TestReminderServiceCreatesWeekdaysReminder(t *testing.T) {
 						t.Helper()
 						require.Equal(t, 32|64, *request.Rule.WeekdaysMask)
 
-						return database.ReminderView{ID: 3, Title: "Weekend plan"}, nil
+						return database.ReminderView{ID: 3, Title: svcTitleWeekendPlan}, nil
 					}).
 					Times(1)
 			},
 			expected: struct {
 				reminder        domain.ReminderView
 				expectedErrText string
-			}{reminder: domain.ReminderView{ID: 3, Title: "Weekend plan"}},
+			}{reminder: domain.ReminderView{ID: 3, Title: svcTitleWeekendPlan}},
 		},
 		{
 			name:         "creates sunday only reminder with single day mask",
-			title:        "Review",
-			desc:         "Weekly",
+			title:        svcTitleReview,
+			desc:         svcDescWeekly,
 			weekdaysMask: 64,
 			before: func(planner *mocks.MockReminderCreationPlanner) {
 				planner.EXPECT().
@@ -1099,19 +1125,19 @@ func TestReminderServiceCreatesWeekdaysReminder(t *testing.T) {
 						t.Helper()
 						require.Equal(t, 64, *request.Rule.WeekdaysMask)
 
-						return database.ReminderView{ID: 4, Title: "Review"}, nil
+						return database.ReminderView{ID: 4, Title: svcTitleReview}, nil
 					}).
 					Times(1)
 			},
 			expected: struct {
 				reminder        domain.ReminderView
 				expectedErrText string
-			}{reminder: domain.ReminderView{ID: 4, Title: "Review"}},
+			}{reminder: domain.ReminderView{ID: 4, Title: svcTitleReview}},
 		},
 		{
-			name:         "empty title returns validation error",
+			name:         svcEmptyTitleCase,
 			title:        " ",
-			desc:         "Weekly",
+			desc:         svcDescWeekly,
 			weekdaysMask: 64,
 			before: func(_ *mocks.MockReminderCreationPlanner) {
 			},
@@ -1122,8 +1148,8 @@ func TestReminderServiceCreatesWeekdaysReminder(t *testing.T) {
 		},
 		{
 			name:         "empty weekdays mask returns validation error",
-			title:        "Review",
-			desc:         "Weekly",
+			title:        svcTitleReview,
+			desc:         svcDescWeekly,
 			weekdaysMask: 0,
 			before: func(_ *mocks.MockReminderCreationPlanner) {
 			},
@@ -1185,8 +1211,8 @@ func TestReminderServiceCreatesIntervalReminder(t *testing.T) {
 	}{
 		{
 			name:         "creates daily interval reminder",
-			title:        "Medicine",
-			desc:         "Morning",
+			title:        svcTitleMedicine,
+			desc:         svcDescMorning,
 			intervalDays: 1,
 			before: func(planner *mocks.MockReminderCreationPlanner) {
 				planner.EXPECT().
@@ -1196,18 +1222,18 @@ func TestReminderServiceCreatesIntervalReminder(t *testing.T) {
 						require.Equal(t, database.ReminderRuleTypeInterval, request.Rule.Type)
 						require.Equal(t, 1, *request.Rule.IntervalDays)
 
-						return database.ReminderView{ID: 10, Title: "Medicine"}, nil
+						return database.ReminderView{ID: 10, Title: svcTitleMedicine}, nil
 					}).
 					Times(1)
 			},
 			expected: struct {
 				reminder        domain.ReminderView
 				expectedErrText string
-			}{reminder: domain.ReminderView{ID: 10, Title: "Medicine"}},
+			}{reminder: domain.ReminderView{ID: 10, Title: svcTitleMedicine}},
 		},
 		{
 			name:         "creates two day interval reminder",
-			title:        "Water plants",
+			title:        svcTitleWaterPlants,
 			desc:         "",
 			intervalDays: 2,
 			before: func(planner *mocks.MockReminderCreationPlanner) {
@@ -1217,18 +1243,18 @@ func TestReminderServiceCreatesIntervalReminder(t *testing.T) {
 						t.Helper()
 						require.Equal(t, 2, *request.Rule.IntervalDays)
 
-						return database.ReminderView{ID: 11, Title: "Water plants"}, nil
+						return database.ReminderView{ID: 11, Title: svcTitleWaterPlants}, nil
 					}).
 					Times(1)
 			},
 			expected: struct {
 				reminder        domain.ReminderView
 				expectedErrText string
-			}{reminder: domain.ReminderView{ID: 11, Title: "Water plants"}},
+			}{reminder: domain.ReminderView{ID: 11, Title: svcTitleWaterPlants}},
 		},
 		{
 			name:         "creates weekly interval reminder",
-			title:        "Report",
+			title:        svcTitleReport,
 			desc:         "Team",
 			intervalDays: 7,
 			before: func(planner *mocks.MockReminderCreationPlanner) {
@@ -1239,18 +1265,18 @@ func TestReminderServiceCreatesIntervalReminder(t *testing.T) {
 						require.Equal(t, 7, *request.Rule.IntervalDays)
 						require.Equal(t, "Team", request.Description)
 
-						return database.ReminderView{ID: 12, Title: "Report"}, nil
+						return database.ReminderView{ID: 12, Title: svcTitleReport}, nil
 					}).
 					Times(1)
 			},
 			expected: struct {
 				reminder        domain.ReminderView
 				expectedErrText string
-			}{reminder: domain.ReminderView{ID: 12, Title: "Report"}},
+			}{reminder: domain.ReminderView{ID: 12, Title: svcTitleReport}},
 		},
 		{
 			name:         "trims interval reminder title and description",
-			title:        "  Pay rent  ",
+			title:        svcTitlePayRentSpaced,
 			desc:         "  Card  ",
 			intervalDays: 1,
 			before: func(planner *mocks.MockReminderCreationPlanner) {
@@ -1258,22 +1284,22 @@ func TestReminderServiceCreatesIntervalReminder(t *testing.T) {
 					CreateInitialOccurrenceForRule(gomock.Any(), gomock.Any()).
 					DoAndReturn(func(_ context.Context, request database.RecurringReminderRequest) (database.ReminderView, error) {
 						t.Helper()
-						require.Equal(t, "Pay rent", request.Title)
-						require.Equal(t, "Card", request.Description)
+						require.Equal(t, svcTitlePayRent, request.Title)
+						require.Equal(t, svcDescCard, request.Description)
 
-						return database.ReminderView{ID: 13, Title: "Pay rent", Description: "Card"}, nil
+						return database.ReminderView{ID: 13, Title: svcTitlePayRent, Description: svcDescCard}, nil
 					}).
 					Times(1)
 			},
 			expected: struct {
 				reminder        domain.ReminderView
 				expectedErrText string
-			}{reminder: domain.ReminderView{ID: 13, Title: "Pay rent", Description: "Card"}},
+			}{reminder: domain.ReminderView{ID: 13, Title: svcTitlePayRent, Description: svcDescCard}},
 		},
 		{
 			name:         "empty interval title returns validation error",
 			title:        " ",
-			desc:         "Morning",
+			desc:         svcDescMorning,
 			intervalDays: 1,
 			before: func(_ *mocks.MockReminderCreationPlanner) {
 			},
@@ -1284,8 +1310,8 @@ func TestReminderServiceCreatesIntervalReminder(t *testing.T) {
 		},
 		{
 			name:         "planner storage interval error is returned",
-			title:        "Medicine",
-			desc:         "Morning",
+			title:        svcTitleMedicine,
+			desc:         svcDescMorning,
 			intervalDays: 1,
 			before: func(planner *mocks.MockReminderCreationPlanner) {
 				planner.EXPECT().
@@ -1355,7 +1381,7 @@ func TestReminderServiceCreatesCustomDatesReminder(t *testing.T) {
 	}{
 		{
 			name:          "creates custom dates reminder using earliest selected date",
-			title:         "Trip",
+			title:         svcTitleTrip,
 			desc:          "Pack",
 			selectedDates: []time.Time{firstDate, secondDate},
 			hour:          8,
@@ -1369,18 +1395,18 @@ func TestReminderServiceCreatesCustomDatesReminder(t *testing.T) {
 						require.Equal(t, time.Date(2026, 6, 8, 8, 15, 0, 0, location), request.FirstRemindAt)
 						require.Equal(t, []time.Time{firstDate, secondDate}, request.CustomDates)
 
-						return database.ReminderView{ID: 20, Title: "Trip"}, nil
+						return database.ReminderView{ID: 20, Title: svcTitleTrip}, nil
 					}).
 					Times(1)
 			},
 			expected: struct {
 				reminder        domain.ReminderView
 				expectedErrText string
-			}{reminder: domain.ReminderView{ID: 20, Title: "Trip"}},
+			}{reminder: domain.ReminderView{ID: 20, Title: svcTitleTrip}},
 		},
 		{
 			name:          "creates custom dates reminder with one selected date",
-			title:         "Doctor",
+			title:         svcTitleDoctor,
 			desc:          "",
 			selectedDates: []time.Time{firstDate},
 			hour:          12,
@@ -1392,14 +1418,14 @@ func TestReminderServiceCreatesCustomDatesReminder(t *testing.T) {
 						t.Helper()
 						require.Equal(t, time.Date(2026, 6, 10, 12, 0, 0, 0, location), request.FirstRemindAt)
 
-						return database.ReminderView{ID: 21, Title: "Doctor"}, nil
+						return database.ReminderView{ID: 21, Title: svcTitleDoctor}, nil
 					}).
 					Times(1)
 			},
 			expected: struct {
 				reminder        domain.ReminderView
 				expectedErrText string
-			}{reminder: domain.ReminderView{ID: 21, Title: "Doctor"}},
+			}{reminder: domain.ReminderView{ID: 21, Title: svcTitleDoctor}},
 		},
 		{
 			name:          "creates custom dates reminder and trims text",
@@ -1427,7 +1453,7 @@ func TestReminderServiceCreatesCustomDatesReminder(t *testing.T) {
 		},
 		{
 			name:          "creates custom dates reminder preserving selected date order",
-			title:         "Tickets",
+			title:         svcTitleTickets,
 			desc:          "Buy",
 			selectedDates: []time.Time{secondDate, firstDate},
 			hour:          9,
@@ -1439,18 +1465,18 @@ func TestReminderServiceCreatesCustomDatesReminder(t *testing.T) {
 						t.Helper()
 						require.Equal(t, []time.Time{secondDate, firstDate}, request.CustomDates)
 
-						return database.ReminderView{ID: 23, Title: "Tickets"}, nil
+						return database.ReminderView{ID: 23, Title: svcTitleTickets}, nil
 					}).
 					Times(1)
 			},
 			expected: struct {
 				reminder        domain.ReminderView
 				expectedErrText string
-			}{reminder: domain.ReminderView{ID: 23, Title: "Tickets"}},
+			}{reminder: domain.ReminderView{ID: 23, Title: svcTitleTickets}},
 		},
 		{
 			name:          "planner storage custom dates error is returned",
-			title:         "Trip",
+			title:         svcTitleTrip,
 			desc:          "Pack",
 			selectedDates: []time.Time{firstDate},
 			hour:          8,
