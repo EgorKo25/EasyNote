@@ -1,4 +1,4 @@
-//nolint:lll,testpackage,goconst // Tests cover internal Telegram payloads with readable inline fixtures.
+//nolint:lll,testpackage // Tests cover internal Telegram payloads with readable inline fixtures.
 package telegram
 
 import (
@@ -20,6 +20,12 @@ import (
 
 var errTelegramAPI = errors.New("telegram api")
 var testTelegramMessageID = 40
+
+const (
+	testReminderTitlePayRent = "Pay rent"
+	testHolidayNameBirthday  = "Birthday"
+	testHolidayRecipientOleg = "Oleg"
+)
 
 var testTelegramToken = strings.Join([]string{"1234567890", strings.Repeat("a", 35)}, ":")
 
@@ -50,7 +56,7 @@ func TestSenderSendReminder(t *testing.T) {
 			reminder: Reminder{
 				ID:             1,
 				TelegramChatID: 100,
-				Title:          "Pay rent",
+				Title:          testReminderTitlePayRent,
 			},
 			before: func(caller *telegoapimock.MockCaller) {
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -67,7 +73,7 @@ func TestSenderSendReminder(t *testing.T) {
 			reminder: Reminder{
 				ID:             2,
 				TelegramChatID: 100,
-				Title:          "Pay rent",
+				Title:          testReminderTitlePayRent,
 				Description:    "Before lunch",
 			},
 			before: func(caller *telegoapimock.MockCaller) {
@@ -104,7 +110,7 @@ func TestSenderSendReminder(t *testing.T) {
 			reminder: Reminder{
 				ID:             4,
 				TelegramChatID: 100,
-				Title:          "Pay rent",
+				Title:          testReminderTitlePayRent,
 			},
 			before: func(caller *telegoapimock.MockCaller) {
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -121,7 +127,7 @@ func TestSenderSendReminder(t *testing.T) {
 			reminder: Reminder{
 				ID:                7,
 				TelegramChatID:    100,
-				Title:             "Pay rent",
+				Title:             testReminderTitlePayRent,
 				TelegramMessageID: &testTelegramMessageID,
 			},
 			before: func(caller *telegoapimock.MockCaller) {
@@ -139,7 +145,7 @@ func TestSenderSendReminder(t *testing.T) {
 			reminder: Reminder{
 				ID:             5,
 				TelegramChatID: 100,
-				Title:          "Pay rent",
+				Title:          testReminderTitlePayRent,
 			},
 			before: func(caller *telegoapimock.MockCaller) {
 				gomock.InOrder(
@@ -161,7 +167,7 @@ func TestSenderSendReminder(t *testing.T) {
 			reminder: Reminder{
 				ID:             6,
 				TelegramChatID: 100,
-				Title:          "Pay rent",
+				Title:          testReminderTitlePayRent,
 			},
 			before: func(caller *telegoapimock.MockCaller) {
 				gomock.InOrder(
@@ -227,8 +233,13 @@ func TestSenderSendHoliday(t *testing.T) {
 		}
 	}{
 		{
-			name:    "holiday is sent",
-			holiday: Holiday{ID: 1, TelegramChatID: 100, HolidayName: "Birthday", RecipientName: "Oleg"},
+			name: "holiday is sent",
+			holiday: Holiday{
+				ID:             1,
+				TelegramChatID: 100,
+				HolidayName:    testHolidayNameBirthday,
+				RecipientName:  testHolidayRecipientOleg,
+			},
 			before: func(caller *telegoapimock.MockCaller) {
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(telegramResponse(t, telego.Message{MessageID: 1}), nil).
@@ -240,9 +251,14 @@ func TestSenderSendHoliday(t *testing.T) {
 			}{messageID: 1},
 		},
 		{
-			name:    "parse mode holiday is sent",
-			cfg:     config.Telegram{ParseMode: telego.ModeHTML},
-			holiday: Holiday{ID: 2, TelegramChatID: 100, HolidayName: "<b>Birthday</b>", RecipientName: "Oleg"},
+			name: "parse mode holiday is sent",
+			cfg:  config.Telegram{ParseMode: telego.ModeHTML},
+			holiday: Holiday{
+				ID:             2,
+				TelegramChatID: 100,
+				HolidayName:    "<b>Birthday</b>",
+				RecipientName:  testHolidayRecipientOleg,
+			},
 			before: func(caller *telegoapimock.MockCaller) {
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(telegramResponse(t, telego.Message{MessageID: 2}), nil).
@@ -254,9 +270,14 @@ func TestSenderSendHoliday(t *testing.T) {
 			}{messageID: 2},
 		},
 		{
-			name:    "silent holiday is sent",
-			cfg:     config.Telegram{DisableNotification: true},
-			holiday: Holiday{ID: 3, TelegramChatID: 100, HolidayName: "Birthday", RecipientName: "Oleg"},
+			name: "silent holiday is sent",
+			cfg:  config.Telegram{DisableNotification: true},
+			holiday: Holiday{
+				ID:             3,
+				TelegramChatID: 100,
+				HolidayName:    testHolidayNameBirthday,
+				RecipientName:  testHolidayRecipientOleg,
+			},
 			before: func(caller *telegoapimock.MockCaller) {
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(telegramResponse(t, telego.Message{MessageID: 3}), nil).
@@ -268,9 +289,14 @@ func TestSenderSendHoliday(t *testing.T) {
 			}{messageID: 3},
 		},
 		{
-			name:    "protected holiday is sent",
-			cfg:     config.Telegram{ProtectContent: true},
-			holiday: Holiday{ID: 4, TelegramChatID: 100, HolidayName: "Birthday", RecipientName: "Oleg"},
+			name: "protected holiday is sent",
+			cfg:  config.Telegram{ProtectContent: true},
+			holiday: Holiday{
+				ID:             4,
+				TelegramChatID: 100,
+				HolidayName:    testHolidayNameBirthday,
+				RecipientName:  testHolidayRecipientOleg,
+			},
 			before: func(caller *telegoapimock.MockCaller) {
 				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(telegramResponse(t, telego.Message{MessageID: 4}), nil).
@@ -282,8 +308,13 @@ func TestSenderSendHoliday(t *testing.T) {
 			}{messageID: 4},
 		},
 		{
-			name:    "holiday send api caller error is returned",
-			holiday: Holiday{ID: 5, TelegramChatID: 100, HolidayName: "Birthday", RecipientName: "Oleg"},
+			name: "holiday send api caller error is returned",
+			holiday: Holiday{
+				ID:             5,
+				TelegramChatID: 100,
+				HolidayName:    testHolidayNameBirthday,
+				RecipientName:  testHolidayRecipientOleg,
+			},
 			before: func(caller *telegoapimock.MockCaller) {
 				gomock.InOrder(
 					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -300,8 +331,13 @@ func TestSenderSendHoliday(t *testing.T) {
 			}{expectedErrText: "send telegram holiday 5: telego: sendMessage: internal execution: request call: telegram api"},
 		},
 		{
-			name:    "holiday api response error is returned",
-			holiday: Holiday{ID: 6, TelegramChatID: 100, HolidayName: "Birthday", RecipientName: "Oleg"},
+			name: "holiday api response error is returned",
+			holiday: Holiday{
+				ID:             6,
+				TelegramChatID: 100,
+				HolidayName:    testHolidayNameBirthday,
+				RecipientName:  testHolidayRecipientOleg,
+			},
 			before: func(caller *telegoapimock.MockCaller) {
 				gomock.InOrder(
 					caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -442,7 +478,7 @@ func TestSchedulerSender(t *testing.T) {
 	reminder := database.ScheduledReminder{
 		ID:             1,
 		TelegramChatID: 100,
-		Title:          "Pay rent",
+		Title:          testReminderTitlePayRent,
 	}
 	reminderWithMessage := reminder
 	reminderWithMessage.ID = 2
@@ -450,8 +486,8 @@ func TestSchedulerSender(t *testing.T) {
 	holiday := database.ScheduledHoliday{
 		ID:             3,
 		TelegramChatID: 100,
-		HolidayName:    "Birthday",
-		RecipientName:  "Oleg",
+		HolidayName:    testHolidayNameBirthday,
+		RecipientName:  testHolidayRecipientOleg,
 	}
 
 	tests := []struct {

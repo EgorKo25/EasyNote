@@ -561,6 +561,7 @@ func (c *BackendClient) do(
 	if err != nil {
 		return err
 	}
+
 	defer func() { _ = httpResponse.Body.Close() }()
 
 	if err = decodeBackendError(httpResponse); err != nil {
