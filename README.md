@@ -6,7 +6,7 @@ Telegram reminder bot for routine tasks.
 
 The source of truth for the application version is `CHANGELIST.md`.
 
-Current version: `1.4.0`.
+Current version: `1.6.0`.
 
 ## Branch Naming
 
@@ -78,6 +78,16 @@ EasyNote follows a thin clean-architecture style around the reminder flow:
 - `scheduler` owns the runtime loop that sends ready reminders.
 - `telegram` owns the user flow and delegates reminder persistence to the service layer.
 - `main` wires PostgreSQL, the Telegram sender, the scheduler runner, and the Telegram bot.
+
+### Shared Kovio Infrastructure
+
+EasyNote uses `github.com/EgorKo25/kovio-common v1.0.0` for reusable application infrastructure:
+
+- `kconfig` loads and validates the common `app` and `logger` configuration sections;
+- `klogger` provides structured logging and owns the complete logger configuration;
+- `background` coordinates the scheduler and Telegram bot under one cancelable context.
+
+Scheduler, planner, Telegram UI, database configuration, and database models remain owned by EasyNote.
 
 Data flow:
 
@@ -189,7 +199,7 @@ The application config is loaded in this order:
 
 1. Struct defaults.
 2. `config/config.yaml`.
-3. Environment overrides parsed by `github.com/caarlos0/env/v11`.
+3. Environment overrides applied by `kconfig`.
 4. Validator checks.
 
 Supported deployment overrides:
@@ -228,12 +238,28 @@ docker compose up -d --no-deps app
 
 PostgreSQL is not restarted by the beta CD job.
 
-For a manual deployment from a pull request branch, run the same workflow manually on the PR branch and enable `deploy_from_pr`. The image tag is built as `X.Y.Z.<short_sha>`, for example `1.4.0.a1b2c3d`, and that exact tag is deployed.
+For a manual deployment from a pull request branch, run the same workflow manually on the PR branch and enable `deploy_from_pr`. The image tag is built as `X.Y.Z.<short_sha>`, for example `1.6.0.a1b2c3d`, and that exact tag is deployed.
 
 ## Changelist
 
 <div style="max-height: 420px; overflow-y: auto; border: 1px solid #d0d7de; border-radius: 6px; padding: 16px;">
-<p><strong>version: 1.4.0</strong></p>
+<p><strong>version: 1.6.0</strong></p>
+
+<h2>v1.6.0 - Kovio common infrastructure</h2>
+<ul>
+  <li>Configuration loading now uses the extendable <code>kconfig.Config</code>.</li>
+  <li>Structured logging and background process coordination now use <code>klogger</code> and <code>background</code>.</li>
+  <li>EasyNote depends on the stable <code>github.com/EgorKo25/kovio-common v1.0.0</code> release.</li>
+  <li>Product-specific scheduler, planner, Telegram UI, and database contracts remain inside EasyNote.</li>
+</ul>
+
+<h2>v1.5.0 - Shared reminders and shopping list editor</h2>
+<ul>
+  <li>Reminder drafts support selecting another EasyNote user by Telegram username.</li>
+  <li>Incoming reminder requests, permission management, and outgoing reminder lists were added.</li>
+  <li>The <code>bot_users</code> and <code>reminder_permissions</code> storage model was added.</li>
+  <li>Shopping list drafts append every user message as a separate item.</li>
+</ul>
 
 <h2>v1.4.0 - Holidays and shopping lists</h2>
 <ul>
