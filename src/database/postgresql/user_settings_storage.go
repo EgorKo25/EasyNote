@@ -22,6 +22,7 @@ func (d *Database) UserSettings(ctx context.Context, telegramChatID int64) (data
 			timezone,
 			intrusive_enabled,
 			intrusive_interval_minutes,
+			incoming_reminder_requests_enabled,
 			updated_at
 	`
 
@@ -35,6 +36,7 @@ func (d *Database) UserSettings(ctx context.Context, telegramChatID int64) (data
 		&settings.Timezone,
 		&settings.IntrusiveEnabled,
 		&intervalMinutes,
+		&settings.IncomingReminderRequestsEnabled,
 		&settings.UpdatedAt,
 	); err != nil {
 		return database.UserSettings{}, fmt.Errorf("load user settings: %w", err)

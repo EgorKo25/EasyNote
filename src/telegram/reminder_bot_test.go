@@ -1,4 +1,4 @@
-//nolint:lll,testpackage // These tests cover internal Telegram UI state transitions without adding production hooks.
+//nolint:dupl,err113,lll,testpackage // These tests cover internal Telegram UI state transitions without adding production hooks.
 package telegram
 
 import (
@@ -251,6 +251,1170 @@ func TestReminderDraftAppliesTextInput(t *testing.T) {
 			require.Equal(t, test.expected.waitingFor, draft.waitingFor)
 			require.Equal(t, test.expected.screen, draft.screen)
 			require.Equal(t, test.expected.notice, draft.notice)
+		})
+	}
+}
+
+func TestReminderDraftRecipientInput(t *testing.T) {
+	t.Parallel()
+
+	chatID := int64(200)
+
+	tests := []struct {
+		name     string
+		draft    reminderDraft
+		input    string
+		before   func(service *telegrammocks.MockReminderService)
+		expected struct {
+			applied           bool
+			recipientUsername string
+			recipientChatID   int64
+			recipientAllowed  bool
+			notice            string
+		}
+	}{
+		{
+			name:  "allowed recipient username is stored in draft",
+			draft: reminderDraft{waitingFor: telegramui.FieldRecipient},
+			input: "@alice",
+			before: func(service *telegrammocks.MockReminderService) {
+				service.EXPECT().
+					ReminderRecipientByUsername(gomock.Any(), chatID, "alice").
+					Return(database.ReminderRecipient{
+						TelegramChatID:  300,
+						Username:        "alice",
+						Allowed:         true,
+						IncomingEnabled: true,
+					}, nil).
+					Times(1)
+			},
+			expected: struct {
+				applied           bool
+				recipientUsername string
+				recipientChatID   int64
+				recipientAllowed  bool
+				notice            string
+			}{applied: true, recipientUsername: "alice", recipientChatID: 300, recipientAllowed: true},
+		},
+		{
+			name:  "pending recipient username is stored in draft",
+			draft: reminderDraft{waitingFor: telegramui.FieldRecipient},
+			input: "bob",
+			before: func(service *telegrammocks.MockReminderService) {
+				service.EXPECT().
+					ReminderRecipientByUsername(gomock.Any(), chatID, "bob").
+					Return(database.ReminderRecipient{
+						TelegramChatID:  301,
+						Username:        "bob",
+						Allowed:         false,
+						IncomingEnabled: true,
+					}, nil).
+					Times(1)
+			},
+			expected: struct {
+				applied           bool
+				recipientUsername string
+				recipientChatID   int64
+				recipientAllowed  bool
+				notice            string
+			}{applied: true, recipientUsername: "bob", recipientChatID: 301},
+		},
+		{
+			name: "own username resets draft to me",
+			draft: reminderDraft{
+				waitingFor:        telegramui.FieldRecipient,
+				recipientUsername: "old",
+				recipientChatID:   302,
+				recipientAllowed:  true,
+			},
+			input: "@me",
+			before: func(service *telegrammocks.MockReminderService) {
+				service.EXPECT().
+					ReminderRecipientByUsername(gomock.Any(), chatID, "me").
+					Return(database.ReminderRecipient{
+						TelegramChatID:  chatID,
+						Username:        "me",
+						Allowed:         true,
+						IncomingEnabled: true,
+					}, nil).
+					Times(1)
+			},
+			expected: struct {
+				applied           bool
+				recipientUsername string
+				recipientChatID   int64
+				recipientAllowed  bool
+				notice            string
+			}{applied: true},
+		},
+		{
+			name:  "username without at sign is accepted",
+			draft: reminderDraft{waitingFor: telegramui.FieldRecipient},
+			input: "carol",
+			before: func(service *telegrammocks.MockReminderService) {
+				service.EXPECT().
+					ReminderRecipientByUsername(gomock.Any(), chatID, "carol").
+					Return(database.ReminderRecipient{
+						TelegramChatID:  303,
+						Username:        "carol",
+						Allowed:         true,
+						IncomingEnabled: true,
+					}, nil).
+					Times(1)
+			},
+			expected: struct {
+				applied           bool
+				recipientUsername string
+				recipientChatID   int64
+				recipientAllowed  bool
+				notice            string
+			}{applied: true, recipientUsername: "carol", recipientChatID: 303, recipientAllowed: true},
+		},
+		{
+			name:   "empty username shows validation notice",
+			draft:  reminderDraft{waitingFor: telegramui.FieldRecipient},
+			input:  "@",
+			before: func(_ *telegrammocks.MockReminderService) {},
+			expected: struct {
+				applied           bool
+				recipientUsername string
+				recipientChatID   int64
+				recipientAllowed  bool
+				notice            string
+			}{applied: true, notice: "Введите никнейм получателя через @username."},
+		},
+		{
+			name:  "unknown username shows invite notice",
+			draft: reminderDraft{waitingFor: telegramui.FieldRecipient},
+			input: "@missing",
+			before: func(service *telegrammocks.MockReminderService) {
+				service.EXPECT().
+					ReminderRecipientByUsername(gomock.Any(), chatID, "missing").
+					Return(database.ReminderRecipient{}, database.ErrBotUserNotFound).
+					Times(1)
+			},
+			expected: struct {
+				applied           bool
+				recipientUsername string
+				recipientChatID   int64
+				recipientAllowed  bool
+				notice            string
+			}{applied: true, notice: "Этот человек еще не пользовался ботом. Пригласите его в EasyNote."},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctrl := gomock.NewController(t)
+			service := telegrammocks.NewMockReminderService(ctrl)
+			test.before(service)
+
+			bot := &ReminderBot{
+				service:     service,
+				draftByChat: map[int64]reminderDraft{chatID: test.draft},
+			}
+
+			applied := bot.applyDraftText(t.Context(), chatID, test.input)
+			draft := bot.draft(chatID)
+
+			require.Equal(t, test.expected.applied, applied)
+			require.Equal(t, test.expected.recipientUsername, draft.recipientUsername)
+			require.Equal(t, test.expected.recipientChatID, draft.recipientChatID)
+			require.Equal(t, test.expected.recipientAllowed, draft.recipientAllowed)
+			require.Equal(t, test.expected.notice, draft.notice)
+		})
+	}
+}
+
+func TestCreateSharedDraftReminder(t *testing.T) {
+	t.Parallel()
+
+	chatID := int64(200)
+	recipientChatID := int64(300)
+	remindAt := time.Date(2099, 6, 2, 18, 45, 0, 0, time.UTC)
+	errSettings := errors.New("settings")
+	errCreate := errors.New("create shared reminder")
+
+	tests := []struct {
+		name     string
+		draft    reminderDraft
+		before   func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository)
+		expected struct {
+			status          database.ReminderStatus
+			expectedErrText string
+		}
+	}{
+		{
+			name: "allowed recipient creates executable reminder",
+			draft: reminderDraft{
+				title:             "Pay rent",
+				description:       "Card",
+				recipientUsername: "alice",
+				recipientChatID:   recipientChatID,
+				recipientAllowed:  true,
+			},
+			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
+				repository.EXPECT().
+					UserSettings(gomock.Any(), recipientChatID).
+					Return(database.UserSettings{IncomingReminderRequestsEnabled: true}, nil).
+					Times(1)
+				service.EXPECT().
+					CreateSharedReminder(gomock.Any(), database.SharedReminderRequest{
+						SenderChatID:      chatID,
+						RecipientChatID:   recipientChatID,
+						RecipientUsername: "alice",
+						Title:             "Pay rent",
+						Description:       "Card",
+						RemindAt:          remindAt,
+						Status:            database.ReminderStatusNew,
+					}).
+					Return(database.ReminderView{ID: 1, Status: database.ReminderStatusNew}, nil).
+					Times(1)
+			},
+			expected: struct {
+				status          database.ReminderStatus
+				expectedErrText string
+			}{status: database.ReminderStatusNew},
+		},
+		{
+			name: "disabled incoming requests creates declined outgoing reminder",
+			draft: reminderDraft{
+				title:             "Pay rent",
+				description:       "Card",
+				recipientUsername: "bob",
+				recipientChatID:   recipientChatID,
+			},
+			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
+				repository.EXPECT().
+					UserSettings(gomock.Any(), recipientChatID).
+					Return(database.UserSettings{IncomingReminderRequestsEnabled: false}, nil).
+					Times(1)
+				service.EXPECT().
+					CreateSharedReminder(gomock.Any(), database.SharedReminderRequest{
+						SenderChatID:      chatID,
+						RecipientChatID:   recipientChatID,
+						RecipientUsername: "bob",
+						Title:             "Pay rent",
+						Description:       "Card",
+						RemindAt:          remindAt,
+						Status:            database.ReminderStatusDeclined,
+					}).
+					Return(database.ReminderView{ID: 2, Status: database.ReminderStatusDeclined}, nil).
+					Times(1)
+			},
+			expected: struct {
+				status          database.ReminderStatus
+				expectedErrText string
+			}{status: database.ReminderStatusDeclined},
+		},
+		{
+			name: "allowed recipient ignores disabled incoming requests",
+			draft: reminderDraft{
+				title:             "Pay rent",
+				description:       "Card",
+				recipientUsername: "carol",
+				recipientChatID:   recipientChatID,
+				recipientAllowed:  true,
+			},
+			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
+				repository.EXPECT().
+					UserSettings(gomock.Any(), recipientChatID).
+					Return(database.UserSettings{IncomingReminderRequestsEnabled: false}, nil).
+					Times(1)
+				service.EXPECT().
+					CreateSharedReminder(gomock.Any(), gomock.Any()).
+					DoAndReturn(func(_ context.Context, request database.SharedReminderRequest) (database.ReminderView, error) {
+						require.Equal(t, database.ReminderStatusNew, request.Status)
+
+						return database.ReminderView{ID: 3, Status: request.Status}, nil
+					}).
+					Times(1)
+			},
+			expected: struct {
+				status          database.ReminderStatus
+				expectedErrText string
+			}{status: database.ReminderStatusNew},
+		},
+		{
+			name: "pending recipient keeps pending status when request delivery is not needed in test",
+			draft: reminderDraft{
+				title:             "Pay rent",
+				description:       "Card",
+				recipientUsername: "dave",
+				recipientChatID:   recipientChatID,
+				recipientAllowed:  true,
+			},
+			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
+				repository.EXPECT().
+					UserSettings(gomock.Any(), recipientChatID).
+					Return(database.UserSettings{IncomingReminderRequestsEnabled: true}, nil).
+					Times(1)
+				service.EXPECT().
+					CreateSharedReminder(gomock.Any(), gomock.Any()).
+					DoAndReturn(func(_ context.Context, request database.SharedReminderRequest) (database.ReminderView, error) {
+						return database.ReminderView{ID: 4, Status: request.Status}, nil
+					}).
+					Times(1)
+			},
+			expected: struct {
+				status          database.ReminderStatus
+				expectedErrText string
+			}{status: database.ReminderStatusNew},
+		},
+		{
+			name: "settings error is returned",
+			draft: reminderDraft{
+				title:             "Pay rent",
+				recipientUsername: "eve",
+				recipientChatID:   recipientChatID,
+			},
+			before: func(_ *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
+				repository.EXPECT().
+					UserSettings(gomock.Any(), recipientChatID).
+					Return(database.UserSettings{}, errSettings).
+					Times(1)
+			},
+			expected: struct {
+				status          database.ReminderStatus
+				expectedErrText string
+			}{expectedErrText: "load recipient settings: settings"},
+		},
+		{
+			name: "create shared reminder error is returned",
+			draft: reminderDraft{
+				title:             "Pay rent",
+				recipientUsername: "frank",
+				recipientChatID:   recipientChatID,
+				recipientAllowed:  true,
+			},
+			before: func(service *telegrammocks.MockReminderService, repository *telegrammocks.MockReminderRepository) {
+				repository.EXPECT().
+					UserSettings(gomock.Any(), recipientChatID).
+					Return(database.UserSettings{IncomingReminderRequestsEnabled: true}, nil).
+					Times(1)
+				service.EXPECT().
+					CreateSharedReminder(gomock.Any(), gomock.Any()).
+					Return(database.ReminderView{}, errCreate).
+					Times(1)
+			},
+			expected: struct {
+				status          database.ReminderStatus
+				expectedErrText string
+			}{expectedErrText: "create shared reminder: create shared reminder"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctrl := gomock.NewController(t)
+			service := telegrammocks.NewMockReminderService(ctrl)
+			repository := telegrammocks.NewMockReminderRepository(ctrl)
+			test.before(service, repository)
+
+			bot := &ReminderBot{service: service, userRepo: repository}
+
+			reminder, err := bot.createSharedDraftReminder(t.Context(), chatID, test.draft, remindAt)
+			if test.expected.expectedErrText != "" {
+				require.EqualErrorf(t, err, test.expected.expectedErrText, "unexpected error")
+
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, test.expected.status, reminder.Status)
+		})
+	}
+}
+
+func TestReminderAccessAndOutgoingHandlers(t *testing.T) {
+	t.Parallel()
+
+	chatID := int64(200)
+	reminderID := int64(10)
+	errRepository := errors.New("repository")
+
+	tests := []struct {
+		name   string
+		action func(context.Context, *ReminderBot) error
+		before func(
+			t *testing.T,
+			caller *telegoapimock.MockCaller,
+			service *telegrammocks.MockReminderService,
+			repository *telegrammocks.MockReminderRepository,
+		)
+		expected struct {
+			expectedErrText string
+		}
+	}{
+		{
+			name: "outgoing reminder page is sent",
+			action: func(ctx context.Context, bot *ReminderBot) error {
+				return bot.sendOutgoingReminderPage(ctx, chatID, 0)
+			},
+			before: func(
+				t *testing.T,
+				caller *telegoapimock.MockCaller,
+				service *telegrammocks.MockReminderService,
+				repository *telegrammocks.MockReminderRepository,
+			) {
+				t.Helper()
+
+				repository.EXPECT().
+					UserSettings(gomock.Any(), chatID).
+					Return(database.UserSettings{Timezone: "Europe/Moscow"}, nil).
+					Times(1)
+				service.EXPECT().
+					FindOutgoingRemindersByChat(gomock.Any(), chatID, reminderPageSize, 0).
+					Return([]database.ReminderView{{
+						ID: 1, Title: "Pay rent", RecipientUsername: "alice",
+					}}, nil).
+					Times(1)
+				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(testTelegramResponse(t, telego.Message{MessageID: 1}), nil).
+					Times(1)
+			},
+		},
+		{
+			name: "reminder access page is sent",
+			action: func(ctx context.Context, bot *ReminderBot) error {
+				return bot.sendReminderAccessPage(ctx, chatID, 0)
+			},
+			before: func(
+				t *testing.T,
+				caller *telegoapimock.MockCaller,
+				service *telegrammocks.MockReminderService,
+				_ *telegrammocks.MockReminderRepository,
+			) {
+				t.Helper()
+
+				service.EXPECT().
+					FindReminderPermissions(gomock.Any(), chatID, reminderPageSize, 0).
+					Return([]database.ReminderPermissionView{{
+						TelegramChatID: 300,
+						Username:       "alice",
+					}}, nil).
+					Times(1)
+				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(testTelegramResponse(t, telego.Message{MessageID: 2}), nil).
+					Times(1)
+			},
+		},
+		{
+			name: "incoming reminder is accepted",
+			action: func(ctx context.Context, bot *ReminderBot) error {
+				return bot.acceptIncomingReminder(ctx, chatID, 0, reminderID, false)
+			},
+			before: func(
+				t *testing.T,
+				caller *telegoapimock.MockCaller,
+				service *telegrammocks.MockReminderService,
+				_ *telegrammocks.MockReminderRepository,
+			) {
+				t.Helper()
+
+				service.EXPECT().
+					AcceptIncomingReminder(gomock.Any(), chatID, reminderID).
+					Return(nil).
+					Times(1)
+				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(testTelegramResponse(t, telego.Message{MessageID: 3}), nil).
+					Times(1)
+			},
+		},
+		{
+			name: "incoming reminder is accepted and sender is allowed forever",
+			action: func(ctx context.Context, bot *ReminderBot) error {
+				return bot.acceptIncomingReminder(ctx, chatID, 0, reminderID, true)
+			},
+			before: func(
+				t *testing.T,
+				caller *telegoapimock.MockCaller,
+				service *telegrammocks.MockReminderService,
+				_ *telegrammocks.MockReminderRepository,
+			) {
+				t.Helper()
+
+				service.EXPECT().
+					ReminderSenderChatID(gomock.Any(), chatID, reminderID).
+					Return(int64(400), nil).
+					Times(1)
+				service.EXPECT().
+					AllowReminderSender(gomock.Any(), chatID, int64(400)).
+					Return(nil).
+					Times(1)
+				service.EXPECT().
+					AcceptIncomingReminder(gomock.Any(), chatID, reminderID).
+					Return(nil).
+					Times(1)
+				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(testTelegramResponse(t, telego.Message{MessageID: 4}), nil).
+					Times(1)
+			},
+		},
+		{
+			name: "outgoing reminder repository error is returned",
+			action: func(ctx context.Context, bot *ReminderBot) error {
+				return bot.sendOutgoingReminderPage(ctx, chatID, 0)
+			},
+			before: func(
+				_ *testing.T,
+				_ *telegoapimock.MockCaller,
+				service *telegrammocks.MockReminderService,
+				repository *telegrammocks.MockReminderRepository,
+			) {
+				repository.EXPECT().
+					UserSettings(gomock.Any(), chatID).
+					Return(database.UserSettings{Timezone: "Europe/Moscow"}, nil).
+					Times(1)
+				service.EXPECT().
+					FindOutgoingRemindersByChat(gomock.Any(), chatID, reminderPageSize, 0).
+					Return(nil, errRepository).
+					Times(1)
+			},
+			expected: struct {
+				expectedErrText string
+			}{expectedErrText: "load outgoing reminders: repository"},
+		},
+		{
+			name: "decline incoming reminder error is returned",
+			action: func(ctx context.Context, bot *ReminderBot) error {
+				return bot.declineIncomingReminder(ctx, chatID, 0, reminderID)
+			},
+			before: func(
+				_ *testing.T,
+				_ *telegoapimock.MockCaller,
+				service *telegrammocks.MockReminderService,
+				_ *telegrammocks.MockReminderRepository,
+			) {
+				service.EXPECT().
+					DeclineIncomingReminder(gomock.Any(), chatID, reminderID).
+					Return(errRepository).
+					Times(1)
+			},
+			expected: struct {
+				expectedErrText string
+			}{expectedErrText: "decline incoming reminder: repository"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctrl := gomock.NewController(t)
+			caller := telegoapimock.NewMockCaller(ctrl)
+			service := telegrammocks.NewMockReminderService(ctrl)
+			repository := telegrammocks.NewMockReminderRepository(ctrl)
+			test.before(t, caller, service, repository)
+
+			api, err := telego.NewBot(
+				testTelegramToken,
+				telego.WithAPICaller(caller),
+				telego.WithDiscardLogger(),
+			)
+			require.NoError(t, err)
+
+			bot := &ReminderBot{
+				bot:         api,
+				service:     service,
+				userRepo:    repository,
+				draftByChat: map[int64]reminderDraft{},
+				uiByChat:    map[int64]int{},
+				listByChat:  map[int64]reminderListState{},
+				menuByChat:  map[int64]chatMenu{},
+			}
+
+			err = test.action(t.Context(), bot)
+			if test.expected.expectedErrText != "" {
+				require.EqualErrorf(t, err, test.expected.expectedErrText, "unexpected error")
+
+				return
+			}
+
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestIncomingReminderCallbackRouting(t *testing.T) {
+	t.Parallel()
+
+	chatID := int64(200)
+
+	tests := []struct {
+		name   string
+		data   string
+		before func(
+			t *testing.T,
+			caller *telegoapimock.MockCaller,
+			service *telegrammocks.MockReminderService,
+		)
+		expected struct {
+			handled         bool
+			expectedErrText string
+		}
+	}{
+		{
+			name: "allow callback accepts reminder",
+			data: telegramui.CallbackIncomingReminderAllow + "10",
+			before: func(t *testing.T, caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService) {
+				t.Helper()
+
+				service.EXPECT().
+					AcceptIncomingReminder(gomock.Any(), chatID, int64(10)).
+					Return(nil).
+					Times(1)
+				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(testTelegramResponse(t, telego.Message{MessageID: 1}), nil).
+					Times(1)
+			},
+			expected: struct {
+				handled         bool
+				expectedErrText string
+			}{handled: true},
+		},
+		{
+			name: "always callback allows sender and accepts reminder",
+			data: telegramui.CallbackIncomingReminderAlways + "11",
+			before: func(t *testing.T, caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService) {
+				t.Helper()
+
+				service.EXPECT().
+					ReminderSenderChatID(gomock.Any(), chatID, int64(11)).
+					Return(int64(300), nil).
+					Times(1)
+				service.EXPECT().
+					AllowReminderSender(gomock.Any(), chatID, int64(300)).
+					Return(nil).
+					Times(1)
+				service.EXPECT().
+					AcceptIncomingReminder(gomock.Any(), chatID, int64(11)).
+					Return(nil).
+					Times(1)
+				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(testTelegramResponse(t, telego.Message{MessageID: 2}), nil).
+					Times(1)
+			},
+			expected: struct {
+				handled         bool
+				expectedErrText string
+			}{handled: true},
+		},
+		{
+			name: "deny callback declines reminder",
+			data: telegramui.CallbackIncomingReminderDeny + "12",
+			before: func(t *testing.T, caller *telegoapimock.MockCaller, service *telegrammocks.MockReminderService) {
+				t.Helper()
+
+				service.EXPECT().
+					DeclineIncomingReminder(gomock.Any(), chatID, int64(12)).
+					Return(nil).
+					Times(1)
+				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(testTelegramResponse(t, telego.Message{MessageID: 3}), nil).
+					Times(1)
+			},
+			expected: struct {
+				handled         bool
+				expectedErrText string
+			}{handled: true},
+		},
+		{
+			name:   "unknown callback is ignored",
+			data:   "incoming_reminder:noop",
+			before: func(_ *testing.T, _ *telegoapimock.MockCaller, _ *telegrammocks.MockReminderService) {},
+			expected: struct {
+				handled         bool
+				expectedErrText string
+			}{handled: false},
+		},
+		{
+			name:   "allow callback parse error is returned",
+			data:   telegramui.CallbackIncomingReminderAllow + "bad",
+			before: func(_ *testing.T, _ *telegoapimock.MockCaller, _ *telegrammocks.MockReminderService) {},
+			expected: struct {
+				handled         bool
+				expectedErrText string
+			}{handled: true, expectedErrText: `parse incoming reminder id: strconv.ParseInt: parsing "bad": invalid syntax`},
+		},
+		{
+			name:   "deny callback parse error is returned",
+			data:   telegramui.CallbackIncomingReminderDeny + "bad",
+			before: func(_ *testing.T, _ *telegoapimock.MockCaller, _ *telegrammocks.MockReminderService) {},
+			expected: struct {
+				handled         bool
+				expectedErrText string
+			}{handled: true, expectedErrText: `parse incoming reminder id: strconv.ParseInt: parsing "bad": invalid syntax`},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctrl := gomock.NewController(t)
+			caller := telegoapimock.NewMockCaller(ctrl)
+			service := telegrammocks.NewMockReminderService(ctrl)
+			test.before(t, caller, service)
+
+			api, err := telego.NewBot(
+				testTelegramToken,
+				telego.WithAPICaller(caller),
+				telego.WithDiscardLogger(),
+			)
+			require.NoError(t, err)
+
+			bot := &ReminderBot{
+				bot:         api,
+				service:     service,
+				uiByChat:    map[int64]int{},
+				draftByChat: map[int64]reminderDraft{},
+			}
+			handled, err := bot.handleIncomingReminderCallback(t.Context(), chatID, 0, test.data)
+			require.Equal(t, test.expected.handled, handled)
+
+			if test.expected.expectedErrText != "" {
+				require.EqualErrorf(t, err, test.expected.expectedErrText, "unexpected error")
+
+				return
+			}
+
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestReminderPermissionInputAndNotifications(t *testing.T) {
+	t.Parallel()
+
+	chatID := int64(200)
+	recipientChatID := int64(300)
+	errRepository := errors.New("repository")
+
+	tests := []struct {
+		name   string
+		action func(context.Context, *ReminderBot) error
+		before func(
+			t *testing.T,
+			caller *telegoapimock.MockCaller,
+			service *telegrammocks.MockReminderService,
+			repository *telegrammocks.MockReminderRepository,
+		)
+		expected struct {
+			expectedErrText string
+		}
+	}{
+		{
+			name: "incoming reminder request message is sent",
+			action: func(ctx context.Context, bot *ReminderBot) error {
+				return bot.sendIncomingReminderRequest(ctx, chatID, recipientChatID, 10)
+			},
+			before: func(
+				t *testing.T,
+				caller *telegoapimock.MockCaller,
+				service *telegrammocks.MockReminderService,
+				_ *telegrammocks.MockReminderRepository,
+			) {
+				t.Helper()
+
+				service.EXPECT().
+					BotUserByChatID(gomock.Any(), chatID).
+					Return(database.BotUser{Username: "sender"}, nil).
+					Times(1)
+				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(testTelegramResponse(t, telego.Message{MessageID: 1}), nil).
+					Times(1)
+			},
+		},
+		{
+			name: "permission username input adds sender",
+			action: func(ctx context.Context, bot *ReminderBot) error {
+				if !bot.applyReminderPermissionText(ctx, chatID, "@alice") {
+					return errors.New("permission text was not applied")
+				}
+
+				return nil
+			},
+			before: func(
+				t *testing.T,
+				caller *telegoapimock.MockCaller,
+				service *telegrammocks.MockReminderService,
+				_ *telegrammocks.MockReminderRepository,
+			) {
+				t.Helper()
+
+				service.EXPECT().
+					ReminderRecipientByUsername(gomock.Any(), chatID, "alice").
+					Return(database.ReminderRecipient{TelegramChatID: 301, Username: "alice"}, nil).
+					Times(1)
+				service.EXPECT().
+					AllowReminderSender(gomock.Any(), chatID, int64(301)).
+					Return(nil).
+					Times(1)
+				service.EXPECT().
+					FindReminderPermissions(gomock.Any(), chatID, reminderPageSize, 0).
+					Return([]database.ReminderPermissionView{{TelegramChatID: 301, Username: "alice"}}, nil).
+					Times(1)
+				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(testTelegramResponse(t, telego.Message{MessageID: 2}), nil).
+					Times(1)
+			},
+		},
+		{
+			name: "incoming reminder requests toggle updates settings",
+			action: func(ctx context.Context, bot *ReminderBot) error {
+				return bot.toggleIncomingReminderRequests(ctx, chatID)
+			},
+			before: func(
+				t *testing.T,
+				caller *telegoapimock.MockCaller,
+				service *telegrammocks.MockReminderService,
+				repository *telegrammocks.MockReminderRepository,
+			) {
+				t.Helper()
+
+				gomock.InOrder(
+					repository.EXPECT().
+						UserSettings(gomock.Any(), chatID).
+						Return(database.UserSettings{IncomingReminderRequestsEnabled: true}, nil).
+						Times(1),
+					service.EXPECT().
+						UpdateIncomingReminderRequests(gomock.Any(), chatID, false).
+						Return(nil).
+						Times(1),
+					repository.EXPECT().
+						UserSettings(gomock.Any(), chatID).
+						Return(database.UserSettings{Timezone: "Europe/Moscow"}, nil).
+						Times(1),
+					repository.EXPECT().
+						UserSettings(gomock.Any(), chatID).
+						Return(database.UserSettings{Timezone: "Europe/Moscow"}, nil).
+						Times(1),
+				)
+				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(testTelegramResponse(t, telego.Message{MessageID: 3}), nil).
+					Times(1)
+			},
+		},
+		{
+			name: "permission removal refreshes access list",
+			action: func(ctx context.Context, bot *ReminderBot) error {
+				return bot.removeReminderPermission(ctx, chatID, 0, 301)
+			},
+			before: func(
+				t *testing.T,
+				caller *telegoapimock.MockCaller,
+				service *telegrammocks.MockReminderService,
+				_ *telegrammocks.MockReminderRepository,
+			) {
+				t.Helper()
+
+				service.EXPECT().
+					RemoveReminderSender(gomock.Any(), chatID, int64(301)).
+					Return(nil).
+					Times(1)
+				service.EXPECT().
+					FindReminderPermissions(gomock.Any(), chatID, reminderPageSize, 0).
+					Return(nil, nil).
+					Times(1)
+				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(testTelegramResponse(t, telego.Message{MessageID: 4}), nil).
+					Times(1)
+			},
+		},
+		{
+			name: "incoming request sender lookup error is returned",
+			action: func(ctx context.Context, bot *ReminderBot) error {
+				return bot.sendIncomingReminderRequest(ctx, chatID, recipientChatID, 10)
+			},
+			before: func(
+				_ *testing.T,
+				_ *telegoapimock.MockCaller,
+				service *telegrammocks.MockReminderService,
+				_ *telegrammocks.MockReminderRepository,
+			) {
+				service.EXPECT().
+					BotUserByChatID(gomock.Any(), chatID).
+					Return(database.BotUser{}, errRepository).
+					Times(1)
+			},
+			expected: struct {
+				expectedErrText string
+			}{expectedErrText: "load sender user: repository"},
+		},
+		{
+			name: "permission username lookup error is rendered",
+			action: func(ctx context.Context, bot *ReminderBot) error {
+				if !bot.applyReminderPermissionText(ctx, chatID, "@missing") {
+					return errors.New("permission text was not applied")
+				}
+
+				return nil
+			},
+			before: func(
+				t *testing.T,
+				caller *telegoapimock.MockCaller,
+				service *telegrammocks.MockReminderService,
+				_ *telegrammocks.MockReminderRepository,
+			) {
+				t.Helper()
+
+				service.EXPECT().
+					ReminderRecipientByUsername(gomock.Any(), chatID, "missing").
+					Return(database.ReminderRecipient{}, errRepository).
+					Times(1)
+				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(testTelegramResponse(t, telego.Message{MessageID: 5}), nil).
+					Times(1)
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctrl := gomock.NewController(t)
+			caller := telegoapimock.NewMockCaller(ctrl)
+			service := telegrammocks.NewMockReminderService(ctrl)
+			repository := telegrammocks.NewMockReminderRepository(ctrl)
+			test.before(t, caller, service, repository)
+
+			api, err := telego.NewBot(
+				testTelegramToken,
+				telego.WithAPICaller(caller),
+				telego.WithDiscardLogger(),
+			)
+			require.NoError(t, err)
+
+			bot := &ReminderBot{
+				bot:         api,
+				service:     service,
+				userRepo:    repository,
+				draftByChat: map[int64]reminderDraft{chatID: {waitingFor: telegramui.FieldPermissionUser}},
+				uiByChat:    map[int64]int{},
+				listByChat:  map[int64]reminderListState{chatID: {kind: reminderListAccess}},
+				menuByChat:  map[int64]chatMenu{},
+			}
+
+			err = test.action(t.Context(), bot)
+			if test.expected.expectedErrText != "" {
+				require.EqualErrorf(t, err, test.expected.expectedErrText, "unexpected error")
+
+				return
+			}
+
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestReminderSettingsAndHistoryScreens(t *testing.T) {
+	t.Parallel()
+
+	chatID := int64(200)
+	errRepository := errors.New("repository")
+
+	tests := []struct {
+		name   string
+		action func(context.Context, *ReminderBot) error
+		before func(
+			t *testing.T,
+			caller *telegoapimock.MockCaller,
+			service *telegrammocks.MockReminderService,
+			repository *telegrammocks.MockReminderRepository,
+		)
+		expected struct {
+			expectedErrText string
+		}
+	}{
+		{
+			name: "timezone settings are sent",
+			action: func(ctx context.Context, bot *ReminderBot) error {
+				return bot.sendTimezoneSettings(ctx, chatID)
+			},
+			before: func(
+				t *testing.T,
+				caller *telegoapimock.MockCaller,
+				_ *telegrammocks.MockReminderService,
+				repository *telegrammocks.MockReminderRepository,
+			) {
+				t.Helper()
+
+				repository.EXPECT().
+					UserSettings(gomock.Any(), chatID).
+					Return(database.UserSettings{Timezone: "Europe/Moscow"}, nil).
+					Times(1)
+				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(testTelegramResponse(t, telego.Message{MessageID: 1}), nil).
+					Times(1)
+			},
+		},
+		{
+			name: "intrusive settings are sent",
+			action: func(ctx context.Context, bot *ReminderBot) error {
+				return bot.sendIntrusiveSettings(ctx, chatID)
+			},
+			before: func(
+				t *testing.T,
+				caller *telegoapimock.MockCaller,
+				_ *telegrammocks.MockReminderService,
+				repository *telegrammocks.MockReminderRepository,
+			) {
+				t.Helper()
+
+				repository.EXPECT().
+					UserSettings(gomock.Any(), chatID).
+					Return(database.UserSettings{Timezone: "Europe/Moscow", IntrusiveInterval: time.Hour}, nil).
+					Times(2)
+				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(testTelegramResponse(t, telego.Message{MessageID: 2}), nil).
+					Times(1)
+			},
+		},
+		{
+			name: "intrusive setting is toggled",
+			action: func(ctx context.Context, bot *ReminderBot) error {
+				return bot.toggleIntrusiveSettings(ctx, chatID)
+			},
+			before: func(
+				t *testing.T,
+				caller *telegoapimock.MockCaller,
+				_ *telegrammocks.MockReminderService,
+				repository *telegrammocks.MockReminderRepository,
+			) {
+				t.Helper()
+
+				gomock.InOrder(
+					repository.EXPECT().
+						UserSettings(gomock.Any(), chatID).
+						Return(database.UserSettings{IntrusiveEnabled: false, IntrusiveInterval: time.Hour}, nil).
+						Times(1),
+					repository.EXPECT().
+						UpdateIntrusiveSettings(gomock.Any(), chatID, true, time.Hour).
+						Return(nil).
+						Times(1),
+					repository.EXPECT().
+						UserSettings(gomock.Any(), chatID).
+						Return(database.UserSettings{IntrusiveEnabled: true, IntrusiveInterval: time.Hour}, nil).
+						Times(2),
+				)
+				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(testTelegramResponse(t, telego.Message{MessageID: 3}), nil).
+					Times(1)
+			},
+		},
+		{
+			name: "history screen is sent",
+			action: func(ctx context.Context, bot *ReminderBot) error {
+				return bot.editReminderHistory(ctx, chatID, 0)
+			},
+			before: func(
+				t *testing.T,
+				caller *telegoapimock.MockCaller,
+				_ *telegrammocks.MockReminderService,
+				repository *telegrammocks.MockReminderRepository,
+			) {
+				t.Helper()
+
+				repository.EXPECT().
+					UserSettings(gomock.Any(), chatID).
+					Return(database.UserSettings{Timezone: "Europe/Moscow"}, nil).
+					Times(1)
+				repository.EXPECT().
+					FindReminderHistoryByChat(gomock.Any(), chatID, reminderPageSize, 0).
+					Return([]database.ReminderView{{ID: 1, Title: "Pay rent"}}, nil).
+					Times(1)
+				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(testTelegramResponse(t, telego.Message{MessageID: 4}), nil).
+					Times(1)
+			},
+		},
+		{
+			name: "timezone settings error is returned",
+			action: func(ctx context.Context, bot *ReminderBot) error {
+				return bot.sendTimezoneSettings(ctx, chatID)
+			},
+			before: func(
+				_ *testing.T,
+				_ *telegoapimock.MockCaller,
+				_ *telegrammocks.MockReminderService,
+				repository *telegrammocks.MockReminderRepository,
+			) {
+				repository.EXPECT().
+					UserSettings(gomock.Any(), chatID).
+					Return(database.UserSettings{}, errRepository).
+					Times(1)
+			},
+			expected: struct {
+				expectedErrText string
+			}{expectedErrText: "load user settings: repository"},
+		},
+		{
+			name: "history load error is returned",
+			action: func(ctx context.Context, bot *ReminderBot) error {
+				return bot.editReminderHistory(ctx, chatID, 0)
+			},
+			before: func(
+				_ *testing.T,
+				_ *telegoapimock.MockCaller,
+				_ *telegrammocks.MockReminderService,
+				repository *telegrammocks.MockReminderRepository,
+			) {
+				repository.EXPECT().
+					UserSettings(gomock.Any(), chatID).
+					Return(database.UserSettings{Timezone: "Europe/Moscow"}, nil).
+					Times(1)
+				repository.EXPECT().
+					FindReminderHistoryByChat(gomock.Any(), chatID, reminderPageSize, 0).
+					Return(nil, errRepository).
+					Times(1)
+			},
+			expected: struct {
+				expectedErrText string
+			}{expectedErrText: "load reminder history: repository"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctrl := gomock.NewController(t)
+			caller := telegoapimock.NewMockCaller(ctrl)
+			service := telegrammocks.NewMockReminderService(ctrl)
+			repository := telegrammocks.NewMockReminderRepository(ctrl)
+			test.before(t, caller, service, repository)
+
+			api, err := telego.NewBot(
+				testTelegramToken,
+				telego.WithAPICaller(caller),
+				telego.WithDiscardLogger(),
+			)
+			require.NoError(t, err)
+
+			bot := &ReminderBot{
+				bot:         api,
+				service:     service,
+				userRepo:    repository,
+				draftByChat: map[int64]reminderDraft{},
+				uiByChat:    map[int64]int{},
+				listByChat:  map[int64]reminderListState{},
+				menuByChat:  map[int64]chatMenu{},
+			}
+
+			err = test.action(t.Context(), bot)
+			if test.expected.expectedErrText != "" {
+				require.EqualErrorf(t, err, test.expected.expectedErrText, "unexpected error")
+
+				return
+			}
+
+			require.NoError(t, err)
 		})
 	}
 }
@@ -546,6 +1710,7 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 				expectedText: "<b>Название:</b>\nPay rent\n\n" +
 					"<b>Описание:</b>\nBefore lunch\n\n" +
 					"<b>Дата начала напоминаний:</b>\n02.06.2026, Вт 09:30\n\n" +
+					"<b>Напомнить:</b>\nмне\n\n" +
 					"<b>Повторять:</b>\nнет\n\n" +
 					"<i>Проверьте шаблон и сохраните напоминание.</i>",
 			},
@@ -569,6 +1734,7 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 				expectedText: "<b>Название:</b>\nPay rent\n\n" +
 					"<b>Описание:</b>\nBefore lunch\n\n" +
 					"<b>Дата начала напоминаний:</b>\n02.06.2026, Вт 00:00\n\n" +
+					"<b>Напомнить:</b>\nмне\n\n" +
 					"<b>Повторять:</b>\nвыбрано дат: 2\n\n" +
 					"<i>Выберите дату и введите время напоминания.</i>",
 			},
@@ -593,6 +1759,7 @@ func TestReminderUITextsAndKeyboards(t *testing.T) {
 				expectedText: "<b>Название:</b>\n\n\n" +
 					"<b>Описание:</b>\n\n\n" +
 					"<b>Дата начала напоминаний:</b>\n\n\n" +
+					"<b>Напомнить:</b>\nмне\n\n" +
 					"<b>Повторять:</b>\nнет\n\n" +
 					"<i>Введите название и время напоминания.</i>",
 			},
@@ -638,7 +1805,7 @@ func TestReminderUIBuildsExpectedKeyboards(t *testing.T) {
 			expected: struct {
 				rowCount        int
 				firstButtonText string
-			}{rowCount: 4, firstButtonText: "Название"},
+			}{rowCount: 5, firstButtonText: "Название"},
 		},
 		{
 			name: "filled one time draft keyboard offers changing date",
@@ -650,7 +1817,7 @@ func TestReminderUIBuildsExpectedKeyboards(t *testing.T) {
 			expected: struct {
 				rowCount        int
 				firstButtonText string
-			}{rowCount: 4, firstButtonText: "Название"},
+			}{rowCount: 5, firstButtonText: "Название"},
 		},
 		{
 			name: "empty recurring draft keyboard explains start date time",
@@ -660,7 +1827,7 @@ func TestReminderUIBuildsExpectedKeyboards(t *testing.T) {
 			expected: struct {
 				rowCount        int
 				firstButtonText string
-			}{rowCount: 4, firstButtonText: "Название"},
+			}{rowCount: 5, firstButtonText: "Название"},
 		},
 		{
 			name: "filled recurring draft keyboard offers changing start date time",
@@ -673,7 +1840,7 @@ func TestReminderUIBuildsExpectedKeyboards(t *testing.T) {
 			expected: struct {
 				rowCount        int
 				firstButtonText string
-			}{rowCount: 4, firstButtonText: "Название"},
+			}{rowCount: 5, firstButtonText: "Название"},
 		},
 		{
 			name: "date choice keyboard is compact",
@@ -954,6 +2121,131 @@ func TestSenderSendsReminder(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+func TestSenderDeletesReminderMessage(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		reminder database.ScheduledReminder
+		before   func(caller *telegoapimock.MockCaller)
+		expected struct {
+			expectedErrText string
+		}
+	}{
+		{
+			name: "message id is absent",
+			reminder: database.ScheduledReminder{
+				ID:             1,
+				TelegramChatID: 200,
+			},
+			before: func(_ *telegoapimock.MockCaller) {},
+		},
+		{
+			name: "message is deleted",
+			reminder: database.ScheduledReminder{
+				ID:                2,
+				TelegramChatID:    200,
+				TelegramMessageID: ptr(10),
+			},
+			before: func(caller *telegoapimock.MockCaller) {
+				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(testTelegramResponse(t, telego.Message{MessageID: 10}), nil).
+					Times(1)
+			},
+		},
+		{
+			name: "api caller error is returned",
+			reminder: database.ScheduledReminder{
+				ID:                3,
+				TelegramChatID:    200,
+				TelegramMessageID: ptr(11),
+			},
+			before: func(caller *telegoapimock.MockCaller) {
+				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil, errTelegramAPI).
+					Times(1)
+			},
+			expected: struct {
+				expectedErrText string
+			}{expectedErrText: "delete telegram reminder 3 message: telego: deleteMessage: internal execution: request call: telegram api"},
+		},
+		{
+			name: "message id zero is sent to telegram api",
+			reminder: database.ScheduledReminder{
+				ID:                4,
+				TelegramChatID:    200,
+				TelegramMessageID: ptr(0),
+			},
+			before: func(caller *telegoapimock.MockCaller) {
+				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(testTelegramResponse(t, telego.Message{MessageID: 0}), nil).
+					Times(1)
+			},
+		},
+		{
+			name: "different chat message is deleted",
+			reminder: database.ScheduledReminder{
+				ID:                5,
+				TelegramChatID:    201,
+				TelegramMessageID: ptr(12),
+			},
+			before: func(caller *telegoapimock.MockCaller) {
+				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(testTelegramResponse(t, telego.Message{MessageID: 12}), nil).
+					Times(1)
+			},
+		},
+		{
+			name: "second api caller error is returned",
+			reminder: database.ScheduledReminder{
+				ID:                6,
+				TelegramChatID:    202,
+				TelegramMessageID: ptr(13),
+			},
+			before: func(caller *telegoapimock.MockCaller) {
+				caller.EXPECT().Call(gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil, errTelegramAPI).
+					Times(1)
+			},
+			expected: struct {
+				expectedErrText string
+			}{expectedErrText: "delete telegram reminder 6 message: telego: deleteMessage: internal execution: request call: telegram api"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctrl := gomock.NewController(t)
+			caller := telegoapimock.NewMockCaller(ctrl)
+			test.before(caller)
+
+			api, err := telego.NewBot(
+				testTelegramToken,
+				telego.WithAPICaller(caller),
+				telego.WithDiscardLogger(),
+			)
+			require.NoError(t, err)
+
+			sender := &Sender{bot: api}
+
+			err = sender.DeleteReminderMessage(t.Context(), test.reminder)
+			if test.expected.expectedErrText != "" {
+				require.EqualErrorf(t, err, test.expected.expectedErrText, "unexpected error")
+
+				return
+			}
+
+			require.NoError(t, err)
+		})
+	}
+}
+
+func ptr(value int) *int {
+	return &value
 }
 
 func TestSenderSendsHoliday(t *testing.T) {

@@ -1,4 +1,73 @@
-version: 1.4.0
+version: 1.6.0
+
+## v1.6.0 - Kovio common infrastructure
+
+### What was done
+
+EasyNote now uses the stable `github.com/EgorKo25/kovio-common v1.0.0` module for shared application infrastructure.
+
+The product configuration embeds `kconfig.Config` for the common application and logger sections while keeping scheduler, Telegram, and database settings inside EasyNote.
+
+The local logger and background runner implementations were removed. EasyNote now uses `klogger` for structured logging and `background` for coordinated long-lived processes.
+
+### API changes
+
+- added the `github.com/EgorKo25/kovio-common v1.0.0` dependency;
+- replaced the local configuration loader with `kconfig.Load`;
+- replaced local logger and background packages with `klogger` and `background`;
+- kept scheduler, planner, Telegram UI, and database models owned by EasyNote.
+
+### Affected files
+
+- `CHANGELIST.md`
+- `go.mod`
+- `go.sum`
+- `main.go`
+- `src/config/config.go`
+- `src/database/postgresql/postgresql.go`
+- `src/scheduler/ready_reminders.go`
+- `src/telegram/reminder_bot.go`
+- `src/telegram/sender.go`
+- `src/background`
+- `src/logger`
+
+## v1.5.0 - Shared reminders and shopping list editor
+
+### What was done
+
+Shopping list creation no longer uses the `Добавить в список` button. After opening the shopping-list draft, every user message is appended as a separate item while the current viewing, item toggle, pagination, and persistence behavior stays unchanged.
+
+Reminder drafts now show `Напомнить: мне` by default. The user can press `Изменить получателя`, enter a recipient as `@username`, or press `Мне` to return to a personal reminder.
+
+The bot stores Telegram usernames for users who have used EasyNote. If the selected recipient exists and already allowed the sender, the outgoing reminder is created as ready for execution. Otherwise, while incoming requests are enabled, the recipient receives `Разрешить пользователю @username добавить вам напоминание?` with `Разрешить`, `Запретить`, and `Разрешать всегда` actions.
+
+Settings now include `Кто может мне напоминать` and `Запросы на напоминания: Включено/Выключено`. The access list is paginated like reminder lists, allows adding users by username, and allows removing previously allowed users. If incoming reminder requests are disabled, new reminders from other users are stored as declined.
+
+The reminders menu now includes `Исходящие`, where users can see reminders they created for other users with statuses `Выполнено`, `Отменено`, `Напомнено`, `Ожидает исполнения`, `Отклонено`, `Ожидает подтверждения`, and `Не отправлено`.
+
+### API changes
+
+- added `bot_users` and `reminder_permissions` tables;
+- added `incoming_reminder_requests_enabled` to `user_settings`;
+- added sender and recipient metadata to `notes`;
+- extended reminder statuses with `pending_confirmation` and `declined`;
+- added PostgreSQL, service, and Telegram methods for shared reminder requests, permissions, outgoing reminders, and incoming request toggles.
+
+### Affected files
+
+- `CHANGELIST.md`
+- `README.md`
+- `README_RU.md`
+- `migrations/00007_add_user_reminders.go`
+- `src/database/postgresql/user_reminder_storage.go`
+- `src/database/postgresql/reminders_storage.go`
+- `src/database/postgresql/recurring_storage.go`
+- `src/database/postgresql/user_settings_storage.go`
+- `src/database/types.go`
+- `src/service/reminders.go`
+- `src/telegram/reminder_bot.go`
+- `src/telegram/sender.go`
+- `src/telegram/ui`
 
 ## v1.4.0 - Holidays and shopping lists
 
