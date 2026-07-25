@@ -1,3 +1,4 @@
+//nolint:wrapcheck // Service tests assert wrapped errors at the call boundary.
 package service_test
 
 import (
@@ -23,6 +24,7 @@ var (
 	errExpectedCreateReminder   = errors.New("create reminder: create reminder repository")
 	errExpectedCancelReminder   = errors.New("delete reminder: cancel reminder repository")
 	errExpectedReminderNotFound = errors.New("delete reminder: reminder not found")
+	errUserReminderRepository   = errors.New("user reminder repository")
 )
 
 func errorText(err error) string {
@@ -31,6 +33,234 @@ func errorText(err error) string {
 	}
 
 	return err.Error()
+}
+
+func TestReminderServiceUserReminderAccess(t *testing.T) {
+	t.Parallel()
+
+	chatID := int64(200)
+	recipientChatID := int64(300)
+	reminderID := int64(10)
+
+	tests := []struct {
+		name     string
+		action   func(context.Context, *service.ReminderService) error
+		before   func(repository *mocks.MockReminderCommandRepository)
+		expected struct {
+			expectedErrText string
+		}
+	}{
+		{
+			name: "recipient lookup trims at sign",
+			action: func(ctx context.Context, reminderService *service.ReminderService) error {
+				recipient, err := reminderService.ReminderRecipientByUsername(ctx, chatID, "@alice")
+				require.Equal(
+					t,
+					database.ReminderRecipient{TelegramChatID: recipientChatID, Username: "alice"},
+					recipient,
+				)
+
+				return err
+			},
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					ReminderRecipientByUsername(gomock.Any(), chatID, "alice").
+					Return(database.ReminderRecipient{TelegramChatID: recipientChatID, Username: "alice"}, nil).
+					Times(1)
+			},
+		},
+		{
+			name: "shared reminder is created",
+			action: func(ctx context.Context, reminderService *service.ReminderService) error {
+				reminder, err := reminderService.CreateSharedReminder(ctx, database.SharedReminderRequest{
+					SenderChatID:      chatID,
+					RecipientChatID:   recipientChatID,
+					RecipientUsername: "@alice",
+					Title:             " Pay rent ",
+					Description:       " Card ",
+					RemindAt:          time.Date(2099, 6, 2, 18, 45, 0, 0, time.UTC),
+					Status:            database.ReminderStatusNew,
+				})
+				require.Equal(t, database.ReminderView{ID: reminderID, Title: "Pay rent"}, reminder)
+
+				return err
+			},
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					CreateSharedReminder(gomock.Any(), gomock.Any()).
+					DoAndReturn(func(_ context.Context, request database.SharedReminderRequest) (database.ReminderView, error) {
+						require.Equal(t, "Pay rent", request.Title)
+						require.Equal(t, "Card", request.Description)
+						require.Equal(t, "alice", request.RecipientUsername)
+
+						return database.ReminderView{ID: reminderID, Title: "Pay rent"}, nil
+					}).
+					Times(1)
+			},
+		},
+		{
+			name: "permission is allowed",
+			action: func(ctx context.Context, reminderService *service.ReminderService) error {
+				return reminderService.AllowReminderSender(ctx, chatID, recipientChatID)
+			},
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					AllowReminderSender(gomock.Any(), chatID, recipientChatID).
+					Return(nil).
+					Times(1)
+			},
+		},
+		{
+			name: "bot user is loaded",
+			action: func(ctx context.Context, reminderService *service.ReminderService) error {
+				user, err := reminderService.BotUserByChatID(ctx, chatID)
+				require.Equal(t, database.BotUser{TelegramChatID: chatID, Username: "sender"}, user)
+
+				return err
+			},
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					BotUserByChatID(gomock.Any(), chatID).
+					Return(database.BotUser{TelegramChatID: chatID, Username: "sender"}, nil).
+					Times(1)
+			},
+		},
+		{
+			name: "incoming reminder is accepted",
+			action: func(ctx context.Context, reminderService *service.ReminderService) error {
+				return reminderService.AcceptIncomingReminder(ctx, chatID, reminderID)
+			},
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					AcceptIncomingReminder(gomock.Any(), chatID, reminderID).
+					Return(nil).
+					Times(1)
+			},
+		},
+		{
+			name: "incoming reminder is declined",
+			action: func(ctx context.Context, reminderService *service.ReminderService) error {
+				return reminderService.DeclineIncomingReminder(ctx, chatID, reminderID)
+			},
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					DeclineIncomingReminder(gomock.Any(), chatID, reminderID).
+					Return(nil).
+					Times(1)
+			},
+		},
+		{
+			name: "reminder sender chat id is loaded",
+			action: func(ctx context.Context, reminderService *service.ReminderService) error {
+				senderChatID, err := reminderService.ReminderSenderChatID(ctx, chatID, reminderID)
+				require.Equal(t, recipientChatID, senderChatID)
+
+				return err
+			},
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					ReminderSenderChatID(gomock.Any(), chatID, reminderID).
+					Return(recipientChatID, nil).
+					Times(1)
+			},
+		},
+		{
+			name: "permissions are loaded",
+			action: func(ctx context.Context, reminderService *service.ReminderService) error {
+				permissions, err := reminderService.FindReminderPermissions(ctx, chatID, 2, 0)
+				require.Equal(
+					t,
+					[]database.ReminderPermissionView{{TelegramChatID: recipientChatID, Username: "alice"}},
+					permissions,
+				)
+
+				return err
+			},
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					FindReminderPermissions(gomock.Any(), chatID, 2, 0).
+					Return([]database.ReminderPermissionView{{TelegramChatID: recipientChatID, Username: "alice"}}, nil).
+					Times(1)
+			},
+		},
+		{
+			name: "permission is removed",
+			action: func(ctx context.Context, reminderService *service.ReminderService) error {
+				return reminderService.RemoveReminderSender(ctx, chatID, recipientChatID)
+			},
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					RemoveReminderSender(gomock.Any(), chatID, recipientChatID).
+					Return(nil).
+					Times(1)
+			},
+		},
+		{
+			name: "outgoing reminders are loaded",
+			action: func(ctx context.Context, reminderService *service.ReminderService) error {
+				reminders, err := reminderService.FindOutgoingRemindersByChat(ctx, chatID, 2, 0)
+				require.Equal(t, []database.ReminderView{{ID: reminderID, Title: "Pay rent"}}, reminders)
+
+				return err
+			},
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					FindOutgoingRemindersByChat(gomock.Any(), chatID, 2, 0).
+					Return([]database.ReminderView{{ID: reminderID, Title: "Pay rent"}}, nil).
+					Times(1)
+			},
+		},
+		{
+			name: "empty recipient is rejected",
+			action: func(ctx context.Context, reminderService *service.ReminderService) error {
+				_, err := reminderService.ReminderRecipientByUsername(ctx, chatID, "@")
+
+				return err
+			},
+			before: func(_ *mocks.MockReminderCommandRepository) {},
+			expected: struct {
+				expectedErrText string
+			}{expectedErrText: "load reminder recipient: reminder recipient is empty"},
+		},
+		{
+			name: "repository error is wrapped",
+			action: func(ctx context.Context, reminderService *service.ReminderService) error {
+				return reminderService.UpdateIncomingReminderRequests(ctx, chatID, false)
+			},
+			before: func(repository *mocks.MockReminderCommandRepository) {
+				repository.EXPECT().
+					UpdateIncomingReminderRequests(gomock.Any(), chatID, false).
+					Return(errUserReminderRepository).
+					Times(1)
+			},
+			expected: struct {
+				expectedErrText string
+			}{expectedErrText: "update incoming reminder requests: user reminder repository"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctrl := gomock.NewController(t)
+			repository := mocks.NewMockReminderCommandRepository(ctrl)
+			planner := mocks.NewMockReminderCreationPlanner(ctrl)
+
+			test.before(repository)
+
+			reminderService := service.NewReminderService(repository, planner)
+
+			err := test.action(t.Context(), reminderService)
+			if test.expected.expectedErrText != "" {
+				require.EqualErrorf(t, err, test.expected.expectedErrText, "unexpected error")
+
+				return
+			}
+
+			require.NoError(t, err)
+		})
+	}
 }
 
 func TestReminderServiceCreatesReminder(t *testing.T) {

@@ -121,11 +121,13 @@ The main menu is a reply-keyboard message with a compact formatted stats block f
 
 The main menu reply keyboard is ordered as `➕ Создать`, `⏰ Напоминания` / `🛒 Списки`, and `🎉 Праздники` / `⚙️ Настройки`.
 
-Reminder creation uses inline keyboards again. The draft message is rendered as labeled sections: title, description, reminder start date, and repeat state. Draft buttons are ordered as title/description, date/time, repeat, and save/cancel. While the bot waits for title or description input, those buttons change to `Введите название` or `Введите описание`; after input they change to `Изменить ...`.
+Reminder creation uses inline keyboards again. The draft message is rendered as labeled sections: title, description, reminder start date, recipient, and repeat state. Draft buttons are ordered as title/description, date/time, recipient, repeat, and save/cancel. While the bot waits for title, description, or recipient input, those buttons change to `Введите ...`; after input they change back to edit actions.
+
+Reminder drafts show `Напомнить: мне` by default. `Изменить получателя` lets the user enter `@username`; `Мне` resets the draft to a personal reminder. Shared reminders can be pending confirmation, ready for execution, declined, reminded, completed, canceled, or failed.
 
 Holiday creation starts from `Создать` -> `Праздник`. The bot renders the prepared congratulation template, asks for holiday name, recipient name, date, and reminder time, and stores the holiday separately from regular notes and reminders. The scheduler sends due holidays through the planner, so holidays do not appear in active or past reminder lists. The `🎉 Праздники` menu shows two holidays per page and opens holiday details with `Изменить`, `Удалить`, and `Назад` actions.
 
-Shopping list creation starts from `Создать` -> `Список покупок`. The editor renders `Необходимо купить` with numbered items, adds items as the user sends them, and stores the list in PostgreSQL. The `🛒 Списки` menu shows two lists per page; opening a list renders each item as an inline button. Pressing an item persists its checked state and shows it with a check mark and strikethrough text.
+Shopping list creation starts from `Создать` -> `Список покупок`. The editor renders `Необходимо купить` with numbered items; every message the user sends while editing is appended as a separate item. The list is stored in PostgreSQL. The `🛒 Списки` menu shows two lists per page; opening a list renders each item as an inline button. Pressing an item persists its checked state and shows it with a check mark and strikethrough text.
 
 The draft screen shows service prompts in italic. The prompt only asks for missing required fields: title, time, or both.
 
@@ -133,9 +135,13 @@ Reminder time is entered as text while the time screen is open, in `HH:MM` forma
 
 Active reminders opened from the reply-keyboard list show inline details actions, including `Изменить` and `Удалить`. Editing opens the reminder draft with the current title, description, date, and time. Reminder list buttons hide internal reminder IDs.
 
+The reminders menu includes `Исходящие`, which shows reminders the current user created for other EasyNote users. Each outgoing reminder shows one of these statuses: `Выполнено`, `Отменено`, `Напомнено`, `Ожидает исполнения`, `Отклонено`, `Ожидает подтверждения`, or `Не отправлено`.
+
 Intrusive reminder settings use an inline `Включено` / `Выключено` toggle, a `Сохранить` button that returns to settings, and edit the existing settings message after manual interval input. Intervals can be entered as plain minutes or Go duration values such as `1m` and `1h30m`, are persisted from 1 to 120 minutes, and are displayed as user-facing text such as `каждые 30 минут` or `раз в 1 час 20 минут`. Intrusive delivery stops at 00:00 on the next local calendar day after the reminder time, and the last intrusive message is deleted when the scheduler stops that mode.
 
 Settings have an explicit `Сохранить` button that returns to the main menu. Timezone selection contains 24 unique UTC hour offsets shown uniformly as `UTC (+N)` / `UTC (-N)`; the UTC+3 option uses Moscow internally as the default timezone. Reminder drafts and reminder details load the user's timezone before formatting or calculating reminder time.
+
+Settings include `Кто может мне напоминать` and `Запросы на напоминания: Включено/Выключено`. The access list is paginated like reminder lists, supports adding users by `@username`, and supports removing allowed users. If incoming reminder requests are disabled, new reminders from other users are automatically declined.
 
 Reminder lists keep their reply `Назад` navigation available while reminder-title buttons still open reminder details.
 

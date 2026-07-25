@@ -28,6 +28,7 @@ func CreateKeyboard() *telego.ReplyKeyboardMarkup {
 func RemindersKeyboard() *telego.ReplyKeyboardMarkup {
 	return tu.Keyboard(
 		tu.KeyboardRow(tu.KeyboardButton(ButtonReminderList), tu.KeyboardButton(ButtonReminderHistory)),
+		tu.KeyboardRow(tu.KeyboardButton(ButtonOutgoingReminders)),
 		tu.KeyboardRow(tu.KeyboardButton(ButtonBack)),
 	).WithResizeKeyboard()
 }
@@ -71,20 +72,29 @@ func reminderDraftMainKeyboard(draft Draft) *telego.InlineKeyboardMarkup {
 		dateButtonText = "Изменить дату и время начала"
 	}
 
-	return tu.InlineKeyboard(
+	rows := [][]telego.InlineKeyboardButton{
 		tu.InlineKeyboardRow(
 			tu.InlineKeyboardButton(titleButtonText).WithCallbackData(CallbackDraftTitle),
 			tu.InlineKeyboardButton(descriptionButtonText).WithCallbackData(CallbackDraftDescription),
 		),
 		tu.InlineKeyboardRow(tu.InlineKeyboardButton(dateButtonText).WithCallbackData(CallbackDraftDate)),
 		tu.InlineKeyboardRow(
-			tu.InlineKeyboardButton(ButtonDraftRepeat).WithCallbackData(CallbackDraftRepeat),
+			tu.InlineKeyboardButton(draftRecipientButtonText(draft)).WithCallbackData(CallbackDraftRecipient),
 		),
+		tu.InlineKeyboardRow(tu.InlineKeyboardButton(ButtonDraftRepeat).WithCallbackData(CallbackDraftRepeat)),
+	}
+	if draft.WaitingFor == FieldRecipient {
+		rows = append(rows, draftRecipientMeRow())
+	}
+
+	rows = append(rows,
 		tu.InlineKeyboardRow(
 			tu.InlineKeyboardButton(ButtonDraftSave).WithCallbackData(CallbackDraftSave),
 			tu.InlineKeyboardButton(ButtonDraftCancel).WithCallbackData(CallbackDraftCancel),
 		),
 	)
+
+	return tu.InlineKeyboard(rows...)
 }
 
 func holidayDraftMainKeyboard(draft Draft) *telego.InlineKeyboardMarkup {
@@ -105,11 +115,24 @@ func holidayDraftMainKeyboard(draft Draft) *telego.InlineKeyboardMarkup {
 
 func shoppingDraftMainKeyboard() *telego.InlineKeyboardMarkup {
 	return tu.InlineKeyboard(
-		tu.InlineKeyboardRow(tu.InlineKeyboardButton(ButtonShoppingAddItem).WithCallbackData(CallbackShoppingAddItem)),
 		tu.InlineKeyboardRow(
 			tu.InlineKeyboardButton(ButtonBack).WithCallbackData(CallbackDraftCancel),
 			tu.InlineKeyboardButton(ButtonDraftSave).WithCallbackData(CallbackDraftSave),
 		),
+	)
+}
+
+func draftRecipientButtonText(draft Draft) string {
+	if draft.WaitingFor == FieldRecipient {
+		return ButtonDraftEnterRecipient
+	}
+
+	return ButtonDraftRecipient
+}
+
+func draftRecipientMeRow() []telego.InlineKeyboardButton {
+	return tu.InlineKeyboardRow(
+		tu.InlineKeyboardButton(ButtonDraftRecipientMe).WithCallbackData(CallbackDraftRecipientMe),
 	)
 }
 
@@ -191,6 +214,7 @@ func DraftReplyKeyboard(draft Draft, now time.Time) *telego.ReplyKeyboardMarkup 
 		return tu.Keyboard(
 			tu.KeyboardRow(tu.KeyboardButton(titleButtonText), tu.KeyboardButton(descriptionButtonText)),
 			tu.KeyboardRow(tu.KeyboardButton(dateButtonText), tu.KeyboardButton(ButtonDraftRepeat)),
+			tu.KeyboardRow(tu.KeyboardButton(draftRecipientButtonText(draft))),
 			tu.KeyboardRow(tu.KeyboardButton(ButtonDraftSave)),
 			tu.KeyboardRow(tu.KeyboardButton(ButtonDraftCancel)),
 		).WithResizeKeyboard()
@@ -431,8 +455,33 @@ func SettingsKeyboard() *telego.ReplyKeyboardMarkup {
 		tu.KeyboardRow(tu.KeyboardButton(ButtonSettingsLanguage)),
 		tu.KeyboardRow(tu.KeyboardButton(ButtonSettingsTimezone)),
 		tu.KeyboardRow(tu.KeyboardButton(ButtonSettingsIntrusive)),
+		tu.KeyboardRow(tu.KeyboardButton(ButtonSettingsReminderAccess)),
+		tu.KeyboardRow(tu.KeyboardButton(ButtonSettingsIncomingRequests)),
 		tu.KeyboardRow(tu.KeyboardButton(ButtonSettingsSave)),
 	).WithResizeKeyboard()
+}
+
+func ReminderAccessKeyboard(users []database.ReminderPermissionView) *telego.ReplyKeyboardMarkup {
+	rows := make([][]telego.KeyboardButton, 0, len(users)+3)
+	for _, user := range users {
+		rows = append(rows, tu.KeyboardRow(tu.KeyboardButton("@"+user.Username)))
+	}
+
+	rows = append(rows, tu.KeyboardRow(tu.KeyboardButton(ButtonPreviousPage), tu.KeyboardButton(ButtonNextPage)))
+	rows = append(rows, tu.KeyboardRow(tu.KeyboardButton(ButtonDraftEnterRecipient)))
+	rows = append(rows, tu.KeyboardRow(tu.KeyboardButton(ButtonBack)))
+
+	return tu.Keyboard(rows...).WithResizeKeyboard()
+}
+
+func ReminderAccessDetailsKeyboard(user database.ReminderPermissionView) *telego.InlineKeyboardMarkup {
+	return tu.InlineKeyboard(
+		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton("Удалить").
+				WithCallbackData(fmt.Sprintf("%s%d", CallbackPermissionRemovePrefix, user.TelegramChatID)),
+		),
+		tu.InlineKeyboardRow(tu.InlineKeyboardButton(ButtonBack).WithCallbackData(CallbackSettingsReminderAccess)),
+	)
 }
 
 func TimezoneKeyboard(index int, now time.Time) *telego.ReplyKeyboardMarkup {
@@ -461,6 +510,22 @@ func IntrusiveSettingsKeyboard(enabled bool) *telego.InlineKeyboardMarkup {
 	return tu.InlineKeyboard(
 		tu.InlineKeyboardRow(tu.InlineKeyboardButton(toggleText).WithCallbackData(callback)),
 		tu.InlineKeyboardRow(tu.InlineKeyboardButton(ButtonSettingsSave).WithCallbackData(CallbackSettings)),
+	)
+}
+
+func IncomingReminderRequestKeyboard(reminderID int64) *telego.InlineKeyboardMarkup {
+	allowCallback := fmt.Sprintf("%s%d", CallbackIncomingReminderAllow, reminderID)
+	denyCallback := fmt.Sprintf("%s%d", CallbackIncomingReminderDeny, reminderID)
+	alwaysCallback := fmt.Sprintf("%s%d", CallbackIncomingReminderAlways, reminderID)
+
+	return tu.InlineKeyboard(
+		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton("Разрешить").WithCallbackData(allowCallback),
+			tu.InlineKeyboardButton("Запретить").WithCallbackData(denyCallback),
+		),
+		tu.InlineKeyboardRow(
+			tu.InlineKeyboardButton("Разрешать всегда").WithCallbackData(alwaysCallback),
+		),
 	)
 }
 

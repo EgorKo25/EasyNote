@@ -11,8 +11,8 @@ import (
 
 	"github.com/EgorKo25/EasyNote/src/config"
 	"github.com/EgorKo25/EasyNote/src/database"
-	"github.com/EgorKo25/EasyNote/src/logger"
 	telegramui "github.com/EgorKo25/EasyNote/src/telegram/ui"
+	logger "github.com/EgorKo25/kovio-common/klogger"
 	"github.com/mymmrac/telego"
 	tu "github.com/mymmrac/telego/telegoutil"
 )

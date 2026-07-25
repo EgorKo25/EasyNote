@@ -60,6 +60,7 @@ func TestTextRendering(t *testing.T) {
 				text: "<b>Название:</b>\nPay rent\n\n" +
 					"<b>Описание:</b>\nBefore lunch\n\n" +
 					"<b>Дата начала напоминаний:</b>\n02.06.2026, Вт 09:30\n\n" +
+					"<b>Напомнить:</b>\nмне\n\n" +
 					"<b>Повторять:</b>\nнет\n\n" +
 					"<i>Проверьте шаблон и сохраните напоминание.</i>",
 			},
@@ -87,9 +88,56 @@ func TestTextRendering(t *testing.T) {
 				text: "<b>Название:</b>\nA\n\n" +
 					"<b>Описание:</b>\n\n\n" +
 					"<b>Дата начала напоминаний:</b>\n\n\n" +
+					"<b>Напомнить:</b>\nмне\n\n" +
 					"<b>Повторять:</b>\nнет\n\n" +
 					"<i>Выберите дату и введите время напоминания.</i>",
 			},
+		},
+		{
+			name: "draft recipient renders username",
+			action: func() string {
+				return telegramui.DraftText(telegramui.Draft{
+					Title:     "Pay rent",
+					Recipient: "alice",
+				}, location)
+			},
+			expected: struct {
+				text string
+			}{
+				text: "<b>Название:</b>\nPay rent\n\n" +
+					"<b>Описание:</b>\n\n\n" +
+					"<b>Дата начала напоминаний:</b>\n\n\n" +
+					"<b>Напомнить:</b>\n@alice\n\n" +
+					"<b>Повторять:</b>\nнет\n\n" +
+					"<i>Выберите дату и введите время напоминания.</i>",
+			},
+		},
+		{
+			name: "outgoing reminder view renders recipient and status",
+			action: func() string {
+				return telegramui.OutgoingReminderViewText(database.ReminderView{
+					Title:             "Pay rent",
+					Description:       "Card",
+					RecipientUsername: "alice",
+					Status:            database.ReminderStatusPendingConfirmation,
+					RemindAt:          time.Date(2026, 6, 2, 9, 30, 0, 0, location),
+				}, location)
+			},
+			expected: struct {
+				text string
+			}{
+				text: "<b>Pay rent</b>\n\nCard\n\n<b>Получатель:</b> @alice\n" +
+					"<b>Статус:</b> Ожидает подтверждения\n<b>Дата:</b> 02.06.2026 09:30",
+			},
+		},
+		{
+			name: "outgoing reminder sent status renders reminded",
+			action: func() string {
+				return telegramui.OutgoingReminderStatusText(database.ReminderStatusSent)
+			},
+			expected: struct {
+				text string
+			}{text: "Напомнено"},
 		},
 		{
 			name: "reminder view text includes formatted time",
@@ -217,6 +265,7 @@ func TestTextRendering(t *testing.T) {
 				text: "<b>Название:</b>\n\n\n" +
 					"<b>Описание:</b>\n\n\n" +
 					"<b>Дата начала напоминаний:</b>\n\n\n" +
+					"<b>Напомнить:</b>\nмне\n\n" +
 					"<b>Повторять:</b>\nнет\n\n" +
 					"<i>Введите название напоминания сообщением.</i>",
 			},
@@ -253,7 +302,7 @@ func TestKeyboardRendering(t *testing.T) {
 			expected: struct {
 				rows      int
 				firstText string
-			}{rows: 4, firstText: "Название"},
+			}{rows: 5, firstText: "Название"},
 		},
 		{
 			name: "filled recurring telegramui.Draft asks to change start date time",
@@ -266,7 +315,7 @@ func TestKeyboardRendering(t *testing.T) {
 			expected: struct {
 				rows      int
 				firstText string
-			}{rows: 4, firstText: "Название"},
+			}{rows: 5, firstText: "Название"},
 		},
 		{
 			name: "date choice screen has quick choices",
@@ -465,7 +514,7 @@ func TestMenuAndActionKeyboards(t *testing.T) {
 			},
 			expected: struct {
 				rows [][]string
-			}{rows: [][]string{{"Активные", "Прошедшие"}, {"Назад"}}},
+			}{rows: [][]string{{"Активные", "Прошедшие"}, {"Исходящие"}, {"Назад"}}},
 		},
 		{
 			name: "reminder details keyboard exposes edit back delete and main menu",
@@ -502,7 +551,7 @@ func TestMenuAndActionKeyboards(t *testing.T) {
 			}},
 		},
 		{
-			name: "shopping draft keyboard exposes add back and save",
+			name: "shopping draft keyboard exposes back and save",
 			action: func() [][]string {
 				keyboard := telegramui.DraftKeyboard(telegramui.Draft{Kind: telegramui.DraftKindShopping}, time.Now())
 
@@ -510,7 +559,7 @@ func TestMenuAndActionKeyboards(t *testing.T) {
 			},
 			expected: struct {
 				rows [][]string
-			}{rows: [][]string{{"Добавить в список"}, {"Назад", "Сохранить"}}},
+			}{rows: [][]string{{"Назад", "Сохранить"}}},
 		},
 		{
 			name: "holiday details keyboard exposes edit delete and back",
@@ -568,7 +617,46 @@ func TestMenuAndActionKeyboards(t *testing.T) {
 			},
 			expected: struct {
 				rows [][]string
-			}{rows: [][]string{{"Язык: русский"}, {"Часовой пояс"}, {"Настойчивые напоминания"}, {"Сохранить"}}},
+			}{rows: [][]string{
+				{"Язык: русский"},
+				{"Часовой пояс"},
+				{"Настойчивые напоминания"},
+				{"Кто может мне напоминать"},
+				{"Запросы на напоминания"},
+				{"Сохранить"},
+			}},
+		},
+		{
+			name: "incoming reminder request keyboard exposes decision buttons",
+			action: func() [][]string {
+				return keyboardTexts(telegramui.IncomingReminderRequestKeyboard(10).InlineKeyboard)
+			},
+			expected: struct {
+				rows [][]string
+			}{rows: [][]string{{"Разрешить", "Запретить"}, {"Разрешать всегда"}}},
+		},
+		{
+			name: "reminder access keyboard exposes users add pagination and back",
+			action: func() [][]string {
+				return keyboardTexts(telegramui.ReminderAccessKeyboard([]database.ReminderPermissionView{{
+					Username: "alice",
+				}}).Keyboard)
+			},
+			expected: struct {
+				rows [][]string
+			}{rows: [][]string{{"@alice"}, {"<-", "->"}, {"Введите получателя"}, {"Назад"}}},
+		},
+		{
+			name: "reminder access details keyboard exposes delete and back",
+			action: func() [][]string {
+				return keyboardTexts(telegramui.ReminderAccessDetailsKeyboard(database.ReminderPermissionView{
+					TelegramChatID: 300,
+					Username:       "alice",
+				}).InlineKeyboard)
+			},
+			expected: struct {
+				rows [][]string
+			}{rows: [][]string{{"Удалить"}, {"Назад"}}},
 		},
 		{
 			name: "draft keyboard asks for title while waiting title input",
@@ -700,7 +788,8 @@ func TestSettingsHistoryAndStatusTexts(t *testing.T) {
 				text string
 			}{
 				text: "<b>Настройки</b>\n\nЯзык: русский\nЧасовой пояс: Europe/Moscow\n" +
-					"Настойчивые напоминания: включены\nИнтервал: каждые 45 минут",
+					"Настойчивые напоминания: включены\nИнтервал: каждые 45 минут\n" +
+					"Запросы на напоминания: Выключено",
 			},
 		},
 		{
