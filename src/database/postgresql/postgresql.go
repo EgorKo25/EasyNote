@@ -12,8 +12,8 @@ import (
 
 	_ "github.com/EgorKo25/EasyNote/migrations"
 	"github.com/EgorKo25/EasyNote/src/config"
-	"github.com/EgorKo25/EasyNote/src/logger"
 	"github.com/EgorKo25/EasyNote/src/planner"
+	logger "github.com/EgorKo25/kovio-common/klogger"
 )
 
 func NewDatabase(ctx context.Context, cfg config.Database) (*Database, error) {

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/EgorKo25/EasyNote/src/database"
-	"github.com/EgorKo25/EasyNote/src/logger"
+	logger "github.com/EgorKo25/kovio-common/klogger"
 )
 
 func (r *Runner) sendDueReminders(ctx context.Context) error {
