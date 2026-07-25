@@ -4,14 +4,9 @@
 package config
 
 import (
-	"fmt"
-	"os"
 	"time"
 
-	"github.com/caarlos0/env/v11"
-	"github.com/creasty/defaults"
-	"github.com/go-playground/validator/v10"
-	"gopkg.in/yaml.v3"
+	"github.com/EgorKo25/kovio-common/kconfig"
 )
 
 const (
@@ -19,48 +14,14 @@ const (
 )
 
 func New() (*Config, error) {
-	var cfg Config
-
-	if err := defaults.Set(&cfg); err != nil {
-		return nil, fmt.Errorf("setting Default Configuration Values: %w", err)
-	}
-
-	data, err := os.ReadFile(localConfigPath)
-	if err != nil {
-		return nil, fmt.Errorf("read configuration file %q: %w", localConfigPath, err)
-	}
-
-	if err = yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("parsing the configuration file %q: %w", localConfigPath, err)
-	}
-
-	if err = env.Parse(&cfg); err != nil {
-		return nil, fmt.Errorf("parsing environment configuration: %w", err)
-	}
-
-	if err = validate(cfg); err != nil {
-		return nil, err
-	}
-
-	return &cfg, nil
-}
-
-func validate(cfg Config) error {
-	v := validator.New(validator.WithRequiredStructEnabled())
-
-	if err := v.Struct(cfg); err != nil {
-		return fmt.Errorf("configuration validation: %w", err)
-	}
-
-	return nil
+	return kconfig.Load[Config](localConfigPath)
 }
 
 type Config struct {
-	AppConfig `validate:"required" yaml:"app"`
-	Logger    `validate:"required" yaml:"logger"`
-	Scheduler `validate:"required" yaml:"scheduler"`
-	Telegram  `validate:"required" yaml:"telegram"`
-	Database  `validate:"required" yaml:"database"`
+	kconfig.Config `yaml:",inline"`
+	Scheduler      `yaml:"scheduler" validate:"required"`
+	Telegram       `yaml:"telegram"  validate:"required"`
+	Database       `yaml:"database"  validate:"required"`
 }
 
 type Scheduler struct {
@@ -70,24 +31,6 @@ type Scheduler struct {
 	BatchLimit           int           `default:"50"       validate:"required,min=1"                      yaml:"batch_limit"`
 	SendRetryCount       int           `default:"3"        validate:"required,min=1"                      yaml:"send_retry_count"`
 	SendRetryBackoff     string        `default:"constant" validate:"required,oneof=constant exponential" yaml:"send_retry_backoff"`
-}
-
-type AppConfig struct {
-	Name        string `default:"easy-note" validate:"required"                                       yaml:"name"`
-	Environment string `default:"local"     validate:"required,oneof=local dev test stage production" yaml:"environment" env:"APP_ENVIRONMENT"`
-}
-
-type Logger struct {
-	Cores []LoggerCore `validate:"required,min=1,dive" yaml:"cores"`
-}
-
-type LoggerCore struct {
-	Name       string `validate:"required"                                                yaml:"name"`
-	Level      string `validate:"required,oneof=debug info warn error dpanic panic fatal" yaml:"level"       default:"info"`
-	Encoding   string `validate:"required,oneof=json console"                             yaml:"encoding"    default:"json"`
-	Output     string `validate:"required,oneof=stdout stderr file"                       yaml:"output"      default:"stdout"`
-	Path       string `validate:"required_if=Output file"                                 yaml:"path"`
-	TimeFormat string `validate:"required,oneof=utc local"                                yaml:"time_format" default:"utc"`
 }
 
 type Telegram struct {

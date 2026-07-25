@@ -3,14 +3,14 @@ package main
 import (
 	"context"
 
-	"github.com/EgorKo25/EasyNote/src/background"
 	"github.com/EgorKo25/EasyNote/src/config"
 	"github.com/EgorKo25/EasyNote/src/database/postgresql"
-	"github.com/EgorKo25/EasyNote/src/logger"
 	"github.com/EgorKo25/EasyNote/src/planner"
 	"github.com/EgorKo25/EasyNote/src/scheduler"
 	"github.com/EgorKo25/EasyNote/src/service"
 	"github.com/EgorKo25/EasyNote/src/telegram"
+	"github.com/EgorKo25/kovio-common/background"
+	"github.com/EgorKo25/kovio-common/klogger"
 )
 
 func main() {
@@ -19,15 +19,21 @@ func main() {
 		panic(err)
 	}
 
-	if err = logger.Initialize(cfg.AppConfig, cfg.Logger); err != nil {
+	if err = klogger.Initialize(
+		klogger.AppConfig{
+			Name:        cfg.App.Name,
+			Environment: cfg.App.Environment,
+		},
+		cfg.Logger,
+	); err != nil {
 		panic(err)
 	}
 
-	log := logger.Get("main")
+	log := klogger.Get("main")
 
 	defer func() { _ = log.Sync() }()
 
-	log.With(logger.Any("config", cfg)).Info("the application configuration is initialized")
+	log.With(klogger.Any("config", cfg)).Info("the application configuration is initialized")
 
 	ctx := context.Background()
 
