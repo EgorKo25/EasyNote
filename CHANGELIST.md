@@ -1,4 +1,35 @@
-version: 1.5.0
+version: 1.6.0
+
+## v1.6.0 - Kovio common infrastructure
+
+### What was done
+
+EasyNote now uses the stable `github.com/EgorKo25/kovio-common v1.0.0` module for shared application infrastructure.
+
+The product configuration embeds `kconfig.Config` for the common application and logger sections while keeping scheduler, Telegram, and database settings inside EasyNote.
+
+The local logger and background runner implementations were removed. EasyNote now uses `klogger` for structured logging and `background` for coordinated long-lived processes.
+
+### API changes
+
+- added the `github.com/EgorKo25/kovio-common v1.0.0` dependency;
+- replaced the local configuration loader with `kconfig.Load`;
+- replaced local logger and background packages with `klogger` and `background`;
+- kept scheduler, planner, Telegram UI, and database models owned by EasyNote.
+
+### Affected files
+
+- `CHANGELIST.md`
+- `go.mod`
+- `go.sum`
+- `main.go`
+- `src/config/config.go`
+- `src/database/postgresql/postgresql.go`
+- `src/scheduler/ready_reminders.go`
+- `src/telegram/reminder_bot.go`
+- `src/telegram/sender.go`
+- `src/background`
+- `src/logger`
 
 ## v1.5.0 - Shared reminders and shopping list editor
 
