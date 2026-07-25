@@ -3,7 +3,7 @@ module github.com/EgorKo25/EasyNote
 go 1.25.7
 
 require (
-	github.com/EgorKo25/kovio-common v0.0.0-20260725134723-6e52a07e6d85
+	github.com/EgorKo25/kovio-common v1.0.0
 	github.com/benbjohnson/clock v1.3.5
 	github.com/cenkalti/backoff/v5 v5.0.3
 	github.com/jackc/pgx/v5 v5.9.2
