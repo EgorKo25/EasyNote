@@ -23,7 +23,7 @@ Docker Compose now runs backend, Telegram UI, PostgreSQL, and Swagger UI as sepa
 Added HTTP API endpoints for:
 
 - health checks and timezone list;
-- active reminder list, reminder history, create/get/update/delete reminder;
+- active reminder list, RFC 10008 `QUERY` selection by statuses, create/get/update/delete reminder;
 - delivered reminder complete/cancel actions;
 - holiday list/create/get/update/delete;
 - shopping list list/create/get and shopping item toggle;

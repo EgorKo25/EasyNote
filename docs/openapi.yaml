@@ -1,4 +1,4 @@
-openapi: 3.0.3
+openapi: 3.2.0
 info:
   title: EasyNote API
   description: API EasyNote - сервиса уведомлений
@@ -7,6 +7,8 @@ info:
 servers:
   - url: http://localhost:8080
     description: Local backend
+
+security: []
 
 paths:
   /api/v1/health:
@@ -36,10 +38,67 @@ paths:
       responses:
         '200':
           description: Список напоминаний успешно получен
+          headers:
+            Accept-Query:
+              description: Поддерживаемый формат тела QUERY-запроса
+              schema:
+                type: string
+                const: application/json
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReminderListResponse'
+
+    query:
+      summary: выборка напоминаний по статусам
+      description: Выполняет безопасную и идемпотентную выборку напоминаний с фильтром в теле запроса
+      operationId: queryReminders
+      tags: [Reminders]
+      parameters:
+        - $ref: '#/components/parameters/TelegramChatID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueryRemindersRequest'
+      responses:
+        '200':
+          description: Напоминания успешно выбраны
+          headers:
+            Accept-Query:
+              description: Поддерживаемый формат тела QUERY-запроса
+              schema:
+                type: string
+                const: application/json
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReminderListResponse'
+        '400':
+          description: Отсутствует Content-Type, тело запроса некорректно или параметры выборки невалидны
+          headers:
+            Accept-Query:
+              description: Поддерживаемый формат тела QUERY-запроса
+              schema:
+                type: string
+                const: application/json
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '415':
+          description: Формат тела QUERY-запроса не поддерживается
+          headers:
+            Accept-Query:
+              description: Поддерживаемый формат тела QUERY-запроса
+              schema:
+                type: string
+                const: application/json
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
     post:
       summary: создание напоминания
@@ -61,24 +120,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReminderResponse'
-
-  /api/v1/reminders/history:
-    get:
-      summary: получение истории напоминаний
-      description: Возвращает завершённые, отменённые, пропущенные и failed-напоминания Telegram-чата
-      operationId: getReminderHistory
-      tags: [Reminders]
-      parameters:
-        - $ref: '#/components/parameters/TelegramChatID'
-        - $ref: '#/components/parameters/Limit'
-        - $ref: '#/components/parameters/Offset'
-      responses:
-        '200':
-          description: История напоминаний успешно получена
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ReminderListResponse'
 
   /api/v1/reminders/{id}:
     get:
@@ -456,6 +497,44 @@ components:
         status:
           type: string
 
+    QueryRemindersRequest:
+      type: object
+      required:
+        - statuses
+      properties:
+        statuses:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            enum: [new, sent, failed, canceled, completed, skipped]
+        limit:
+          type: integer
+          default: 10
+          minimum: 1
+          maximum: 100
+        offset:
+          type: integer
+          default: 0
+          minimum: 0
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: integer
+            message:
+              type: string
+
     CreateReminderRequest:
       type: object
       required:
@@ -558,9 +637,8 @@ components:
           type: integer
           format: int64
         rule_id:
-          type: integer
+          type: [integer, "null"]
           format: int64
-          nullable: true
         title:
           type: string
         description:

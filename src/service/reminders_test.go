@@ -757,6 +757,13 @@ func TestReminderServiceProvidesReadAndSettingsOperations(t *testing.T) {
 
 	chatID := int64(100)
 	reminderID := int64(55)
+	historyStatuses := []database.ReminderStatus{
+		database.ReminderStatusSent,
+		database.ReminderStatusFailed,
+		database.ReminderStatusCanceled,
+		database.ReminderStatusCompleted,
+		database.ReminderStatusSkipped,
+	}
 	settings := database.UserSettings{
 		TelegramChatID:    chatID,
 		Language:          "ru",
@@ -780,7 +787,7 @@ func TestReminderServiceProvidesReadAndSettingsOperations(t *testing.T) {
 			name: "find reminder history returns repository page",
 			before: func(repository *mocks.MockReminderCommandRepository) {
 				repository.EXPECT().
-					FindReminderHistoryByChat(gomock.Any(), chatID, 2, 4).
+					FindRemindersByChat(gomock.Any(), chatID, historyStatuses, 2, 4).
 					Return([]database.ReminderView{{ID: 1}, {ID: 2}}, nil).
 					Times(1)
 			},
@@ -925,7 +932,7 @@ func TestReminderServiceProvidesReadAndSettingsOperations(t *testing.T) {
 			name: "find reminder history repository error is wrapped",
 			before: func(repository *mocks.MockReminderCommandRepository) {
 				repository.EXPECT().
-					FindReminderHistoryByChat(gomock.Any(), chatID, 2, 4).
+					FindRemindersByChat(gomock.Any(), chatID, historyStatuses, 2, 4).
 					Return(nil, errRepository).
 					Times(1)
 			},

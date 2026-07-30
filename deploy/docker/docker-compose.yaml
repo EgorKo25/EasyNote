@@ -44,7 +44,7 @@ services:
       - easy_note_logs:/app/logs
 
   swagger-ui:
-    image: swaggerapi/swagger-ui:latest
+    image: swaggerapi/swagger-ui:v5.32.6
     container_name: easy-note-swagger-ui
     restart: unless-stopped
     environment:

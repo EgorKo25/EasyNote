@@ -1,4 +1,3 @@
-//nolint:dupl // Command files intentionally repeat lifecycle boilerplate to keep endpoints explicit.
 package commands
 
 import (
@@ -49,6 +48,8 @@ func (c *GetRemindersCommand) Parse(ctx *gin.Context) error {
 }
 
 func (c *GetRemindersCommand) Apply(ctx *gin.Context) (any, error) {
+	ctx.Header("Accept-Query", "application/json")
+
 	reminders, err := c.service.FindRemindersByChat(
 		ctx.Request.Context(),
 		c.req.TelegramChatID,

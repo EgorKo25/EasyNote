@@ -70,7 +70,7 @@ services:
       - easy_note_local_logs:/app/logs
 
   swagger-ui:
-    image: swaggerapi/swagger-ui:latest
+    image: swaggerapi/swagger-ui:v5.32.6
     container_name: easy-note-local-swagger-ui
     restart: unless-stopped
     environment:

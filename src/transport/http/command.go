@@ -2,6 +2,8 @@ package apphttp
 
 import "github.com/gin-gonic/gin"
 
+const MethodQuery = "QUERY"
+
 type Command interface {
 	Method() string
 	Path() string

@@ -17,6 +17,9 @@ func mapErrorResponse(err error) ErrorResponse {
 		errors.Is(err, apphttp.ErrInvalidItemID),
 		errors.Is(err, apphttp.ErrInvalidOffset),
 		errors.Is(err, apphttp.ErrInvalidLimit),
+		errors.Is(err, apphttp.ErrReminderStatusesEmpty),
+		errors.Is(err, apphttp.ErrReminderStatusInvalid),
+		errors.Is(err, apphttp.ErrQueryContentTypeMissing),
 		errors.Is(err, apphttp.ErrReminderRepeatIntervalDaysEmpty),
 		errors.Is(err, apphttp.ErrReminderRepeatIntervalDaysInvalid),
 		errors.Is(err, apphttp.ErrReminderRepeatWeekdaysMaskEmpty),
@@ -36,14 +39,10 @@ func mapErrorResponse(err error) ErrorResponse {
 		errors.Is(err, apphttp.ErrIntrusiveIntervalInvalid):
 		return newErrorResponse(http.StatusBadRequest, err.Error())
 
-	case errors.Is(err, service.ErrReminderTitleEmpty):
-		return newErrorResponse(http.StatusBadRequest, service.ErrReminderTitleEmpty.Error())
-
-	case errors.Is(err, service.ErrWeekdaysMaskEmpty):
-		return newErrorResponse(http.StatusBadRequest, service.ErrWeekdaysMaskEmpty.Error())
-
-	case errors.Is(err, service.ErrReminderStatusUnsupported):
-		return newErrorResponse(http.StatusBadRequest, service.ErrReminderStatusUnsupported.Error())
+	case errors.Is(err, service.ErrReminderTitleEmpty),
+		errors.Is(err, service.ErrWeekdaysMaskEmpty),
+		errors.Is(err, service.ErrReminderStatusUnsupported):
+		return newErrorResponse(http.StatusBadRequest, err.Error())
 
 	case errors.Is(err, service.ErrReminderNotFound):
 		return newErrorResponse(http.StatusNotFound, service.ErrReminderNotFound.Error())
@@ -56,6 +55,9 @@ func mapErrorResponse(err error) ErrorResponse {
 
 	case errors.Is(err, service.ErrAccessDenied):
 		return newErrorResponse(http.StatusForbidden, service.ErrAccessDenied.Error())
+
+	case errors.Is(err, apphttp.ErrQueryContentTypeUnsupported):
+		return newErrorResponse(http.StatusUnsupportedMediaType, apphttp.ErrQueryContentTypeUnsupported.Error())
 
 	default:
 		return newErrorResponse(http.StatusInternalServerError, "internal server error")

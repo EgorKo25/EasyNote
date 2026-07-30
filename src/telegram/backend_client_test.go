@@ -3,6 +3,7 @@ package telegram
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +14,59 @@ import (
 	apphttp "github.com/EgorKo25/EasyNote/src/transport/http"
 	"github.com/stretchr/testify/require"
 )
+
+func TestBackendClientUsesQueryForReminderHistory(t *testing.T) {
+	t.Parallel()
+
+	type observedRequest struct {
+		method      string
+		contentType string
+		body        backendReminderQuery
+		decodeErr   error
+	}
+
+	requestCh := make(chan observedRequest, 1)
+
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		var requestBody backendReminderQuery
+
+		decodeErr := json.NewDecoder(request.Body).Decode(&requestBody)
+
+		requestCh <- observedRequest{
+			method:      request.Method,
+			contentType: request.Header.Get("Content-Type"),
+			body:        requestBody,
+			decodeErr:   decodeErr,
+		}
+
+		response.Header().Set("Content-Type", "application/json")
+		_, _ = response.Write([]byte(`{"reminders":[]}`))
+	}))
+	t.Cleanup(server.Close)
+
+	client, err := NewBackendClient(server.URL, time.Second)
+	require.NoError(t, err)
+
+	reminders, err := client.FindReminderHistoryByChat(context.Background(), 123456, 3, 6)
+	require.NoError(t, err)
+	require.Empty(t, reminders)
+
+	request := <-requestCh
+	require.NoError(t, request.decodeErr)
+	require.Equal(t, apphttp.MethodQuery, request.method)
+	require.Equal(t, "application/json", request.contentType)
+	require.Equal(t, backendReminderQuery{
+		Statuses: []telegrammodel.ReminderStatus{
+			telegrammodel.ReminderStatusSent,
+			telegrammodel.ReminderStatusFailed,
+			telegrammodel.ReminderStatusCanceled,
+			telegrammodel.ReminderStatusCompleted,
+			telegrammodel.ReminderStatusSkipped,
+		},
+		Limit:  3,
+		Offset: 6,
+	}, request.body)
+}
 
 func TestBackendClientSendsTelegramChatRequests(t *testing.T) {
 	t.Parallel()
@@ -156,7 +210,7 @@ func TestBackendClientSendsTelegramChatRequests(t *testing.T) {
 				expectedErrText string
 			}{
 				result:         "1|Archive|canceled",
-				requestPath:    "/api/v1/reminders/history?limit=3&offset=6",
+				requestPath:    "/api/v1/reminders",
 				telegramHeader: "123456",
 			},
 		},

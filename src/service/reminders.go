@@ -45,12 +45,7 @@ type ReminderCommandRepository interface {
 	FindRemindersByChat(
 		ctx context.Context,
 		telegramChatID int64,
-		limit int,
-		offset int,
-	) ([]database.ReminderView, error)
-	FindReminderHistoryByChat(
-		ctx context.Context,
-		telegramChatID int64,
+		statuses []database.ReminderStatus,
 		limit int,
 		offset int,
 	) ([]database.ReminderView, error)
@@ -315,7 +310,13 @@ func (s *ReminderService) FindRemindersByChat(
 	limit int,
 	offset int,
 ) ([]domain.ReminderView, error) {
-	reminders, err := s.repository.FindRemindersByChat(ctx, telegramChatID, limit, offset)
+	reminders, err := s.repository.FindRemindersByChat(
+		ctx,
+		telegramChatID,
+		[]database.ReminderStatus{database.ReminderStatusNew},
+		limit,
+		offset,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("find reminders: %w", err)
 	}
@@ -329,9 +330,37 @@ func (s *ReminderService) FindReminderHistoryByChat(
 	limit int,
 	offset int,
 ) ([]domain.ReminderView, error) {
-	reminders, err := s.repository.FindReminderHistoryByChat(ctx, telegramChatID, limit, offset)
+	statuses := []database.ReminderStatus{
+		database.ReminderStatusSent,
+		database.ReminderStatusFailed,
+		database.ReminderStatusCanceled,
+		database.ReminderStatusCompleted,
+		database.ReminderStatusSkipped,
+	}
+
+	reminders, err := s.repository.FindRemindersByChat(ctx, telegramChatID, statuses, limit, offset)
 	if err != nil {
 		return nil, fmt.Errorf("find reminder history: %w", err)
+	}
+
+	return mapReminderViewsToDomain(reminders), nil
+}
+
+func (s *ReminderService) FindRemindersByStatuses(
+	ctx context.Context,
+	telegramChatID int64,
+	statuses []domain.ReminderStatus,
+	limit int,
+	offset int,
+) ([]domain.ReminderView, error) {
+	databaseStatuses := make([]database.ReminderStatus, 0, len(statuses))
+	for _, status := range statuses {
+		databaseStatuses = append(databaseStatuses, database.ReminderStatus(status))
+	}
+
+	reminders, err := s.repository.FindRemindersByChat(ctx, telegramChatID, databaseStatuses, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("find reminders by statuses: %w", err)
 	}
 
 	return mapReminderViewsToDomain(reminders), nil

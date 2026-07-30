@@ -1,6 +1,10 @@
 package commands
 
-import "time"
+import (
+	"time"
+
+	"github.com/EgorKo25/EasyNote/src/domain"
+)
 
 type EmptyResponse struct{}
 
@@ -16,6 +20,19 @@ type PaginationRequest struct {
 	Offset         int
 	Limit          int
 	TelegramChatID int64
+}
+
+type QueryRemindersRequest struct {
+	Statuses []domain.ReminderStatus `json:"statuses"`
+	Limit    *int                    `json:"limit,omitempty"`
+	Offset   *int                    `json:"offset,omitempty"`
+}
+
+type ReminderQueryRequest struct {
+	TelegramChatID int64
+	Statuses       []domain.ReminderStatus
+	Limit          int
+	Offset         int
 }
 
 type ReminderRequest struct {

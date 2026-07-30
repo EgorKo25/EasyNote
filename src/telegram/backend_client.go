@@ -137,14 +137,37 @@ func (c *BackendClient) FindReminderHistoryByChat(
 	limit int,
 	offset int,
 ) ([]telegrammodel.ReminderView, error) {
+	statuses := []telegrammodel.ReminderStatus{
+		telegrammodel.ReminderStatusSent,
+		telegrammodel.ReminderStatusFailed,
+		telegrammodel.ReminderStatusCanceled,
+		telegrammodel.ReminderStatusCompleted,
+		telegrammodel.ReminderStatusSkipped,
+	}
+
+	return c.QueryReminders(ctx, telegramChatID, statuses, limit, offset)
+}
+
+func (c *BackendClient) QueryReminders(
+	ctx context.Context,
+	telegramChatID int64,
+	statuses []telegrammodel.ReminderStatus,
+	limit int,
+	offset int,
+) ([]telegrammodel.ReminderView, error) {
 	var response backendReminderListResponse
-	if err := c.get(
+	if err := c.query(
 		ctx,
 		telegramChatID,
-		pathWithPagination(apiV1Prefix+"/reminders/history", limit, offset),
+		apiV1Prefix+"/reminders",
+		backendReminderQuery{
+			Statuses: statuses,
+			Limit:    limit,
+			Offset:   offset,
+		},
 		&response,
 	); err != nil {
-		return nil, fmt.Errorf("load reminder history through backend: %w", err)
+		return nil, fmt.Errorf("query reminders through backend: %w", err)
 	}
 
 	return mapBackendReminders(response.Reminders), nil
@@ -541,6 +564,10 @@ func (c *BackendClient) post(ctx context.Context, telegramChatID int64, path str
 	return c.do(ctx, telegramChatID, http.MethodPost, path, body, response)
 }
 
+func (c *BackendClient) query(ctx context.Context, telegramChatID int64, path string, body any, response any) error {
+	return c.do(ctx, telegramChatID, apphttp.MethodQuery, path, body, response)
+}
+
 func (c *BackendClient) patch(ctx context.Context, telegramChatID int64, path string, body any, response any) error {
 	return c.do(ctx, telegramChatID, http.MethodPatch, path, body, response)
 }
@@ -704,6 +731,12 @@ type backendReminderRequest struct {
 	Description string                        `json:"description"`
 	RemindAt    time.Time                     `json:"remind_at"`
 	Repeat      *backendReminderRepeatRequest `json:"repeat,omitempty"`
+}
+
+type backendReminderQuery struct {
+	Statuses []telegrammodel.ReminderStatus `json:"statuses"`
+	Limit    int                            `json:"limit"`
+	Offset   int                            `json:"offset"`
 }
 
 type backendReminderRepeatRequest struct {

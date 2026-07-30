@@ -20,6 +20,7 @@ env:
   GO_VERSION_FILE: go.mod
   GOLANGCI_LINT_VERSION: v2.11
   APP_NAME: easynote
+  TELEGRAM_UI_NAME: easynote-telegram-ui
 
 jobs:
   build:
@@ -46,16 +47,19 @@ jobs:
           fi
           echo "version=${version}" >> "$GITHUB_OUTPUT"
 
-      - name: Build application
+      - name: Build applications
         run: |
           mkdir -p dist
           go build -trimpath -ldflags="-s -w" -o dist/${APP_NAME} ./cmd/backend
+          go build -trimpath -ldflags="-s -w" -o dist/${TELEGRAM_UI_NAME} ./cmd/telegram-ui
 
-      - name: Upload build artifact
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: build-${{ env.APP_NAME }}-${{ steps.version.outputs.version }}
-          path: dist/${{ env.APP_NAME }}
+          path: |
+            dist/${{ env.APP_NAME }}
+            dist/${{ env.TELEGRAM_UI_NAME }}
           if-no-files-found: error
           retention-days: 14
 
@@ -73,6 +77,12 @@ jobs:
           go-version-file: ${{ env.GO_VERSION_FILE }}
           cache: true
 
+      - name: Verify Go module files
+        run: go mod tidy -diff
+
+      - name: Validate GitHub Actions workflows
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
+
       - name: Run golangci-lint
         id: golangci-lint
         uses: golangci/golangci-lint-action@v9
@@ -81,7 +91,7 @@ jobs:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
 
       - name: Open PR discussion for lint failure
-        if: steps.golangci-lint.outcome == 'failure'
+        if: steps.golangci-lint.outcome == 'failure' && github.event_name == 'pull_request'
         uses: actions/github-script@v8
         with:
           script: |
@@ -116,15 +126,53 @@ jobs:
           go-version-file: ${{ env.GO_VERSION_FILE }}
           cache: true
 
-      - name: Run unit tests
-        run: go test ./...
+      - name: Run tests with race detector and coverage
+        run: go test -count=1 -race -covermode=atomic -coverprofile=coverage.out ./...
+
+      - name: Print coverage
+        run: go tool cover -func=coverage.out
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ github.sha }}
+          path: coverage.out
+          if-no-files-found: error
+          retention-days: 14
+
+  contracts:
+    name: contracts
+    runs-on: ubuntu-latest
+    needs: build
+    env:
+      TELEGRAM_BOT_TOKEN: ci-validation-token
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Validate OpenAPI
+        run: npx --yes @redocly/cli@2.32.2 lint docs/openapi.yaml --extends minimal
+
+      - name: Validate production Docker Compose
+        run: docker compose -f deploy/docker/docker-compose.yaml config --quiet
+
+      - name: Validate local Docker Compose
+        run: docker compose -f deploy/docker/docker-compose.local.yaml config --quiet
 
   dockerize:
     name: dockerize
     runs-on: ubuntu-latest
-    needs: tests
+    needs:
+      - tests
+      - contracts
     outputs:
-      image-name: ${{ steps.image.outputs.name }}
+      backend-image: ${{ steps.image.outputs.backend }}
+      telegram-ui-image: ${{ steps.image.outputs.telegram_ui }}
       beta-tag: ${{ steps.tags.outputs.beta }}
       pr_deploy_tag: ${{ steps.tags.outputs.pr_deploy }}
     steps:
@@ -134,8 +182,9 @@ jobs:
       - name: Resolve image name
         id: image
         run: |
-          image="ghcr.io/${GITHUB_REPOSITORY,,}"
-          echo "name=${image}" >> "$GITHUB_OUTPUT"
+          backend="ghcr.io/${GITHUB_REPOSITORY,,}"
+          echo "backend=${backend}" >> "$GITHUB_OUTPUT"
+          echo "telegram_ui=${backend}-telegram-ui" >> "$GITHUB_OUTPUT"
 
       - name: Read application version
         id: version
@@ -164,20 +213,33 @@ jobs:
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Extract Docker metadata
-        id: meta
+      - name: Extract backend Docker metadata
+        id: backend_meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ steps.image.outputs.name }}
+          images: ${{ steps.image.outputs.backend }}
           tags: |
-            type=raw,value=v${{ steps.version.outputs.version }}
-            type=raw,value=beta,enable=${{ github.event_name == 'workflow_dispatch' }}
+            type=raw,value=v${{ steps.version.outputs.version }},enable=${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && !inputs.deploy_from_pr }}
+            type=raw,value=beta,enable=${{ github.event_name == 'workflow_dispatch' && !inputs.deploy_from_pr }}
             type=raw,value=${{ steps.tags.outputs.pr_deploy }},enable=${{ github.event_name == 'workflow_dispatch' && inputs.deploy_from_pr }}
             type=raw,value=v${{ steps.version.outputs.version }}-pr-${{ github.event.pull_request.number }},enable=${{ github.event_name == 'pull_request' }}
             type=raw,value=pr-${{ github.event.pull_request.number }},enable=${{ github.event_name == 'pull_request' }}
             type=sha,prefix=${{ github.event_name == 'pull_request' && format('pr-{0}-', github.event.pull_request.number) || 'beta-' }}
 
-      - name: Build and push Docker image
+      - name: Extract Telegram UI Docker metadata
+        id: telegram_ui_meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.image.outputs.telegram_ui }}
+          tags: |
+            type=raw,value=v${{ steps.version.outputs.version }},enable=${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && !inputs.deploy_from_pr }}
+            type=raw,value=beta,enable=${{ github.event_name == 'workflow_dispatch' && !inputs.deploy_from_pr }}
+            type=raw,value=${{ steps.tags.outputs.pr_deploy }},enable=${{ github.event_name == 'workflow_dispatch' && inputs.deploy_from_pr }}
+            type=raw,value=v${{ steps.version.outputs.version }}-pr-${{ github.event.pull_request.number }},enable=${{ github.event_name == 'pull_request' }}
+            type=raw,value=pr-${{ github.event.pull_request.number }},enable=${{ github.event_name == 'pull_request' }}
+            type=sha,prefix=${{ github.event_name == 'pull_request' && format('pr-{0}-', github.event.pull_request.number) || 'beta-' }}
+
+      - name: Build and push backend Docker image
         uses: docker/build-push-action@v6
         env:
           DOCKER_BUILD_RECORD_UPLOAD: false
@@ -185,8 +247,21 @@ jobs:
           context: .
           file: deploy/docker/EasyNote.Dockerfile
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          build-args: APP_TARGET=./cmd/backend
+          tags: ${{ steps.backend_meta.outputs.tags }}
+          labels: ${{ steps.backend_meta.outputs.labels }}
+
+      - name: Build and push Telegram UI Docker image
+        uses: docker/build-push-action@v6
+        env:
+          DOCKER_BUILD_RECORD_UPLOAD: false
+        with:
+          context: .
+          file: deploy/docker/EasyNote.Dockerfile
+          push: true
+          build-args: APP_TARGET=./cmd/telegram-ui
+          tags: ${{ steps.telegram_ui_meta.outputs.tags }}
+          labels: ${{ steps.telegram_ui_meta.outputs.labels }}
 
   deploy-beta:
     name: deploy beta
@@ -196,7 +271,8 @@ jobs:
     environment: beta
     env:
       DEPLOY_PATH: ${{ vars.BETA_DEPLOY_PATH }}
-      APP_IMAGE: ${{ needs.dockerize.outputs.image-name }}:${{ inputs.deploy_from_pr && needs.dockerize.outputs.pr_deploy_tag || needs.dockerize.outputs.beta-tag }}
+      APP_IMAGE: ${{ needs.dockerize.outputs.backend-image }}:${{ inputs.deploy_from_pr && needs.dockerize.outputs.pr_deploy_tag || needs.dockerize.outputs.beta-tag }}
+      TELEGRAM_UI_IMAGE: ${{ needs.dockerize.outputs.telegram-ui-image }}:${{ inputs.deploy_from_pr && needs.dockerize.outputs.pr_deploy_tag || needs.dockerize.outputs.beta-tag }}
       GHCR_USERNAME: ${{ github.actor }}
       GHCR_TOKEN: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -247,18 +323,20 @@ jobs:
           target: ${{ vars.BETA_DEPLOY_PATH }}
           strip_components: 2
 
-      - name: Pull image and restart application
+      - name: Pull images and restart applications
         uses: appleboy/ssh-action@v1.2.2
         with:
           host: ${{ secrets.BETA_SSH_HOST }}
           username: ${{ secrets.BETA_SSH_USERNAME }}
           key: ${{ secrets.BETA_SSH_KEY }}
           port: ${{ secrets.BETA_SSH_PORT || 22 }}
-          envs: DEPLOY_PATH,APP_IMAGE,GHCR_USERNAME,GHCR_TOKEN,TELEGRAM_BOT_TOKEN,TZ,POSTGRES_DB,POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_HOST_PORT,PROXY,NO_PROXY
+          envs: DEPLOY_PATH,APP_IMAGE,TELEGRAM_UI_IMAGE,GHCR_USERNAME,GHCR_TOKEN,TELEGRAM_BOT_TOKEN,TZ,POSTGRES_DB,POSTGRES_USER,POSTGRES_PASSWORD,POSTGRES_HOST_PORT,PROXY,NO_PROXY
           script: |
             set -e
             cd "${DEPLOY_PATH}"
             {
+              printf 'APP_IMAGE=%s\n' "${APP_IMAGE}"
+              printf 'TELEGRAM_UI_IMAGE=%s\n' "${TELEGRAM_UI_IMAGE}"
               printf 'TELEGRAM_BOT_TOKEN=%s\n' "${TELEGRAM_BOT_TOKEN}"
               printf 'TZ=%s\n' "${TZ:-Europe/Moscow}"
               
@@ -266,17 +344,17 @@ jobs:
               printf 'HTTPS_PROXY=%s\n' "${PROXY}"
               printf 'http_proxy=%s\n' "${PROXY}"
               printf 'https_proxy=%s\n' "${PROXY}"
-              printf 'NO_PROXY=%s\n' "${NO_PROXY:-localhost,127.0.0.1,postgres,db}"
-              printf 'no_proxy=%s\n' "${NO_PROXY:-localhost,127.0.0.1,postgres,db}"
+              printf 'NO_PROXY=%s\n' "${NO_PROXY:-app,localhost,127.0.0.1,postgres,db}"
+              printf 'no_proxy=%s\n' "${NO_PROXY:-app,localhost,127.0.0.1,postgres,db}"
               
               printf 'POSTGRES_DB=%s\n' "${POSTGRES_DB}"
               printf 'POSTGRES_USER=%s\n' "${POSTGRES_USER}"
               printf 'POSTGRES_PASSWORD=%s\n' "${POSTGRES_PASSWORD}"
               printf 'POSTGRES_HOST_PORT=%s\n' "${POSTGRES_HOST_PORT:-5432}"
-            } > .env.production
+            } > .env
             
-            chmod 600 .env.production
+            chmod 600 .env
             
             echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USERNAME}" --password-stdin
-            APP_IMAGE="${APP_IMAGE}" docker compose pull app
-            APP_IMAGE="${APP_IMAGE}" docker compose --env-file .env.production up -d --no-deps app
+            docker compose pull app telegram-ui
+            docker compose up -d --no-deps app telegram-ui
